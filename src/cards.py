@@ -1,6 +1,9 @@
 """Bilgi kartları: havuzdaki DOĞRULANMIŞ sorulardan deste + aralıklı tekrar (Leitner kutuları).
 
-LLM çağrısı yok: soru → ön yüz; cevap, kanıt alıntısı ve (varsa) çözüm → arka yüz. Kartın sonucu öğrencinin kendi
+LLM çağrısı yok: soru → ön yüz; cevap, kanıt alıntısı ve (varsa) çözüm → arka yüz. NotebookLM'deki gibi şık yok:
+yalnızca şıksız da anlaşılan sorular kart olur (card_ok) — kısa cevap ve kökü kendi başına soru olan çoktan seçmeli
+(cevabı doğru şıkkın metni). Doğru/yanlış ifadeleri ve "aşağıdakilerden hangisi", olumsuz kök gibi şıklara dayanan
+sorular sınavda kalır. Kartın sonucu öğrencinin kendi
 değerlendirmesidir (Bildim / Bilemedim / Atla); sınavın madde istatistiğine (attempts.jsonl) karışmaz, ayrı kaydedilir:
 data/review/cards.jsonl (soru kimliğine bağlı, yalnızca eklenir — kutular kayıt baştan oynatılarak bulunur).
 
@@ -12,6 +15,7 @@ from __future__ import annotations
 
 import json
 import random
+import re
 import time
 from pathlib import Path
 
@@ -20,6 +24,17 @@ from src import config
 LOG = config.DATA_DIR / "review" / "cards.jsonl"
 INTERVAL_DAYS = {1: 0, 2: 1, 3: 3, 4: 7, 5: 14}
 RESULTS = ("good", "bad", "skip")
+# Kökü şıklara dayanan soru: "Aşağıdakilerden hangisi…", olumsuz kök, şık/seçenek anılıyor ("yaklaşık" değil: \b)
+_OPTION_BOUND = re.compile(r"aşağıdaki|\bseçenek|\bşıklar|\bşık\b|değildir|yanlıştır|which of|the following", re.I)
+
+
+def card_ok(q: dict) -> bool:
+    """Soru şıksız bir karta dönüşebilir mi?"""
+    if q.get("type") == "short_answer":
+        return True
+    if q.get("type") == "multiple_choice":
+        return not _OPTION_BOUND.search(str(q.get("question", "")))
+    return False  # doğru / yanlış: ifadenin kendisi bir seçim
 
 
 def step(state: dict | None, result: str, t: float) -> dict:
@@ -78,10 +93,11 @@ def pick(items: list[dict], hist: dict[str, dict], n: int, now: float, only_due:
 
 
 def pool(docs: list[str]) -> list[dict]:
-    """Seçili belgelerdeki kullanılabilir sorular (sınavla aynı kural: doğrulanmış, reddedilmemiş, bildirilmemiş)."""
+    """Seçili belgelerdeki kart olabilen sorular (sınavla aynı kural: doğrulanmış, reddedilmemiş, bildirilmemiş)."""
     from src import request as R
     blocked = R.blocked_ids()
-    return [it for it in R.all_items().values() if R.usable(it) and it["id"] not in blocked and it["doc"] in docs]
+    return [it for it in R.all_items().values()
+            if R.usable(it) and it["id"] not in blocked and it["doc"] in docs and card_ok(it["q"])]
 
 
 def summary(items: list[dict], hist: dict[str, dict], now: float) -> dict:

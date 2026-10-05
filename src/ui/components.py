@@ -94,42 +94,82 @@ def question_card(item: dict, number: int, reveal: bool = True, chosen=None, ver
             f'<div class="nr-q">{t(q.get("question", "(şema dışı)"))}</div>{body}{tail}</div>')
 
 
-# Bitiş istatistikleri: durum → renk (renk hep etiketle birlikte gösterilir; açık gri "boş" için nötr)
-STAT_COLORS = {"Doğru": "#10B981", "Bildim": "#10B981", "Yanlış": "#F43F5E", "Bilemedim": "#F43F5E",
-               "Boş": "#CBD5E1", "Atladım": "#F59E0B"}
+# Bitiş özeti (kart oturumu ve sınav sonucu). Grafik ilkeleri (dataviz yönergesi): hikâye "nerede zorlandım?" →
+# grup başına tek oran (isabet) ölçer çubuğuyla, tek seri → tek renk ve lejant yok; her değer yazılı (renk tek başına
+# anlam taşımaz); büyük sayılar düz yazı tipiyle. Durum renkleri yalnızca etiketli kutucuklarda (doğru / yanlış / boş).
+STATUS_DOT = {"Doğru": "#3B8D66", "Bildim": "#3B8D66", "Yanlış": "#C6503A", "Bilemedim": "#C6503A",
+              "Boş": "#B9AF98", "Atladım": "#B9AF98"}
 DIFF_ORDER = ["Kolay", "Orta", "Zor"]
 
 
-def breakdown(title: str, rows: list[tuple[str, list[int]]], labels: tuple[str, ...], wide: bool = False,
-              note: str = "") -> str:
-    """Kırılım kartı: her satır bir grup (ör. 'Kolay'); çubuk durumlara göre yığılı, sağda 'ilk durum / toplam'."""
-    body = "" if rows else '<div class="none">Bu gruplamada veri yok.</div>'
-    for i, (name, counts) in enumerate(rows):
-        total = max(1, sum(counts))
-        detail = " · ".join(f"{lab}: {c}" for lab, c in zip(labels, counts))
-        segs = "".join(f'<i style="width:{100 * c / total:.1f}%;background:{STAT_COLORS[lab]};'
-                       f'animation-delay:{.15 + i * .06:.2f}s"></i>' for lab, c in zip(labels, counts) if c)
-        body += (f'<div class="r" title="{style.esc(detail)}"><div class="nm">{style.esc(name)}</div>'
-                 f'<div class="bar">{segs}</div><div class="ct"><b>{counts[0]}</b> / {sum(counts)}</div></div>')
-    legend = "".join(f'<span><i style="background:{STAT_COLORS[lab]}"></i>{lab}</span>' for lab in labels)
-    return (f'<div class="nr-bd{" wide" if wide else ""}"><div class="h">{style.esc(title)}<small>{style.esc(note)}</small>'
-            f'</div>{body}<div class="nr-lg">{legend}</div></div>')
+def _rate(counts: list[int], skip_neutral: bool) -> tuple[int, int]:
+    """(bilinen, payda). Kartta atlananlar paydaya girmez (değerlendirilmedi); sınavda boş yanlış sayılır."""
+    return counts[0], counts[0] + counts[1] + (0 if skip_neutral else counts[2])
 
 
-def breakdowns(records: list[dict], labels: tuple[str, ...]) -> str:
-    """records: [{"diff", "type", "topic", "status"}] → zorluk ve soru tipi yan yana, konu altta geniş."""
-    def group(key: str, order: list[str] | None = None, limit: int | None = None) -> list[tuple[str, list[int]]]:
-        agg: dict[str, list[int]] = {}
-        for r in records:
-            agg.setdefault(r[key] or "Belirsiz", [0] * len(labels))[labels.index(r["status"])] += 1
-        keys = [k for k in (order or []) if k in agg] + sorted((k for k in agg if k not in (order or [])),
-                                                               key=lambda k: -sum(agg[k]))
-        return [(k, agg[k]) for k in keys[:limit]]
-    topics = group("topic", limit=8)
-    note = f"en çok soru olan {len(topics)} konu" if len({r['topic'] for r in records}) > len(topics) else ""
-    return ('<div class="nr-bdgrid">' + breakdown("Zorluğa göre", group("diff", DIFF_ORDER), labels)
-            + breakdown("Soru tipine göre", group("type"), labels)
-            + breakdown("Konuya göre", topics, labels, wide=True, note=note) + "</div>")
+def _group(records: list[dict], key: str, labels: tuple[str, ...]) -> dict[str, list[int]]:
+    agg: dict[str, list[int]] = {}
+    for r in records:
+        agg.setdefault(r[key] or "Belirsiz", [0] * len(labels))[labels.index(r["status"])] += 1
+    return agg
+
+
+def _detail(name: str, counts: list[int], labels: tuple[str, ...]) -> str:
+    return style.esc(f"{name} — " + " · ".join(f"{lab}: {c}" for lab, c in zip(labels, counts)))
+
+
+def _meter(name: str, counts: list[int] | None, labels: tuple[str, ...], skip_neutral: bool) -> str:
+    if not counts or not sum(counts):
+        return (f'<div class="nr-m none"><div class="t"><span class="nm">{style.esc(name)}</span><span class="v">–</span>'
+                f'</div><div class="nr-track"></div><div class="c">bu turda yok</div></div>')
+    good, total = _rate(counts, skip_neutral)
+    pct = round(100 * good / total) if total else None
+    extra = f" · {counts[2]} {labels[2].lower()}" if skip_neutral and counts[2] else ""
+    return (f'<div class="nr-m" title="{_detail(name, counts, labels)}"><div class="t"><span class="nm">{style.esc(name)}</span>'
+            f'<span class="v">{"–" if pct is None else f"%{pct}"}</span></div>'
+            f'<div class="nr-track"><i style="width:{pct or 0}%"></i></div><div class="c">{good} / {total}{extra}</div></div>')
+
+
+def _topic_row(name: str, counts: list[int], labels: tuple[str, ...], skip_neutral: bool) -> str:
+    good, total = _rate(counts, skip_neutral)
+    pct = round(100 * good / total) if total else None
+    weak = '<b class="nr-weak">↻ tekrar et</b>' if pct is not None and pct < 50 else ""
+    return (f'<div class="nr-tr" title="{_detail(name, counts, labels)}"><div class="nm"><span>{style.esc(name)}</span>{weak}</div>'
+            f'<div class="nr-track"><i style="width:{pct or 0}%"></i></div>'
+            f'<div class="v">{"–" if pct is None else f"%{pct}"}</div><div class="c">{good}/{total}</div></div>')
+
+
+def summary_html(records: list[dict], labels: tuple[str, ...], *, title: str, note: str, hero_label: str,
+                 hero_sub: str, extra_tile: tuple[str, str] | None = None, by_type: bool = False,
+                 skip_neutral: bool = False, topics_shown: int = 6) -> str:
+    """records: [{"status": labels[i], "diff": "Kolay"…, "type", "topic"}] → tek özet kartı (HTML)."""
+    counts = [sum(r["status"] == lab for r in records) for lab in labels]
+    good, total = _rate(counts, skip_neutral)
+    tiles = "".join(f'<div class="tile"><div class="k"><i style="background:{STATUS_DOT[lab]}"></i>{lab}</div>'
+                    f'<div class="v">{c}</div></div>' for lab, c in zip(labels, counts))
+    if extra_tile:
+        tiles += f'<div class="tile"><div class="k">{style.esc(extra_tile[0])}</div><div class="v">{style.esc(extra_tile[1])}</div></div>'
+    out = (f'<div class="nr-sum"><div class="title">{style.esc(title)}</div><div class="note">{style.esc(note)}</div>'
+           f'<div class="head"><div class="hero"><div class="k">{style.esc(hero_label)}</div>'
+           f'<div class="v">%{round(100 * good / total) if total else 0}</div><div class="d">{style.esc(hero_sub)}</div></div>'
+           f'<div class="tiles">{tiles}</div></div>')
+    diff = _group(records, "diff", labels)
+    out += ('<div class="sec"><div class="h">Zorluğa göre</div><div class="meters">'
+            + "".join(_meter(d, diff.get(d), labels, skip_neutral) for d in DIFF_ORDER) + "</div></div>")
+    if by_type:
+        types = sorted(_group(records, "type", labels).items(), key=lambda kv: -sum(kv[1]))
+        out += (f'<div class="sec"><div class="h">Soru tipine göre</div><div class="meters" style="--n:{max(2, min(4, len(types)))}">'
+                + "".join(_meter(t, c, labels, skip_neutral) for t, c in types) + "</div></div>")
+
+    def weakness(kv: tuple[str, list[int]]) -> tuple[float, int]:
+        g, t = _rate(kv[1], skip_neutral)
+        return (g / t if t else 2.0, -sum(kv[1]))  # değerlendirilmemiş konu en sona
+    rows = [_topic_row(n, c, labels, skip_neutral) for n, c in sorted(_group(records, "topic", labels).items(), key=weakness)]
+    more = (f'<details><summary>+ {len(rows) - topics_shown} konu daha</summary>{"".join(rows[topics_shown:])}</details>'
+            if len(rows) > topics_shown else "")
+    out += (f'<div class="sec"><div class="h">Konulara göre<small>en çok zorlandığın önce</small></div>{"".join(rows[:topics_shown])}'
+            f'{more}</div>')
+    return out + "</div>"
 
 
 def page_card(item: dict, png: bytes | None, note: str, reveal: bool = True) -> str:

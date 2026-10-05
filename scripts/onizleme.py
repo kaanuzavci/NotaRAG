@@ -34,12 +34,10 @@ def run_page(rel: str) -> None:
 
 if v in ("setup", "session", "flip", "summary"):
     if v != "setup" and "cards" not in st.session_state:
-        items = [it for it in R.all_items().values() if R.usable(it)]
-        mcq = [it for it in items if it["q"]["type"] == "multiple_choice"]
-        ids = [mcq[3]["id"]] + [it["id"] for it in rnd.sample(items, 14)]
+        items = K.pool(sorted({it["doc"] for it in R.all_items().values()}))
+        ids = [it["id"] for it in rnd.sample(items, 15)]
         st.session_state.cards = {"queue": ids, "pos": 0, "res": {}, "col": {}, "skipped": [], "streak": 0, "best": 0,
-                                  "last": None, "started": time.time() - 400, "ended": False, "party": True,
-                                  "say": ("happy", "Harika, bildin! Bunu <b>yarın</b> yeniden soracağım.", "p")}
+                                  "last": None, "started": time.time() - 400, "ended": False, "v": 0}
         cs = st.session_state.cards
         if v in ("session", "flip"):
             for i, r in enumerate(["good", "bad", "good", "skip", "good"]):

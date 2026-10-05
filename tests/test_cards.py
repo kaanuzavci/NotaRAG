@@ -3,7 +3,7 @@
 import tempfile
 from pathlib import Path
 
-from src.cards import history, is_due, next_gap, pick, record, step, summary
+from src.cards import card_ok, history, is_due, next_gap, pick, record, step, summary
 
 DAY = 86400
 
@@ -28,6 +28,14 @@ def test_all() -> None:
     assert order[:2] == ["a", "b"] and order[2] == "d" and "c" not in order
     assert len(pick(items, hist, 10, now=0, only_due=False)) == 4
     assert summary(items, hist, 10 * DAY + 5) == {"total": 4, "new": 1, "due": 2, "mastered": 0}
+    # Kart = soru → cevap: şıklara dayanan kökler ve doğru/yanlış karta dönüşmez (kullanıcı: "kartta şık olmaz")
+    mc = lambda s: {"type": "multiple_choice", "question": s}
+    assert card_ok({"type": "short_answer", "question": "C(5,2) kaçtır?"})
+    assert card_ok(mc("ALU'nun temel görevi nedir?")) and card_ok(mc("Verileri taşıyan işlev hangisidir?"))
+    assert card_ok(mc("Karışan yaklaşık oran yüzde kaçtır?"))  # 'yaklaşık' içindeki 'şık' şık sayılmaz
+    assert not card_ok(mc("Aşağıdakilerden hangisi bir seçim yöntemidir?"))
+    assert not card_ok(mc("Hangisi kodlama mekanizmalarından biri değildir?"))
+    assert not card_ok({"type": "true_false", "question": "Mutasyon çeşitliliği artırır."})
     # Kayıt baştan oynatılınca aynı durum
     with tempfile.TemporaryDirectory() as d:
         p = Path(d) / "cards.jsonl"
