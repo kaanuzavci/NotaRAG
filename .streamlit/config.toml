@@ -1,0 +1,29 @@
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"
+
+[theme]
+# "Akademik baskı + fosforlu kalem": sıcak kâğıt zemin, mürekkep laciverdi, kanıt için sarı vurgu
+base = "light"
+primaryColor = "#1F3A5F"
+backgroundColor = "#F7F4ED"
+secondaryBackgroundColor = "#EFE9DC"
+textColor = "#1E2433"
+linkColor = "#1F3A5F"
+borderColor = "#DCD3C1"
+showWidgetBorder = true
+baseRadius = "0.55rem"
+font = "Instrument Sans:https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap"
+headingFont = "Fraunces:https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap"
+codeFont = "JetBrains Mono:https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap"
+headingFontWeights = [600, 600, 600, 600, 600, 600]
+chartCategoricalColors = ["#3A7BB8", "#CB5A44", "#8A72C2", "#3F9A6E", "#C98A28"]  # validate_palette.js: tüm kontroller geçti (kâğıt zemin)
+
+[theme.sidebar]
+backgroundColor = "#1E2433"
+secondaryBackgroundColor = "#2A3246"
+textColor = "#EDE6D6"
+primaryColor = "#F2D64B"
+borderColor = "#3A4359"

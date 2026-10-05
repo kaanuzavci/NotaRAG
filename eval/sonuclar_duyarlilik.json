@@ -1,0 +1,87 @@
+{
+ "openai/gpt-oss-120b": {
+  "kinds": {
+   "wrong_key": [
+    6,
+    6
+   ],
+   "two_correct": [
+    6,
+    6
+   ],
+   "tf_flip": [
+    1,
+    1
+   ],
+   "short_wrong": [
+    1,
+    1
+   ],
+   "not_in_context": [
+    3,
+    3
+   ]
+  },
+  "light": false,
+  "first_version": {
+   "two_correct": [
+    5,
+    7
+   ],
+   "wrong_key": [
+    7,
+    7
+   ]
+  }
+ },
+ "openai/gpt-oss-20b": {
+  "kinds": {
+   "wrong_key": [
+    6,
+    6
+   ],
+   "two_correct": [
+    6,
+    6
+   ],
+   "tf_flip": [
+    3,
+    3
+   ],
+   "short_wrong": [
+    2,
+    2
+   ],
+   "not_in_context": [
+    3,
+    3
+   ]
+  },
+  "light": true
+ },
+ "qwen/qwen3.8-27b": {
+  "kinds": {
+   "tf_flip": [
+    3,
+    3
+   ],
+   "short_wrong": [
+    3,
+    3
+   ],
+   "wrong_key": [
+    5,
+    5
+   ],
+   "two_correct": [
+    5,
+    5
+   ],
+   "not_in_context": [
+    3,
+    3
+   ]
+  },
+  "light": true
+ }
+}

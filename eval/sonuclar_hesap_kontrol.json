@@ -1,0 +1,22 @@
+{
+ "source": "data/questions/tyt-matematik_tr.jsonl",
+ "n_clean": 20,
+ "false_alarms_on_clean": 0,
+ "corruptions": {
+  "wrong_key": {
+   "caught": 20,
+   "total": 20,
+   "expected_reason": "compute_mismatch"
+  },
+  "two_correct": {
+   "caught": 20,
+   "total": 20,
+   "expected_reason": "compute_two_correct"
+  },
+  "text_mismatch": {
+   "caught": 19,
+   "total": 20,
+   "expected_reason": "compute_text_mismatch"
+  }
+ }
+}

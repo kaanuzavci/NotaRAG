@@ -1,0 +1,9 @@
+.venv/
+wheelhouse/
+.env
+secrets/
+__pycache__/
+# Depo herkese açık: data/ altında hocaların ders notları (sample_docs), onlardan çıkarılan metin
+# (parsed, chunks, vision_cache), LLM yanıt önbelleği, kişisel çözüm kayıtları ve günlükler var → hiçbiri yüklenmez
+data/
+*.log

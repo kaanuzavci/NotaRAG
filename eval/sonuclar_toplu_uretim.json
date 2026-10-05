@@ -1,0 +1,103 @@
+[
+ {
+  "yöntem": "qwen, birim başına istek (taban)",
+  "soru": 12,
+  "kod red": {
+   "context_reference": 1
+  },
+  "verified": 11,
+  "needs_review": 0,
+  "verified oranı": 0.9166666666666666,
+  "dayanaksız": 0,
+  "uyarılar": {
+   "vision_evidence": 5,
+   "length_cue": 1
+  },
+  "tipler": {
+   "multiple_choice": 9,
+   "short_answer": 2,
+   "true_false": 1
+  },
+  "bloom": {
+   "remember": 7,
+   "understand": 3,
+   "apply": 1
+  },
+  "istek": 12,
+  "token": 32400,
+  "süre_sn": 0
+ },
+ {
+  "yöntem": "gemini-2.5-flash, TEK istek",
+  "soru": 12,
+  "kod red": {},
+  "verified": 11,
+  "needs_review": 1,
+  "verified oranı": 0.9166666666666666,
+  "dayanaksız": 1,
+  "uyarılar": {
+   "vision_evidence": 3,
+   "length_cue": 1
+  },
+  "tipler": {
+   "multiple_choice": 6,
+   "true_false": 3,
+   "short_answer": 3
+  },
+  "bloom": {
+   "remember": 9,
+   "understand": 2
+  },
+  "istek": 0,
+  "token": 0,
+  "süre_sn": 0
+ },
+ {
+  "yöntem": "gemini-3.5-flash, TEK istek",
+  "soru": 12,
+  "kod red": {},
+  "verified": 11,
+  "needs_review": 1,
+  "verified oranı": 0.9166666666666666,
+  "dayanaksız": 1,
+  "uyarılar": {
+   "vision_evidence": 4
+  },
+  "tipler": {
+   "multiple_choice": 6,
+   "true_false": 3,
+   "short_answer": 3
+  },
+  "bloom": {
+   "understand": 8,
+   "remember": 3
+  },
+  "istek": 0,
+  "token": 0,
+  "süre_sn": 0
+ },
+ {
+  "yöntem": "gemini-3.8-flash, TEK istek",
+  "soru": 11,
+  "kod red": {},
+  "verified": 11,
+  "needs_review": 0,
+  "verified oranı": 1.0,
+  "dayanaksız": 0,
+  "uyarılar": {
+   "vision_evidence": 2
+  },
+  "tipler": {
+   "true_false": 3,
+   "short_answer": 3,
+   "multiple_choice": 5
+  },
+  "bloom": {
+   "remember": 6,
+   "understand": 5
+  },
+  "istek": 0,
+  "token": 0,
+  "süre_sn": 0
+ }
+]

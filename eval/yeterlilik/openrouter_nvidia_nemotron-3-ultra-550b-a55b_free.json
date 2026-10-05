@@ -1,0 +1,33 @@
+{
+ "model": "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+ "short": true,
+ "text": {
+  "catch": [
+   10,
+   10
+  ],
+  "clean": [
+   6,
+   6
+  ]
+ },
+ "math": {
+  "clean": [
+   12,
+   12
+  ],
+  "hard": [
+   2,
+   2
+  ],
+  "catch": [
+   5,
+   5
+  ]
+ },
+ "misses": [],
+ "recommend": {
+  "verify": true,
+  "verify_math": true
+ }
+}

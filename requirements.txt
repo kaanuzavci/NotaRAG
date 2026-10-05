@@ -1,0 +1,12 @@
+# Çekirdek bağımlılıklar (Python 3.11). Kurulum:
+#   .venv\Scripts\python -m pip install --find-links wheelhouse -c constraints.txt -r requirements.txt
+pymupdf
+chromadb
+streamlit
+groq
+google-genai
+rank-bm25
+rapidfuzz
+pydantic
+python-dotenv
+sympy

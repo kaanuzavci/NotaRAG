@@ -1,0 +1,34 @@
+[
+ {
+  "koşul": "remember",
+  "birim": 17,
+  "soru": 32,
+  "soru üretmeyen birim": 0,
+  "verified": 30,
+  "needs_review": 0,
+  "rejected": 2,
+  "kod red nedenleri": {
+   "near_duplicate_options": 2
+  },
+  "dayanaksız": 0,
+  "dayanaksız oranı": 0.0,
+  "modelin kendi bloom etiketi": {
+   "remember": 32
+  }
+ },
+ {
+  "koşul": "apply",
+  "birim": 17,
+  "soru": 29,
+  "soru üretmeyen birim": 3,
+  "verified": 29,
+  "needs_review": 0,
+  "rejected": 0,
+  "kod red nedenleri": {},
+  "dayanaksız": 0,
+  "dayanaksız oranı": 0.0,
+  "modelin kendi bloom etiketi": {
+   "apply": 29
+  }
+ }
+]
