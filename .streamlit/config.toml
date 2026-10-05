@@ -5,13 +5,13 @@ gatherUsageStats = false
 toolbarMode = "minimal"
 
 [theme]
-# "Akademik baskı + fosforlu kalem": sıcak kâğıt zemin, mürekkep laciverdi, kanıt için sarı vurgu
+# Yumuşak çalışma dili (v2, 2026-10-05): pastel ışık zemin (src/ui/style.py), mor-çivit birincil renk, kanıt için sarı vurgu
 base = "light"
-primaryColor = "#1F3A5F"
+primaryColor = "#7C3AED"
 backgroundColor = "#F7F4ED"
 secondaryBackgroundColor = "#EFE9DC"
 textColor = "#1E2433"
-linkColor = "#1F3A5F"
+linkColor = "#6D28D9"
 borderColor = "#DCD3C1"
 showWidgetBorder = true
 baseRadius = "0.55rem"

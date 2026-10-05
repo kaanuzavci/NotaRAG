@@ -1,8 +1,9 @@
 """Bilgi Kartları — havuzdaki doğrulanmış sorulardan aralıklı tekrar (src/cards.py; LLM çağrısı yok).
 
-Akış: seçim (belgeler, kart sayısı, yalnızca zamanı gelenler) → oturum (odak modu: kart tıklanınca çevrilir;
-Bilemedim / Atla / Bildim → kart ilgili yığına uçar, sıradaki desteden gelir; Fosfor konuşur) → özet (konfeti, tekrar).
-Klavye: Boşluk çevir · ← bilemedim · ↓ atla · → bildim. Sınav sonucundan "Yanlışlarını kartla çalış" buraya gelir.
+Akış: seçim (belgeler, kart sayısı, yalnızca zamanı gelenler) → oturum (odak modu; solda deste, sağda koç Fosfor:
+kart tıklanınca 3B döner ve yine tıklanınca geri döner; Bilemedim / Atla / Bildim → kart ilgili yığına uçar,
+sıradaki desteden gelir) → özet (zorluk / soru tipi / konu kırılımı, konfeti, bilemediklerle yeni tur).
+Klavye: Boşluk çevir · ← bilemedim · ↓ atla · → bildim. Sınav sonucundan "Yanlışları kartla çalış" buraya gelir.
 """
 
 import random
@@ -15,11 +16,12 @@ from src import request as R
 from src.ui import buddy, data, style
 from src.ui import components as C
 
-SYM = {"good": "✓", "bad": "✗", "skip": "↷"}
+SYM = {"good": "✓", "bad": "✕", "skip": "↷"}
 PILE = {"bad": "Bilemedim", "skip": "Atladım", "good": "Bildim"}
 FOCUS_CSS = """<style>
 section[data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"], [data-testid="stExpandSidebarButton"] { display: none !important; }
-.block-container, [data-testid="stMainBlockContainer"] { max-width: 860px; padding-top: 1.4rem; }
+.block-container, [data-testid="stMainBlockContainer"] { max-width: 1180px; padding-top: 1.3rem; }
+[data-testid="stMain"] { position: relative; z-index: 0; }
 .st-key-fc_keys { height: 0; overflow: hidden; margin: 0; }
 </style>"""
 
@@ -39,21 +41,20 @@ def _line(result: str, cs: dict, gap: int, again: bool) -> tuple[str, str, str]:
     """(ruh hâli, HTML söz, nonce). Seçim konuma bağlı: aynı durumda her yeniden çizimde söz değişmez."""
     i, streak = cs["pos"], cs["streak"]
     if result == "good":
-        if streak >= 5:
-            return "cheer", f"🔥 <b>{streak}</b> kart üst üste! Durdurulamıyorsun.", f"g{i}"
-        if streak == 3:
-            return "cheer", f"Üç üst üste! Bu kart <b>{_gap(gap)}</b> yeniden gelecek.", f"g{i}"
-        says = [f"Harika, bildin! Bunu <b>{_gap(gap)}</b> tekrar soracağım.", "Doğru yığına! 👏 Bir kutu yukarı çıktı.",
-                "Süper. Bildiğin kartlar giderek seyrekleşir; vaktin bilmediklerine kalır."]
-        return "happy", says[i % len(says)], f"g{i}"
+        if streak >= 3:
+            return "fire", f"<b>{streak}</b> kart üst üste! Bu tempoyla deste bitmek üzere.", f"g{i}"
+        says = [f"Harika, bildin! Bunu <b>{_gap(gap)}</b> yeniden soracağım.",
+                "Bildim yığınına gitti. Bir kutu yukarı çıktı; artık daha seyrek gelecek.",
+                "Çok iyi. Bildiklerin seyrekleşir, vaktin bilmediklerine kalır."]
+        return ("cheer" if i % 3 == 1 else "happy"), says[i % len(says)], f"g{i}"
     if result == "bad":
-        says = ["Sorun değil, öğrenmenin yolu bu. Bu kart <b>bugün</b> yine gelecek.",
-                "Arka yüzdeki kaynak cümleyi bir kez daha oku; birazdan yeniden karşılaşacağız.",
-                "Bilemediklerin en değerli kartlar. Sonda onları ayrıca çalışabilirsin."]
+        says = ["Sorun değil, öğrenmenin yolu bu. Bu kart <b>bugün</b> yine karşına çıkacak.",
+                "Arka yüzdeki kaynak cümleyi bir kez daha oku; birazdan yeniden göreceğiz.",
+                "Bilemediklerin en değerli kartlar. Turun sonunda onları ayrıca çalışabiliriz."]
         return "sad", says[i % len(says)], f"b{i}"
     if again:
         return "think", "Bunu ikinci kez geçtin; bir sonraki oturuma bıraktım.", f"s{i}"
-    says = ["Tamam, bunu destenin sonuna koydum; birazdan yine gelecek.", "Emin değil misin? Sonda bir kez daha deneriz."]
+    says = ["Tamam, destenin sonuna koydum. Birazdan yine gelecek.", "Emin değil misin? Sonda bir kez daha deneriz."]
     return "think", says[i % len(says)], f"s{i}"
 
 
@@ -62,8 +63,9 @@ def _line(result: str, cs: dict, gap: int, again: bool) -> tuple[str, str, str]:
 def _begin(ids: list[str]) -> None:
     st.session_state.cards = {
         "queue": list(ids), "pos": 0, "res": {}, "col": {}, "skipped": [], "streak": 0, "best": 0, "last": None,
-        "started": time.time(), "ended": False, "confetti": False,
-        "say": ("happy", "İlk kart geliyor! Kartın üstüne tıkla ya da <b>Boşluk</b>'a bas, arkasını gör.", "start")}
+        "started": time.time(), "ended": False, "party": False,
+        "say": ("hello", "İlk kart geliyor! Kartın üstüne tıkla ya da <b>Boşluk</b>'a bas, arkasını gör. Bir daha "
+                         "tıklarsan ön yüze döner.", "start")}
 
 
 def _grade(result: str) -> None:
@@ -91,14 +93,14 @@ def _shuffle() -> None:
     rest = cs["queue"][cs["pos"]:]
     random.shuffle(rest)
     cs["queue"][cs["pos"]:] = rest
-    cs["say"] = ("happy", "Kalan kartları karıştırdım. 🔀", f"x{time.time()}")
+    cs["say"] = ("happy", "Kalan kartları karıştırdım. Sıra değişince hafıza daha iyi sınanır.", f"x{time.time()}")
 
 
 def _only_bad() -> None:
     cs = st.session_state.cards
     bad = [q for q, r in cs["res"].items() if r == "bad"]
     if not bad:
-        cs["say"] = ("cheer", "Henüz bilemediğin kart yok! 🎉", f"n{time.time()}")
+        cs["say"] = ("cheer", "Henüz bilemediğin kart yok!", f"n{time.time()}")
         return
     _begin(bad)
     st.session_state.cards["say"] = ("think", f"Bilemediğin <b>{len(bad)}</b> kartla yeni tur. Bu sefer olacak!", "rb")
@@ -116,15 +118,16 @@ def _new() -> None:
 
 def _front(it: dict) -> str:
     q = it["q"]
-    tags = "".join(f"<span>{style.esc(t)}</span>" for t in (C.type_label(q), C.DIFF_TR.get(q.get("difficulty"), ""),
+    meta = "".join(f"<span>{style.esc(t)}</span>" for t in (C.type_label(q), C.DIFF_TR.get(q.get("difficulty"), ""),
                                                              data.short(it.get("doc", ""))) if t)
     body = f'<div class="fq">{C.t(q["question"])}</div>'
     if q["type"] == "multiple_choice":
-        body += '<div class="fopts">' + "".join(f"<div><b>{C.LETTERS[j]})</b>{C.t(o)}</div>"
+        body += '<div class="fopts">' + "".join(f"<div><b>{C.LETTERS[j]}</b>{C.t(o)}</div>"
                                                 for j, o in enumerate(q["options"])) + "</div>"
     elif q["type"] == "true_false":
-        body += '<div class="fopts"><div>Doğru mu, yanlış mı?</div></div>'
-    return f'<div class="tag">{tags}</div>{body}<div class="tap"><i>👆</i> Çevirmek için tıkla ya da Boşluk</div>'
+        body += '<div class="fopts" style="grid-template-columns:1fr"><div>Bu ifade doğru mu, yanlış mı?</div></div>'
+    return (f'<div class="meta">{meta}</div><div class="body">{body}</div>'
+            '<div class="hint"><span class="ico">↻</span>Cevabı görmek için kartı çevir · tıkla ya da Boşluk</div>')
 
 
 def _back(it: dict) -> str:
@@ -133,7 +136,7 @@ def _back(it: dict) -> str:
         a = q["answer_index"]
         ans = f'<span class="ltr">{C.LETTERS[a]}</span>{C.t(q["options"][a])}'
     elif q["type"] == "true_false":
-        ans = "Doğru ✓" if q["answer"] == "true" else "Yanlış ✗"
+        ans = "Doğru" if q["answer"] == "true" else "Yanlış"
     else:
         ans = C.expected(q)
     text = str(q["question"])
@@ -143,16 +146,23 @@ def _back(it: dict) -> str:
         parts.append('<div class="lab">Çözüm</div><ol class="nr-solution">'
                      + "".join(f"<li>{C.t(s)}</li>" for s in q["solution"]) + "</ol>")
     where = " · ".join(x for x in (data.short(it.get("doc", "")), f"sayfa {page}" if page else "") if x)
-    parts.append(f'<div class="lab">Kaynak · {style.esc(where)}</div>'
-                 f'<div class="nr-evidence"><span class="nr-hl">{C.t(q.get("evidence_quote", ""))}</span></div>')
+    parts.append(f'<div class="lab">Notundaki kaynak · {style.esc(where)}</div>'
+                 f'<div class="nr-evidence"><span class="nr-hl">{C.t(q.get("evidence_quote", ""))}</span></div>'
+                 '<div class="flipback">Ön yüze dönmek için yine tıkla</div>')
     return "".join(parts)
+
+
+def _length_class(q: dict) -> str:
+    n = len(str(q["question"])) + sum(len(str(o)) for o in q.get("options") or [])
+    return " xlong" if n > 420 else (" long" if n > 240 else "")
 
 
 def _piles(cs: dict, bump: str | None = None) -> str:
     out = []
     for kind in ("bad", "skip", "good"):
         ids = [q for q, r in cs["res"].items() if r == kind]
-        minis = "".join(f'<b style="background:{style.color(cs["col"][q])[0]}"></b>' for q in ids[-6:])
+        minis = "".join(f'<b style="--mc:{style.color(cs["col"][q])[1]};--ma:{style.color(cs["col"][q])[3]}"></b>'
+                        for q in ids[-6:])
         out.append(f'<div class="nr-pile {kind}{" bump" if kind == bump else ""}"><span class="ico">{SYM[kind]}</span>'
                    f'<div><div class="n">{len(ids)}</div><div class="l">{PILE[kind]}</div></div>'
                    f'<div class="mini">{minis}</div></div>')
@@ -161,15 +171,16 @@ def _piles(cs: dict, bump: str | None = None) -> str:
 
 def _stage(it: dict, cs: dict) -> str:
     pos, left = cs["pos"], len(cs["queue"]) - cs["pos"] - 1
-    stacks = ((f'<div class="nr-stack s2" style="background:{style.color(pos + 2)[0]}"></div>' if left > 1 else "")
-              + (f'<div class="nr-stack s1" style="background:{style.color(pos + 1)[0]}"></div>' if left > 0 else ""))
-    card = (f'<details class="nr-fc" style="{style.color_vars(pos)}" data-k="{it["id"]}-{pos}">'
-            f'<summary>{_front(it)}</summary><div class="back">{_back(it)}</div></details>')
+    stacks = ((f'<div class="nr-stack s2" style="--s:{style.color(pos + 2)[1]}"></div>' if left > 1 else "")
+              + (f'<div class="nr-stack s1" style="--s:{style.color(pos + 1)[1]}"></div>' if left > 0 else ""))
+    card = (f'<details class="nr-fc{_length_class(it["q"])}" style="{style.color_vars(pos)}" data-k="{it["id"]}-{pos}">'
+            f'<summary><div class="nr-flip"><div class="nr-face front">{_front(it)}</div>'
+            f'<div class="nr-face back">{_back(it)}</div></div></summary></details>')
     last = cs.pop("last", None)  # uçan kart yalnızca bir kez (değerlendirmenin hemen ardından) çizilir
     ghost = (f'<div class="nr-ghost {last["result"]}" data-s="{SYM[last["result"]]}" style="{style.color_vars(last["pos"])}">'
              f'{style.esc(last["text"])}</div>') if last else ""
-    return (f'<div class="nr-stage"><div class="nr-deck">{stacks}{card}{ghost}</div>'
-            f'{_piles(cs, last["result"] if last else None)}</div>')
+    return (f'<div class="nr-deck">{stacks}{card}{ghost}</div>'
+            f'{_piles(cs, last["result"] if last else None)}')
 
 
 def _keys() -> None:
@@ -192,6 +203,17 @@ D.addEventListener('keydown', P.__nrKeyFn);
 </script></body>""", height=1)
 
 
+def _topic(it: dict) -> str:
+    """Kartın konusu: bölüm adı; bölüm adı yalnızca numaraysa ('01') belge adıyla birlikte."""
+    unit, doc = str(it.get("unit") or "").strip(), data.short(it.get("doc", ""))
+    return unit if len(unit) > 3 and not unit.isdigit() else f"{doc} · bölüm {unit}" if unit else doc
+
+
+def _counts(cs: dict) -> tuple[int, int, int]:
+    res = list(cs["res"].values())
+    return res.count("good"), res.count("bad"), res.count("skip")
+
+
 # ---------------------------------------------------------------- ekranlar
 
 def _setup() -> None:
@@ -202,33 +224,39 @@ def _setup() -> None:
     if not docs:
         st.info("Henüz doğrulanmış soru yok. Önce **Belgeler** sayfasından bir ders notu ekle.", icon=":material/upload_file:")
         return
-    chosen = st.pills("Belgeler", [d["stem"] for d in docs], selection_mode="multi", default=[d["stem"] for d in docs],
-                      format_func=data.short)
-    if not chosen:
-        st.caption("En az bir belge seç.")
-        return
-    items, hist, now = K.pool(chosen), K.history(), time.time()
-    s = K.summary(items, hist, now)
-    tile = lambda i, v, k: f'<div class="nr-ctile" style="background:linear-gradient(135deg,{style.color(i)[0]},{style.color(i)[1]});animation-delay:{i * .06:.2f}s"><div class="v">{v}</div><div class="k">{k}</div></div>'
-    style.html('<div class="nr-ctiles">' + tile(0, s["total"], "kart") + tile(1, s["due"], "tekrar zamanı gelen")
-               + tile(2, s["new"], "hiç görmediğin") + tile(3, s["mastered"], "ustalaştığın") + "</div>")
-    c = st.columns([3, 3, 2], vertical_alignment="bottom")
-    n = c[0].select_slider("Kart sayısı", [10, 20, 30, 50], value=20)
-    only_due = c[1].toggle("Yalnızca zamanı gelenler", value=True,
-                           help="Açıkken yalnızca hiç görmediğin ve tekrar zamanı gelmiş kartlar gelir.")
-    avail = len(K.pick(items, hist, 10 ** 6, now, only_due))
-    if c[2].button(f"Başla · {min(n, avail)} kart", key="fc_start", type="primary", icon=":material/style:",
-                   width="stretch", disabled=not avail):
-        _begin(K.pick(items, hist, n, now, only_due))
-        st.rerun()
-    if not avail:
-        st.caption("Bugün tekrar zamanı gelen kart yok 🎉 Yeni tur istersen \"Yalnızca zamanı gelenler\"i kapat.")
-    buddy.show("happy", "Merhaba, ben <b>Fosfor</b>! Kartı çevir; bildiklerini sağa, bilemediklerini sola at. Hangisini "
-                        "ne zaman tekrar göstereceğimi ben hatırlarım.", nonce="setup")
+    main, side = st.columns([3, 1.1], gap="large")
+    with main:
+        chosen = st.pills("Belgeler", [d["stem"] for d in docs], selection_mode="multi",
+                          default=[d["stem"] for d in docs], format_func=data.short)
+        if not chosen:
+            st.caption("En az bir belge seç.")
+            return
+        items, hist, now = K.pool(chosen), K.history(), time.time()
+        s = K.summary(items, hist, now)
+        tile = lambda i, v, k: (f'<div class="nr-ctile" style="{style.color_vars(i)};animation-delay:{i * .07:.2f}s">'
+                                f'<div class="v">{v}</div><div class="k">{k}</div></div>')
+        style.html('<div class="nr-ctiles">' + tile(0, s["total"], "kart") + tile(1, s["due"], "tekrar zamanı gelen")
+                   + tile(2, s["new"], "hiç görmediğin") + tile(3, s["mastered"], "ustalaştığın") + "</div>")
+        c = st.columns([3, 3, 2.2], vertical_alignment="bottom")
+        n = c[0].select_slider("Kart sayısı", [10, 20, 30, 50], value=20)
+        only_due = c[1].toggle("Yalnızca zamanı gelenler", value=True,
+                               help="Açıkken yalnızca hiç görmediğin ve tekrar zamanı gelmiş kartlar gelir.")
+        avail = len(K.pick(items, hist, 10 ** 6, now, only_due))
+        if c[2].button(f"Başla · {min(n, avail)} kart", key="fc_start", type="primary", icon=":material/style:",
+                       width="stretch", disabled=not avail):
+            _begin(K.pick(items, hist, n, now, only_due))
+            st.rerun()
+        if not avail:
+            st.caption("Bugün tekrar zamanı gelen kart yok. Yeni tur istersen \"Yalnızca zamanı gelenler\"i kapat.")
+    with side:
+        buddy.panel("hello", "Merhaba, ben <b>Fosfor</b>! Kartı çevir, bildiklerini sağa, bilemediklerini sola at. "
+                             "Hangisini ne zaman yeniden göstereceğimi ben hatırlarım.", nonce="setup",
+                    stats=buddy.stats([(str(s["due"]), "bugün"), (str(s["new"]), "yeni"), (str(s["mastered"]), "usta")]))
 
 
 def _session() -> None:
     style.html(FOCUS_CSS)
+    style.aurora()
     cs, items = st.session_state.cards, _items()
     while cs["pos"] < len(cs["queue"]) and cs["queue"][cs["pos"]] not in items:  # havuzdan çıkmış soru
         cs["pos"] += 1
@@ -236,58 +264,78 @@ def _session() -> None:
         _summary()
         return
     it, total = items[cs["queue"][cs["pos"]]], len(cs["queue"])
-    top = st.columns([5, 1.2], vertical_alignment="center")
-    streak = f'<span class="nr-streak">🔥 {cs["streak"]} seri</span>' if cs["streak"] >= 2 else ""
-    with top[0]:
-        style.html(f'<div class="nr-qprog"><div class="lbl"><span><b>Kart {cs["pos"] + 1}</b> / {total} {streak}</span>'
-                   f'<span>{len(cs["res"])} değerlendirildi</span></div><div class="bar"><i style="width:'
-                   f'{100 * cs["pos"] / total:.1f}%"></i></div></div>')
-    top[1].button("Bitir", key="fc_exit", icon=":material/flag:", width="stretch", on_click=_end)
-    st.space("small")
-    style.html(_stage(it, cs))
-    st.space("small")
-    b = st.columns(3)
-    b[0].button("Bilemedim", key="fc_bad", icon=":material/close:", width="stretch", on_click=_grade, args=("bad",))
-    b[1].button("Atla", key="fc_skip", icon=":material/redo:", width="stretch", on_click=_grade, args=("skip",))
-    b[2].button("Bildim", key="fc_good", icon=":material/check:", width="stretch", on_click=_grade, args=("good",))
-    gap = K.next_gap(K.history().get(it["id"]), "good")
-    style.html(f'<div class="nr-gap">Bildim → {_gap(gap)} tekrar · Bilemedim → bugün yine · Klavye: '
-               '<span class="nr-kbd">Boşluk</span> çevir · <span class="nr-kbd">←</span> <span class="nr-kbd">↓</span> '
-               '<span class="nr-kbd">→</span></div>')
-    _keys()
-    mood, text, nonce = cs["say"]
-    buddy.show(mood, text, nonce=nonce, menu=[("Karıştır", ":material/shuffle:", _shuffle, ()),
-                                              ("Bilemediklerim", ":material/replay:", _only_bad, ()),
-                                              ("Oturumu bitir", ":material/flag:", _end, ())])
+    good, bad, _ = _counts(cs)
+    main, side = st.columns([3, 1.1], gap="large")
+    with main:
+        streak = f'<span class="nr-streak">🔥 {cs["streak"]}</span>' if cs["streak"] >= 2 else ""
+        style.html(f'<div class="nr-topbar"><span class="c"><b>Kart {cs["pos"] + 1}</b> / {total}{streak}</span>'
+                   f'<div class="track"><i style="width:{100 * cs["pos"] / total:.1f}%"></i></div>'
+                   f'<span class="c">{len(cs["res"])} değerlendirildi</span></div>')
+        st.space("small")
+        style.html(_stage(it, cs))
+        st.space("small")
+        b = st.columns(3, gap="small")
+        b[0].button("Bilemedim", key="fc_bad", icon=":material/close:", width="stretch", on_click=_grade, args=("bad",))
+        b[1].button("Atla", key="fc_skip", icon=":material/redo:", width="stretch", on_click=_grade, args=("skip",))
+        b[2].button("Bildim", key="fc_good", icon=":material/check:", width="stretch", on_click=_grade, args=("good",))
+        gap = K.next_gap(K.history().get(it["id"]), "good")
+        style.html(f'<div class="nr-gap">Bildim → {_gap(gap)} yeniden · Bilemedim → bugün yine · '
+                   '<span class="nr-kbd">Boşluk</span> çevir · <span class="nr-kbd">←</span> '
+                   '<span class="nr-kbd">↓</span> <span class="nr-kbd">→</span></div>')
+        _keys()
+    with side:
+        mood, text, nonce = cs["say"]
+        acc = f"%{round(100 * good / (good + bad))}" if good + bad else "–"
+        buddy.panel(mood, text, nonce=nonce, stats=buddy.stats([(acc, "isabet"), (str(cs["best"]), "rekor seri"),
+                                                                (str(total - cs["pos"]), "kalan")]),
+                    actions=[("Kalanları karıştır", ":material/shuffle:", _shuffle, ()),
+                             ("Yalnızca bilemediklerim", ":material/replay:", _only_bad, ()),
+                             ("Oturumu bitir", ":material/flag:", _end, ())])
 
 
 def _summary() -> None:
-    cs = st.session_state.cards
-    style.header("Çalış", "Bilgi Kartları")
-    res = list(cs["res"].values())
-    good, bad, skip = res.count("good"), res.count("bad"), res.count("skip")
+    cs, items = st.session_state.cards, _items()
+    good, bad, skip = _counts(cs)
     seen = max(1, good + bad)
-    if good and good / seen >= .7 and not cs["confetti"]:
-        style.html(style.confetti())
-        cs["confetti"] = True
+    if good and good / seen >= .7 and not cs["party"]:
+        buddy.celebrate()
+        cs["party"] = True
     mins = max(1, round((time.time() - cs["started"]) / 60))
-    style.html(f'<div class="nr-res" style="grid-template-columns:1fr"><div><div class="msg">Oturum bitti: '
-               f'{good} / {len(res)} kart bildin</div><div class="sub">~{mins} dk · en uzun seri {cs["best"]} · '
-               f'bilemediklerin bugün yine gelecek, bildiklerin günler sonra.</div>{_piles(cs)}</div></div>')
-    st.space("small")
-    c = st.columns([2, 1.4, 2])
-    if bad:
-        c[0].button(f"Bilemediklerimi çalış ({bad})", key="fc_rb", type="primary", icon=":material/replay:",
-                    width="stretch", on_click=_only_bad)
-    c[1].button("Yeni oturum", key="fc_new", icon=":material/add:", width="stretch", on_click=_new)
-    if good / seen >= .7:
-        mood, say = "cheer", f"Muhteşem! <b>{good}</b> kartı bildin. Bunlar artık daha seyrek gelecek."
-    elif bad:
-        mood, say = "sad", f"<b>{bad}</b> kartı bilemedin; hepsi bir sonraki turda. İstersen hemen bir tur daha atalım!"
-    else:
-        mood, say = "happy", "Güzel bir tur! Yarın tekrar zamanı gelen kartlarla görüşürüz."
-    menu = [("Bilemediklerim", ":material/replay:", _only_bad, ())] if bad else []
-    buddy.show(mood, say, nonce="end", menu=menu + [("Yeni oturum", ":material/add:", _new, ())])
+    records = []
+    for qid, r in cs["res"].items():
+        it = items.get(qid)
+        if it:
+            q = it["q"]
+            records.append({"status": PILE[r], "diff": C.DIFF_TR.get(q.get("difficulty")), "type": C.type_label(q),
+                            "topic": _topic(it)})
+    main, side = st.columns([3, 1.1], gap="large")
+    with main:
+        kpi = lambda v, k, col: (f'<div class="nr-kpi"><div class="k"><i style="background:{col}"></i>{k}</div>'
+                                 f'<div class="v">{v}</div></div>')
+        style.html(f'<div class="nr-res" style="grid-template-columns:1fr"><div><div class="msg">Oturum bitti: '
+                   f'{len(cs["res"])} karttan {good} tanesini bildin</div><div class="sub">~{mins} dk · en uzun seri '
+                   f'{cs["best"]} · isabet %{round(100 * good / seen)} · bilemediklerin bugün yine, bildiklerin günler '
+                   f'sonra gelecek.</div><div class="nr-kpis">{kpi(good, "Bildim", "#10B981")}'
+                   f'{kpi(bad, "Bilemedim", "#F43F5E")}{kpi(skip, "Atladım", "#F59E0B")}'
+                   f'{kpi(f"{mins} dk", "Süre", "#A78BFA")}</div></div></div>')
+        style.html(C.breakdowns(records, ("Bildim", "Bilemedim", "Atladım")))
+        st.space("small")
+        c = st.columns([2, 1.4, 2])
+        if bad:
+            c[0].button(f"Bilemediklerimi çalış ({bad})", key="fc_rb", type="primary", icon=":material/replay:",
+                        width="stretch", on_click=_only_bad)
+        c[1 if bad else 0].button("Yeni oturum", key="fc_new", icon=":material/add:", width="stretch", on_click=_new,
+                                  type="secondary" if bad else "primary")
+    with side:
+        if good / seen >= .7:
+            mood, say = "party", f"Muhteşem bir tur! <b>{good}</b> kartı bildin; bunlar artık daha seyrek gelecek."
+        elif bad:
+            mood, say = "sad", (f"<b>{bad}</b> kartı bilemedin; hepsi bir sonraki turda. Soldaki kırılıma bak: en çok "
+                                "nerede zorlandığını gösteriyor.")
+        else:
+            mood, say = "happy", "Güzel bir tur! Yarın tekrar zamanı gelen kartlarla görüşürüz."
+        actions = [("Bilemediklerimi çalış", ":material/replay:", _only_bad, ())] if bad else []
+        buddy.panel(mood, say, nonce="end", actions=actions + [("Yeni oturum", ":material/add:", _new, ())])
 
 
 def render() -> None:

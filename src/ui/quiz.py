@@ -10,8 +10,6 @@ from __future__ import annotations
 import math
 import time
 
-import altair as alt
-import pandas as pd
 import streamlit as st
 
 from src import request as R
@@ -19,7 +17,7 @@ from src.textnorm import pretty_math
 from src.ui import buddy, data, style
 from src.ui import components as C
 
-GOOD, BAD, EMPTY, INK = "#3B8D66", "#C6503A", "#B9AF98", "#1E2433"
+GOOD, BAD, EMPTY, INK = "#10B981", "#F43F5E", "#CBD5E1", "#1E1B4B"
 # Şık harflerinin rozet rengi (Streamlit etiket Markdown'ı). Yeşil/kırmızı yok: sınavda doğru/yanlış ipucu sanılmasın
 LETTER_COLORS = ("blue", "orange", "violet", "gray")
 TRANSPARENCY = ("Sorular yapay zekâ ile üretildi; her biri kaynağındaki cümleye bağlandı ve farklı bir model tarafından "
@@ -91,29 +89,34 @@ def start_screen(req: dict, items: list[dict]) -> None:
     topics = list(dict.fromkeys(topic_of(req, it) for it in v))
     kinds = list(dict.fromkeys(C.type_label(it["q"]) for it in v))
     title = "İkinci deneme: yanlışların" if ex.get("retry") else f"{len(v)} soruluk deneme sınavı"
-    style.html(
-        f'<div class="nr-start"><div class="k">Sınav hazır</div><h2>{style.esc(title)}</h2>'
-        f'<div style="color:#D7DEE8">{style.esc(" · ".join(topics[:4]))}{" …" if len(topics) > 4 else ""}</div>'
-        f'<div class="facts"><div><b>{len(v)}</b>soru</div><div><b>~{max(1, round(len(v) * 1.2))} dk</b>tahmini süre</div>'
-        f'<div><b>{len(topics)}</b>konu</div><div><b>{len(kinds)}</b>soru tipi</div></div></div>')
-    st.space("small")
-    c = st.columns([1.4, 3], vertical_alignment="center")
-    if c[0].button("Sınava başla", type="primary", icon=":material/play_arrow:", width="stretch", key="nr_start"):
-        ex.update({"phase": "solve", "cur": 0, "started": time.time(), "hints": {}})
-        st.rerun()
-    c[1].markdown('<div class="nr-keys" style="text-align:left">Sınav odak modunda açılır. Klavye: '
-                  '<span class="nr-kbd">A</span>–<span class="nr-kbd">D</span> şık · <span class="nr-kbd">←</span> '
-                  '<span class="nr-kbd">→</span> soru · <span class="nr-kbd">H</span> ipucu</div>', unsafe_allow_html=True)
-    st.caption(TRANSPARENCY)
-    buddy.show("happy", f"Sınavın hazır: <b>{len(v)}</b> soru, yaklaşık <b>{max(1, round(len(v) * 1.2))} dk</b>. "
-                        "Takılırsan ipucu alabilirsin; ben de yanında olacağım.", nonce="start")
+    mins = max(1, round(len(v) * 1.2))
+    main, side = st.columns([3, 1.1], gap="large")
+    with main:
+        style.html(
+            f'<div class="nr-start"><div class="k">Sınav hazır</div><h2>{style.esc(title)}</h2>'
+            f'<div class="topics">{style.esc(" · ".join(topics[:4]))}{" …" if len(topics) > 4 else ""}</div>'
+            f'<div class="facts"><div><b>{len(v)}</b>soru</div><div><b>~{mins} dk</b>tahmini süre</div>'
+            f'<div><b>{len(topics)}</b>konu</div><div><b>{len(kinds)}</b>soru tipi</div></div></div>')
+        st.space("small")
+        c = st.columns([1.4, 3], vertical_alignment="center")
+        if c[0].button("Sınava başla", type="primary", icon=":material/play_arrow:", width="stretch", key="nr_start"):
+            ex.update({"phase": "solve", "cur": 0, "started": time.time(), "hints": {}})
+            st.rerun()
+        c[1].markdown('<div class="nr-keys" style="text-align:left">Sınav odak modunda açılır. Klavye: '
+                      '<span class="nr-kbd">A</span>–<span class="nr-kbd">D</span> şık · <span class="nr-kbd">←</span> '
+                      '<span class="nr-kbd">→</span> soru · <span class="nr-kbd">H</span> ipucu</div>', unsafe_allow_html=True)
+        st.caption(TRANSPARENCY)
+    with side:
+        buddy.panel("hello", f"Sınavın hazır: <b>{len(v)}</b> soru, yaklaşık <b>{mins} dk</b>. Takılırsan ipucu "
+                             "alabilirsin; ben de yanında olacağım.", nonce="start")
 
 
 # ---------------------------------------------------------------- 2. odak modu
 
 _FOCUS_CSS = """<style>
 section[data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"], [data-testid="stExpandSidebarButton"] { display: none !important; }
-.block-container, [data-testid="stMainBlockContainer"] { max-width: 880px; padding-top: 1.4rem; }
+.block-container, [data-testid="stMainBlockContainer"] { max-width: 1180px; padding-top: 1.3rem; }
+[data-testid="stMain"] { position: relative; z-index: 0; }
 </style>"""
 
 
@@ -227,6 +230,7 @@ setTimeout(() => {{ const h = D.querySelector('.nr-hint.new');
 
 def solve(req: dict, items: list[dict]) -> None:
     style.html(_FOCUS_CSS)
+    style.aurora()
     ex = st.session_state.exam
     v = view(items)
     n = len(v)
@@ -237,95 +241,100 @@ def solve(req: dict, items: list[dict]) -> None:
     qid, answers = it["id"], ex["answers"]
     done = sum(_answered(answers.get(x["id"])) for x in v)
 
-    # Üst şerit: ilerleme, süre, çıkış
-    top = st.columns([5, 1.2, 1.1], vertical_alignment="center")
-    with top[0]:
-        style.html(f'<div class="nr-qprog"><div class="lbl"><span><b>Soru {cur + 1}</b> / {n}</span>'
-                   f'<span>{done} cevaplandı</span></div><div class="bar"><i style="width:{100 * done / n:.1f}%"></i>'
-                   f'</div></div>')
-    hs, level = hints(req, it), ex["hints"].get(qid, 0)
-    with top[1]:
-        _keys_and_scroll(ex["started"], f"{qid}:{level}" if ex.get("hint_flash") == qid else "")
-    if top[2].button("Çık", icon=":material/close:", width="stretch", help="Cevapların saklanır; sonra kaldığın yerden devam edersin."):
-        _sync_text(qid)
-        ex["phase"] = "start"
-        st.rerun()
-
-    # Soru haritası en üstte (yeri hiç değişmez): numaraya tıklayıp atla (✓ = cevaplandı)
-    key = f"nr_map_{cur}"
-    st.pills("Sorular", list(range(n)), default=cur, key=key, label_visibility="collapsed", on_change=_jump,
-             args=(key, qid), format_func=lambda i: f"{i + 1}{' ✓' if _answered(answers.get(v[i]['id'])) else ''}")
-
-    # Soru kartı: sabit asgari yükseklik (kısa / uzun soruda düzen oynamaz); yeni soru ortadan büyüyerek gelir
-    chips = "".join(f'<span class="nr-chip">{style.esc(c)}</span>'
-                    for c in (C.type_label(q), C.DIFF_TR.get(q.get("difficulty"), ""), topic_of(req, it)) if c)
-    style.html(f'<div class="nr-focus" data-q="{cur}" style="--c:{style.color(cur)[0]}"><div class="nr-qhead">'
-               f'<span class="nr-qnum">SORU {cur + 1}</span>'
-               f'{chips}</div><div class="nr-q">{C.t(q["question"])}</div></div>')
-
-    # Cevap alanı: soru tipi ne olursa olsun aynı yükseklik → gezinme düğmeleri yerinde kalır
-    with st.container(key="nr_answer"):
-        with st.container(key="nr_opts"):
-            if q["type"] == "multiple_choice":
-                for j, o in enumerate(q["options"]):
-                    st.button(f":{LETTER_COLORS[j]}-background[**{C.LETTERS[j]}**]  {pretty_math(o)}",
-                              key=f"opt_{qid}_{j}", width="stretch",
-                              type="primary" if answers.get(qid) == j else "secondary", on_click=_pick, args=(qid, j))
-            elif q["type"] == "true_false":
-                cc = st.columns(2)
-                for col, (val, label) in zip(cc, (("true", "Doğru"), ("false", "Yanlış"))):
-                    col.button(label, key=f"opt_{qid}_{val}", width="stretch", on_click=_pick, args=(qid, val),
-                               type="primary" if answers.get(qid) == val else "secondary",
-                               icon=":material/check:" if val == "true" else ":material/close:")
-            else:
-                st.text_input("Cevabın", key=f"sa_{qid}", value=answers.get(qid) or "", label_visibility="collapsed",
-                              placeholder="Sonucu yaz ve Enter'a bas" if q.get("compute") else "Kısa cevabını yaz ve Enter'a bas",
-                              on_change=_sync_text, args=(qid,))
-                style.html('<div class="nr-sa-help">' + (
-                    "Sayı ya da ifade yazabilirsin: <b>30240</b> ile <b>9!/(3!·2!)</b> aynı sayılır; <b>2^n</b>, "
-                    "<b>C(n,2)</b>, <b>n(n-1)</b> gibi yazımlar da tanınır." if q.get("compute") or any(
-                        ch.isdigit() for ch in str(q.get("answer", ""))) else
-                    "Bir kelime ya da kısa bir ifade yeterli. Küçük yazım hataları ve ekler (ör. -dır) sorun değil.")
-                    + "</div>")
-        # Kademeli ipucu: yeni açılan parlayarak gelir ve ekran ona kayar
-        for k in range(min(level, len(hs))):
-            new = " new" if (k == level - 1 and ex.get("hint_flash") == qid) else ""
-            style.html(f'<div class="nr-hint{new}"><div class="h">💡 {k + 1}. ipucu · {style.esc(hs[k][0])}</div>'
-                       f'<div class="b">{hs[k][1]}</div></div>')
-
-    # Gezinme: ekranın altına yapışık
-    nav_box = st.container(key="nr_nav")
-    nav = nav_box.columns([1.2, 1.3, 1.5], vertical_alignment="center")
-    nav[0].button("Önceki", key="nav_prev", icon=":material/arrow_back:", width="stretch", disabled=cur == 0,
-                  on_click=_go, args=(cur - 1, qid))
-    if level < len(hs):
-        nav[1].button(f"İpucu al ({level + 1}/{len(hs)})", key=f"hint_{qid}", icon=":material/lightbulb:",
-                      width="stretch", on_click=_hint, args=(qid,))
-    else:
-        nav[1].button("İpuçları bitti", key=f"hint_{qid}", icon=":material/lightbulb:", width="stretch", disabled=True)
-    if cur < n - 1:
-        nav[2].button("Sonraki", key="nav_next", icon=":material/arrow_forward:", type="primary", width="stretch",
-                      on_click=_go, args=(cur + 1, qid))
-    elif nav[2].button("Sınavı bitir", key="nav_next", icon=":material/flag:", type="primary", width="stretch"):
-        _sync_text(qid)
-        empty = sum(not _answered(answers.get(x["id"])) for x in v)
-        if empty:
-            _confirm_finish(empty, qid)
-        else:
-            _finish()
+    main, side = st.columns([3, 1.1], gap="large")
+    with main:
+        # Üst şerit: ilerleme, süre, çıkış
+        top = st.columns([5, 1.2, 1.1], vertical_alignment="center")
+        with top[0]:
+            style.html(f'<div class="nr-qprog"><div class="lbl"><span><b>Soru {cur + 1}</b> / {n}</span>'
+                       f'<span>{done} cevaplandı</span></div><div class="bar"><i style="width:{100 * done / n:.1f}%"></i>'
+                       f'</div></div>')
+        hs, level = hints(req, it), ex["hints"].get(qid, 0)
+        with top[1]:
+            _keys_and_scroll(ex["started"], f"{qid}:{level}" if ex.get("hint_flash") == qid else "")
+        if top[2].button("Çık", icon=":material/close:", width="stretch", help="Cevapların saklanır; sonra kaldığın yerden devam edersin."):
+            _sync_text(qid)
+            ex["phase"] = "start"
             st.rerun()
 
-    with nav_box:
-        style.html('<div class="nr-keys">Klavye: <span class="nr-kbd">A</span>–<span class="nr-kbd">D</span> şık · '
-                   '<span class="nr-kbd">←</span> <span class="nr-kbd">→</span> soru · <span class="nr-kbd">H</span> ipucu</div>')
+        # Soru haritası en üstte (yeri hiç değişmez): numaraya tıklayıp atla (✓ = cevaplandı)
+        key = f"nr_map_{cur}"
+        st.pills("Sorular", list(range(n)), default=cur, key=key, label_visibility="collapsed", on_change=_jump,
+                 args=(key, qid), format_func=lambda i: f"{i + 1}{' ✓' if _answered(answers.get(v[i]['id'])) else ''}")
 
-    # Fosfor: son olaya göre konuşur; hızlı menü (ilk boş soruya git, ipucu)
-    mood, text, nonce = _say(ex, v, cur)
-    blanks = [i for i, x in enumerate(v) if not _answered(answers.get(x["id"])) and i != cur]
-    menu = [("İlk boş soruya git", ":material/skip_next:", _go, (blanks[0], qid))] if blanks else []
-    if level < len(hs):
-        menu.append(("İpucu al", ":material/lightbulb:", _hint, (qid,)))
-    buddy.show(mood, text, menu=menu, nonce=nonce)
+        # Soru kartı: sabit asgari yükseklik (kısa / uzun soruda düzen oynamaz); yeni soru ortadan büyüyerek gelir
+        chips = "".join(f'<span class="nr-chip">{style.esc(c)}</span>'
+                        for c in (C.type_label(q), C.DIFF_TR.get(q.get("difficulty"), ""), topic_of(req, it)) if c)
+        style.html(f'<div class="nr-focus" data-q="{cur}" style="--c:{style.color(cur)[3]};--c2:{style.color(cur)[1]}"><div class="nr-qhead">'
+                   f'<span class="nr-qnum">SORU {cur + 1}</span>'
+                   f'{chips}</div><div class="nr-q">{C.t(q["question"])}</div></div>')
+
+        # Cevap alanı: soru tipi ne olursa olsun aynı yükseklik → gezinme düğmeleri yerinde kalır
+        with st.container(key="nr_answer"):
+            with st.container(key="nr_opts"):
+                if q["type"] == "multiple_choice":
+                    for j, o in enumerate(q["options"]):
+                        st.button(f":{LETTER_COLORS[j]}-background[**{C.LETTERS[j]}**]  {pretty_math(o)}",
+                                  key=f"opt_{qid}_{j}", width="stretch",
+                                  type="primary" if answers.get(qid) == j else "secondary", on_click=_pick, args=(qid, j))
+                elif q["type"] == "true_false":
+                    cc = st.columns(2)
+                    for col, (val, label) in zip(cc, (("true", "Doğru"), ("false", "Yanlış"))):
+                        col.button(label, key=f"opt_{qid}_{val}", width="stretch", on_click=_pick, args=(qid, val),
+                                   type="primary" if answers.get(qid) == val else "secondary",
+                                   icon=":material/check:" if val == "true" else ":material/close:")
+                else:
+                    st.text_input("Cevabın", key=f"sa_{qid}", value=answers.get(qid) or "", label_visibility="collapsed",
+                                  placeholder="Sonucu yaz ve Enter'a bas" if q.get("compute") else "Kısa cevabını yaz ve Enter'a bas",
+                                  on_change=_sync_text, args=(qid,))
+                    style.html('<div class="nr-sa-help">' + (
+                        "Sayı ya da ifade yazabilirsin: <b>30240</b> ile <b>9!/(3!·2!)</b> aynı sayılır; <b>2^n</b>, "
+                        "<b>C(n,2)</b>, <b>n(n-1)</b> gibi yazımlar da tanınır." if q.get("compute") or any(
+                            ch.isdigit() for ch in str(q.get("answer", ""))) else
+                        "Bir kelime ya da kısa bir ifade yeterli. Küçük yazım hataları ve ekler (ör. -dır) sorun değil.")
+                        + "</div>")
+            # Kademeli ipucu: yeni açılan parlayarak gelir ve ekran ona kayar
+            for k in range(min(level, len(hs))):
+                new = " new" if (k == level - 1 and ex.get("hint_flash") == qid) else ""
+                style.html(f'<div class="nr-hint{new}"><div class="h">💡 {k + 1}. ipucu · {style.esc(hs[k][0])}</div>'
+                           f'<div class="b">{hs[k][1]}</div></div>')
+
+        # Gezinme: ekranın altına yapışık
+        nav_box = st.container(key="nr_nav")
+        nav = nav_box.columns([1.2, 1.3, 1.5], vertical_alignment="center")
+        nav[0].button("Önceki", key="nav_prev", icon=":material/arrow_back:", width="stretch", disabled=cur == 0,
+                      on_click=_go, args=(cur - 1, qid))
+        if level < len(hs):
+            nav[1].button(f"İpucu al ({level + 1}/{len(hs)})", key=f"hint_{qid}", icon=":material/lightbulb:",
+                          width="stretch", on_click=_hint, args=(qid,))
+        else:
+            nav[1].button("İpuçları bitti", key=f"hint_{qid}", icon=":material/lightbulb:", width="stretch", disabled=True)
+        if cur < n - 1:
+            nav[2].button("Sonraki", key="nav_next", icon=":material/arrow_forward:", type="primary", width="stretch",
+                          on_click=_go, args=(cur + 1, qid))
+        elif nav[2].button("Sınavı bitir", key="nav_next", icon=":material/flag:", type="primary", width="stretch"):
+            _sync_text(qid)
+            empty = sum(not _answered(answers.get(x["id"])) for x in v)
+            if empty:
+                _confirm_finish(empty, qid)
+            else:
+                _finish()
+                st.rerun()
+
+        with nav_box:
+            style.html('<div class="nr-keys">Klavye: <span class="nr-kbd">A</span>–<span class="nr-kbd">D</span> şık · '
+                       '<span class="nr-kbd">←</span> <span class="nr-kbd">→</span> soru · <span class="nr-kbd">H</span> ipucu</div>')
+
+    # Fosfor: son olaya göre konuşur; hızlı eylemler (ilk boş soruya git, ipucu)
+    with side:
+        mood, text, nonce = _say(ex, v, cur)
+        blanks = [i for i, x in enumerate(v) if not _answered(answers.get(x["id"])) and i != cur]
+        acts = [("İlk boş soruya git", ":material/skip_next:", _go, (blanks[0], qid))] if blanks else []
+        if level < len(hs):
+            acts.append(("İpucu al", ":material/lightbulb:", _hint, (qid,)))
+        used = sum(ex["hints"].values())
+        buddy.panel(mood, text, actions=acts, nonce=nonce, status="Sınavdayız",
+                    stats=buddy.stats([(str(done), "cevaplı"), (str(n - done), "boş"), (str(used), "ipucu")]))
 
 
 # ---------------------------------------------------------------- 3. sonuç
@@ -345,7 +354,7 @@ def _ring(c: int, w: int, e: int) -> str:
     pct = round(100 * c / total)
     return (f'<svg class="nr-ring" viewBox="0 0 180 180" width="190" height="190" role="img" '
             f'aria-label="{c} doğru, {w} yanlış, {e} boş">'
-            f'<circle cx="90" cy="90" r="{r}" fill="none" stroke="#ECE6D8" stroke-width="18"/>{"".join(segs)}'
+            f'<circle cx="90" cy="90" r="{r}" fill="none" stroke="#EEF0F6" stroke-width="18"/>{"".join(segs)}'
             f'<text x="90" y="92" text-anchor="middle" class="pct">%{pct}</text>'
             f'<text x="90" y="114" text-anchor="middle" class="lbl">{c} / {total} doğru</text></svg>')
 
@@ -358,27 +367,6 @@ def _message(pct: int) -> tuple[str, str]:
     if pct >= 40:
         return "Temel oturuyor.", "Aşağıdaki konulara notlarından bir kez daha göz atıp yanlışlarını tekrar çöz."
     return "Tekrar zamanı.", "Konuları notlarından yeniden çalış; ipuçlarını kullanarak yanlışlarını tekrar çöz."
-
-
-def _topic_chart(rows: list[dict]) -> alt.Chart:
-    df = pd.DataFrame(rows)
-    order = ["Doğru", "Yanlış", "Boş"]
-    sort = df.groupby("Konu")["Sayı"].sum().sort_values(ascending=False).index.tolist()
-    base = alt.Chart(df).encode(
-        y=alt.Y("Konu:N", sort=sort, title=None, axis=alt.Axis(labelLimit=260)),
-        x=alt.X("Sayı:Q", stack="zero", title=None, axis=alt.Axis(tickMinStep=1, format="d", grid=True)),
-        tooltip=["Konu:N", "Durum:N", "Sayı:Q"])
-    bars = base.mark_bar(height=18, stroke="#FFFDF8", strokeWidth=2, cornerRadius=3).encode(
-        color=alt.Color("Durum:N", scale=alt.Scale(domain=order, range=[GOOD, BAD, EMPTY]),
-                        legend=alt.Legend(orient="top", title=None)),
-        order=alt.Order("sira:Q"))
-    text = base.mark_text(dx=-8, align="right", color="#FFFFFF", fontWeight=600).encode(
-        x=alt.X("Sayı:Q", stack="zero"), detail="Durum:N", order=alt.Order("sira:Q"),
-        text=alt.condition(alt.datum.Sayı > 0, alt.Text("Sayı:Q"), alt.value("")))
-    return (bars + text).properties(height=max(90, 40 * len(sort))).configure(
-        font="Instrument Sans", background="transparent").configure_view(stroke=None).configure_axis(
-        labelColor="#4A5163", gridColor="#E6DFCF", domainColor="#E6DFCF", tickColor="#E6DFCF", labelFontSize=12
-    ).configure_legend(labelColor="#4A5163", labelFontSize=12)
 
 
 def restart(req: dict, items: list[dict], retry: list[str] | None) -> None:
@@ -425,53 +413,52 @@ def results(req: dict, items: list[dict]) -> None:
     extra += " · itirazla" if overrides & set(ok) else ""
     kpi = lambda k, val, color=None: (f'<div class="nr-kpi"><div class="k">{f"<i style=background:{color}></i>" if color else ""}'
                                       f'{k}</div><div class="v">{val}</div></div>')
-    style.html(
-        f'<div class="nr-res"><div>{_ring(c, w, e)}<div class="nr-legend"><span><i style="background:{GOOD}"></i>Doğru</span>'
-        f'<span><i style="background:{BAD}"></i>Yanlış</span><span><i style="background:{EMPTY}"></i>Boş</span></div></div>'
-        f'<div><div class="msg">{style.esc(head)}</div><div class="sub">{style.esc(sub)}{style.esc(extra)}</div>'
-        f'<div class="nr-kpis">{kpi("Doğru", c, GOOD)}{kpi("Yanlış", w, BAD)}{kpi("Boş", e, EMPTY)}'
-        f'{kpi("Süre", _fmt_time(dur))}</div>'
-        f'<div style="margin-top:.6rem;color:#6B6F7B;font-size:.88rem">💡 {used} ipucu kullandın</div></div></div>')
-    st.space("small")
-    if pct >= 70 and not ex.get("confetti"):  # bir kez (sonuç ekranındaki her tıklamada değil)
-        style.html(style.confetti())
-        ex["confetti"] = True
-
     wrong = [k for k, g in ok.items() if not g]
-    if pct >= 90:
-        mood, say = "cheer", f"Muhteşem! <b>%{pct}</b> 🎉 Bir dahaki sınavda zorluğu artırmayı dene."
-    elif pct >= 70:
-        mood, say = "happy", f"<b>{c}</b> doğru, çok iyi! Kalan <b>{len(wrong)}</b> soruyu kartla pekiştirelim mi?"
-    elif pct >= 40:
-        mood, say = "think", f"<b>{c}</b> doğru, <b>{w}</b> yanlış, <b>{e}</b> boş. Yanlışlarını kart yapıp çalışmak iyi gelir."
-    else:
-        mood, say = "sad", "Bu sefer zorlandın, olur. Kaynak cümleleri kartlarla tekrar edip yeniden deneyelim!"
-    buddy.show(mood, say, nonce=f"res{pct}", menu=[("Yanlışları kartla çalış", ":material/style:", _to_cards, (wrong,))]
-               if wrong else [])
-    b = st.columns([1.9, 1.3, 1.3], vertical_alignment="center")
-    # Anahtarlar şart: üstteki özette de "Yeni sınav" var (aynı etiketli iki düğme Streamlit'te çakışıyordu)
-    if wrong and b[0].button(f"Yanlışları tekrar çöz ({len(wrong)})", icon=":material/refresh:", type="primary",
-                             width="stretch", key="res_retry"):
-        restart(req, items, wrong)
-    if b[1].button("Baştan çöz", icon=":material/replay:", width="stretch", key="res_restart"):
-        restart(req, items, None)
-    if b[2].button("Yeni sınav", icon=":material/add:", width="stretch", key="new_exam_bottom"):
-        st.session_state.pop("exam", None)
-        st.query_params.clear()
-        st.rerun()
-
-    # Konulara göre başarı
-    rows = []
-    for it in v:
-        status = "Doğru" if ok[it["id"]] else ("Boş" if it["id"] in empty else "Yanlış")
-        rows.append({"Konu": topic_of(req, it), "Durum": status, "Sayı": 1,
-                     "sira": {"Doğru": 0, "Yanlış": 1, "Boş": 2}[status]})
-    agg = (pd.DataFrame(rows).groupby(["Konu", "Durum", "sira"], as_index=False)["Sayı"].sum().to_dict("records"))
-    st.markdown("#### Konulara göre")
-    st.altair_chart(_topic_chart(agg), width="stretch")
-    weak = [t for t in dict.fromkeys(r["Konu"] for r in rows if r["Durum"] != "Doğru")]
-    if weak:
-        st.caption("Tekrar etmen gereken konular: " + " · ".join(weak[:6]))
+    records = [{"status": "Doğru" if ok[it["id"]] else ("Boş" if it["id"] in empty else "Yanlış"),
+                "diff": C.DIFF_TR.get(it["q"].get("difficulty")), "type": C.type_label(it["q"]),
+                "topic": topic_of(req, it)} for it in v]
+    main, side = st.columns([3, 1.1], gap="large")
+    with main:
+        style.html(
+            f'<div class="nr-res"><div>{_ring(c, w, e)}<div class="nr-legend"><span><i style="background:{GOOD}"></i>Doğru</span>'
+            f'<span><i style="background:{BAD}"></i>Yanlış</span><span><i style="background:{EMPTY}"></i>Boş</span></div></div>'
+            f'<div><div class="msg">{style.esc(head)}</div><div class="sub">{style.esc(sub)}{style.esc(extra)}</div>'
+            f'<div class="nr-kpis">{kpi("Doğru", c, GOOD)}{kpi("Yanlış", w, BAD)}{kpi("Boş", e, EMPTY)}'
+            f'{kpi("Süre", _fmt_time(dur))}</div>'
+            f'<div style="margin-top:.6rem;color:#6B6F7B;font-size:.88rem">💡 {used} ipucu kullandın</div></div></div>')
+        st.space("small")
+        b = st.columns([1.9, 1.3, 1.3], vertical_alignment="center")
+        # Anahtarlar şart: üstteki özette de "Yeni sınav" var (aynı etiketli iki düğme Streamlit'te çakışıyordu)
+        if wrong and b[0].button(f"Yanlışları tekrar çöz ({len(wrong)})", icon=":material/refresh:", type="primary",
+                                 width="stretch", key="res_retry"):
+            restart(req, items, wrong)
+        if b[1].button("Baştan çöz", icon=":material/replay:", width="stretch", key="res_restart"):
+            restart(req, items, None)
+        if b[2].button("Yeni sınav", icon=":material/add:", width="stretch", key="new_exam_bottom"):
+            st.session_state.pop("exam", None)
+            st.query_params.clear()
+            st.rerun()
+        # Zorluk, soru tipi ve konu kırılımı (doğru / yanlış / boş)
+        style.html(C.breakdowns(records, ("Doğru", "Yanlış", "Boş")))
+        weak = list(dict.fromkeys(r["topic"] for r in records if r["status"] != "Doğru"))
+        if weak:
+            st.caption("Tekrar etmen gereken konular: " + " · ".join(weak[:6]))
+    with side:
+        if pct >= 70 and not ex.get("confetti"):  # bir kez (sonuç ekranındaki her tıklamada değil)
+            buddy.celebrate()
+            ex["confetti"] = True
+        hard_bad = sum(1 for r in records if r["diff"] == "Zor" and r["status"] != "Doğru")
+        if pct >= 90:
+            mood, say = "party", f"Muhteşem! <b>%{pct}</b>. Bir dahaki sınavda zorluğu artırmayı dene."
+        elif pct >= 70:
+            mood, say = "cheer", f"<b>{c}</b> doğru, çok iyi! Kalan <b>{len(wrong)}</b> soruyu kartla pekiştirelim mi?"
+        elif pct >= 40:
+            mood, say = "think", (f"<b>{c}</b> doğru, <b>{w}</b> yanlış, <b>{e}</b> boş. Soldaki kırılım nerede "
+                                  "zorlandığını gösteriyor" + (f"; zor sorulardan <b>{hard_bad}</b> tanesi kaldı." if hard_bad else "."))
+        else:
+            mood, say = "sad", "Bu sefer zorlandın, olur. Kaynak cümleleri kartlarla tekrar edip yeniden deneyelim!"
+        buddy.panel(mood, say, nonce=f"res{pct}", status="Sonuçların",
+                    actions=[("Yanlışları kartla çalış", ":material/style:", _to_cards, (wrong,))] if wrong else [])
 
     # Gözden geçirme
     st.markdown("#### Soruları gözden geçir")

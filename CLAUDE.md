@@ -19,6 +19,7 @@ Kullanıcı Türkçe yazar; arayüz, belgeler ve istem dışı metinler Türkçe
   → http://localhost:8501 (sağlık: `/_stcore/health`). `src/ui/pages/*` dışındaki modüller değişince Streamlit'i yeniden başlat.
 - Belge işleme: `python -m src.pipeline "<pdf kökü>"` (arayüzden yükleme de bunu ayrı süreçte başlatır → `data/jobs/<belge>.log`).
   Sınav istekleri → `data/requests/<id>.log`. İzleme: `python scripts\bekci.py` arka planda; çıkınca kullanıcıya bildir, yeniden başlat.
+- Arayüzü görerek kontrol: `streamlit run scripts/onizleme.py --server.port 8502` (hazır verili ekranlar, `?v=session|flip|summary|quiz|results|setup`) + `python scripts\ekran.py <url> <png>` (görünmez Edge + CDP; Read ile bak). Tasarım değişikliğini kullanıcıya göstermeden önce bununla bak.
 - Kota durumu: `python -m src.llm.capacity`. Testler (API çağırmaz): `python -m tests.<ad>` (README §8'deki liste).
 
 ## Kurallar

@@ -94,6 +94,44 @@ def question_card(item: dict, number: int, reveal: bool = True, chosen=None, ver
             f'<div class="nr-q">{t(q.get("question", "(şema dışı)"))}</div>{body}{tail}</div>')
 
 
+# Bitiş istatistikleri: durum → renk (renk hep etiketle birlikte gösterilir; açık gri "boş" için nötr)
+STAT_COLORS = {"Doğru": "#10B981", "Bildim": "#10B981", "Yanlış": "#F43F5E", "Bilemedim": "#F43F5E",
+               "Boş": "#CBD5E1", "Atladım": "#F59E0B"}
+DIFF_ORDER = ["Kolay", "Orta", "Zor"]
+
+
+def breakdown(title: str, rows: list[tuple[str, list[int]]], labels: tuple[str, ...], wide: bool = False,
+              note: str = "") -> str:
+    """Kırılım kartı: her satır bir grup (ör. 'Kolay'); çubuk durumlara göre yığılı, sağda 'ilk durum / toplam'."""
+    body = "" if rows else '<div class="none">Bu gruplamada veri yok.</div>'
+    for i, (name, counts) in enumerate(rows):
+        total = max(1, sum(counts))
+        detail = " · ".join(f"{lab}: {c}" for lab, c in zip(labels, counts))
+        segs = "".join(f'<i style="width:{100 * c / total:.1f}%;background:{STAT_COLORS[lab]};'
+                       f'animation-delay:{.15 + i * .06:.2f}s"></i>' for lab, c in zip(labels, counts) if c)
+        body += (f'<div class="r" title="{style.esc(detail)}"><div class="nm">{style.esc(name)}</div>'
+                 f'<div class="bar">{segs}</div><div class="ct"><b>{counts[0]}</b> / {sum(counts)}</div></div>')
+    legend = "".join(f'<span><i style="background:{STAT_COLORS[lab]}"></i>{lab}</span>' for lab in labels)
+    return (f'<div class="nr-bd{" wide" if wide else ""}"><div class="h">{style.esc(title)}<small>{style.esc(note)}</small>'
+            f'</div>{body}<div class="nr-lg">{legend}</div></div>')
+
+
+def breakdowns(records: list[dict], labels: tuple[str, ...]) -> str:
+    """records: [{"diff", "type", "topic", "status"}] → zorluk ve soru tipi yan yana, konu altta geniş."""
+    def group(key: str, order: list[str] | None = None, limit: int | None = None) -> list[tuple[str, list[int]]]:
+        agg: dict[str, list[int]] = {}
+        for r in records:
+            agg.setdefault(r[key] or "Belirsiz", [0] * len(labels))[labels.index(r["status"])] += 1
+        keys = [k for k in (order or []) if k in agg] + sorted((k for k in agg if k not in (order or [])),
+                                                               key=lambda k: -sum(agg[k]))
+        return [(k, agg[k]) for k in keys[:limit]]
+    topics = group("topic", limit=8)
+    note = f"en çok soru olan {len(topics)} konu" if len({r['topic'] for r in records}) > len(topics) else ""
+    return ('<div class="nr-bdgrid">' + breakdown("Zorluğa göre", group("diff", DIFF_ORDER), labels)
+            + breakdown("Soru tipine göre", group("type"), labels)
+            + breakdown("Konuya göre", topics, labels, wide=True, note=note) + "</div>")
+
+
 def page_card(item: dict, png: bytes | None, note: str, reveal: bool = True) -> str:
     """Kaynak sayfa kartı (kanıt sarıyla işaretli sayfa görüntüsü)."""
     page = item.get("check", {}).get("evidence_page")
