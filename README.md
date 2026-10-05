@@ -215,4 +215,4 @@ Windows, Python 3.11 sanal ortamı (`.venv`). Anahtarlar `.env` dosyasında (şa
 ```
 
 Testler (internetsiz, API çağrısı yok): `.venv\Scripts\python -m tests.<ad>` — `test_pipeline`, `test_checks`, `test_compute`,
-`test_grading`, `test_textnorm`, `test_router`, `test_parser`.
+`test_grading`, `test_textnorm`, `test_router`, `test_parser`, `test_cards`.

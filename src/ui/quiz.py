@@ -16,10 +16,12 @@ import streamlit as st
 
 from src import request as R
 from src.textnorm import pretty_math
+from src.ui import buddy, data, style
 from src.ui import components as C
-from src.ui import data, style
 
 GOOD, BAD, EMPTY, INK = "#3B8D66", "#C6503A", "#B9AF98", "#1E2433"
+# Şık harflerinin rozet rengi (Streamlit etiket Markdown'ı). Yeşil/kırmızı yok: sınavda doğru/yanlış ipucu sanılmasın
+LETTER_COLORS = ("blue", "orange", "violet", "gray")
 TRANSPARENCY = ("Sorular yapay zekâ ile üretildi; her biri kaynağındaki cümleye bağlandı ve farklı bir model tarafından "
                 "cevap anahtarı görülmeden çözülerek doğrulandı. Kısa cevaplar otomatik karşılaştırılır; yanlış "
                 "değerlendirildiğini düşünürsen sonuçta itiraz edebilirsin.")
@@ -103,6 +105,8 @@ def start_screen(req: dict, items: list[dict]) -> None:
                   '<span class="nr-kbd">A</span>–<span class="nr-kbd">D</span> şık · <span class="nr-kbd">←</span> '
                   '<span class="nr-kbd">→</span> soru · <span class="nr-kbd">H</span> ipucu</div>', unsafe_allow_html=True)
     st.caption(TRANSPARENCY)
+    buddy.show("happy", f"Sınavın hazır: <b>{len(v)}</b> soru, yaklaşık <b>{max(1, round(len(v) * 1.2))} dk</b>. "
+                        "Takılırsan ipucu alabilirsin; ben de yanında olacağım.", nonce="start")
 
 
 # ---------------------------------------------------------------- 2. odak modu
@@ -116,6 +120,7 @@ section[data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"], [da
 def _pick(qid: str, value) -> None:
     st.session_state.exam["answers"][qid] = value
     st.session_state.exam.pop("hint_flash", None)
+    st.session_state.exam["event"] = ("pick", qid)
 
 
 def _sync_text(qid: str) -> None:
@@ -127,6 +132,9 @@ def _sync_text(qid: str) -> None:
 def _go(target: int, qid: str) -> None:
     _sync_text(qid)
     ex = st.session_state.exam
+    # İleri giderken soru boş kaldıysa Fosfor bunu söyler (geri dönmek ya da haritadan atlamak "boş geçmek" değil)
+    skipped = target == ex.get("cur", 0) + 1 and not _answered(ex["answers"].get(qid))
+    ex["event"] = ("skip", ex.get("cur", 0)) if skipped else ("go", target)
     ex["cur"] = target
     ex.pop("hint_flash", None)
 
@@ -135,6 +143,31 @@ def _hint(qid: str) -> None:
     ex = st.session_state.exam
     ex["hints"][qid] = ex["hints"].get(qid, 0) + 1
     ex["hint_flash"] = qid
+    ex["event"] = ("hint", qid)
+
+
+def _say(ex: dict, v: list[dict], cur: int) -> tuple[str, str, str]:
+    """Fosfor'un sınav sırasındaki sözü: son olaya göre (şık seçildi, boş geçildi, ipucu); cevabın doğruluğunu
+    söylemez (sınav). Seçim konuma bağlı: yeniden çizimde söz değişmez."""
+    kind, arg = ex.get("event") or ("start", "")
+    blanks = [i for i, x in enumerate(v) if not _answered(ex["answers"].get(x["id"]))]
+    nonce = f"{kind}{cur}-{len(blanks)}"
+    if kind == "pick":
+        says = ["Cevabını kaydettim ✍️", "Tamamdır! Emin değilsen <b>H</b> ile ipucu alabilirsin.",
+                "Not aldım. Sıradakine geçelim mi? <b>→</b>"]
+        return "happy", says[cur % len(says)], nonce
+    if kind == "skip":
+        return "think", (f"<b>{arg + 1}. soruyu</b> boş geçtin. Haritada ✓ olmayanlar boş; istediğin zaman "
+                         "dönebilirsin."), nonce
+    if kind == "hint":
+        return "think", "İpucu aşağıda parlıyor 💡 Hâlâ zorlanırsan bir sonrakini açabilirsin.", nonce
+    if cur == len(v) - 1:
+        if blanks:
+            return "calm", f"Son soru! Hâlâ <b>{len(blanks)}</b> boş var; bitirmeden önce bakmak ister misin?", nonce
+        return "cheer", "Son soru ve hepsini cevapladın! Hazırsan bitirebilirsin 🎯", nonce
+    if kind == "go":
+        return "calm", f"<b>{cur + 1}. soru</b>. Acele etme, notlarındaki cümleleri hatırlamaya çalış.", nonce
+    return "happy", "Hadi başlayalım! Şıkları <b>A–D</b> tuşlarıyla da seçebilirsin.", nonce
 
 
 def _jump(key: str, qid: str) -> None:
@@ -226,7 +259,8 @@ def solve(req: dict, items: list[dict]) -> None:
     # Soru kartı: sabit asgari yükseklik (kısa / uzun soruda düzen oynamaz); yeni soru ortadan büyüyerek gelir
     chips = "".join(f'<span class="nr-chip">{style.esc(c)}</span>'
                     for c in (C.type_label(q), C.DIFF_TR.get(q.get("difficulty"), ""), topic_of(req, it)) if c)
-    style.html(f'<div class="nr-focus" data-q="{cur}"><div class="nr-qhead"><span class="nr-qnum">SORU {cur + 1}</span>'
+    style.html(f'<div class="nr-focus" data-q="{cur}" style="--c:{style.color(cur)[0]}"><div class="nr-qhead">'
+               f'<span class="nr-qnum">SORU {cur + 1}</span>'
                f'{chips}</div><div class="nr-q">{C.t(q["question"])}</div></div>')
 
     # Cevap alanı: soru tipi ne olursa olsun aynı yükseklik → gezinme düğmeleri yerinde kalır
@@ -234,7 +268,8 @@ def solve(req: dict, items: list[dict]) -> None:
         with st.container(key="nr_opts"):
             if q["type"] == "multiple_choice":
                 for j, o in enumerate(q["options"]):
-                    st.button(f"**{C.LETTERS[j]}**  ·  {pretty_math(o)}", key=f"opt_{qid}_{j}", width="stretch",
+                    st.button(f":{LETTER_COLORS[j]}-background[**{C.LETTERS[j]}**]  {pretty_math(o)}",
+                              key=f"opt_{qid}_{j}", width="stretch",
                               type="primary" if answers.get(qid) == j else "secondary", on_click=_pick, args=(qid, j))
             elif q["type"] == "true_false":
                 cc = st.columns(2)
@@ -283,6 +318,14 @@ def solve(req: dict, items: list[dict]) -> None:
     with nav_box:
         style.html('<div class="nr-keys">Klavye: <span class="nr-kbd">A</span>–<span class="nr-kbd">D</span> şık · '
                    '<span class="nr-kbd">←</span> <span class="nr-kbd">→</span> soru · <span class="nr-kbd">H</span> ipucu</div>')
+
+    # Fosfor: son olaya göre konuşur; hızlı menü (ilk boş soruya git, ipucu)
+    mood, text, nonce = _say(ex, v, cur)
+    blanks = [i for i, x in enumerate(v) if not _answered(answers.get(x["id"])) and i != cur]
+    menu = [("İlk boş soruya git", ":material/skip_next:", _go, (blanks[0], qid))] if blanks else []
+    if level < len(hs):
+        menu.append(("İpucu al", ":material/lightbulb:", _hint, (qid,)))
+    buddy.show(mood, text, menu=menu, nonce=nonce)
 
 
 # ---------------------------------------------------------------- 3. sonuç
@@ -350,8 +393,17 @@ def restart(req: dict, items: list[dict], retry: list[str] | None) -> None:
     st.rerun()
 
 
+def _to_cards(ids: list[str]) -> None:
+    """Yanlış ve boşları bilgi kartı olarak çalış (sayfa geçişi geri çağrıda yapılamaz → bayrak, sonra switch_page)."""
+    st.session_state.cards_preset = ids
+    st.session_state.pop("cards", None)
+    st.session_state.exam["to_cards"] = True
+
+
 def results(req: dict, items: list[dict]) -> None:
     ex = st.session_state.exam
+    if ex.pop("to_cards", False):
+        st.switch_page("ui/pages/cards.py")
     v = view(items)
     overrides = set(ex.get("overrides", []))
     graded = {it["id"]: grade(it, ex["answers"].get(it["id"])) for it in v}
@@ -381,8 +433,21 @@ def results(req: dict, items: list[dict]) -> None:
         f'{kpi("Süre", _fmt_time(dur))}</div>'
         f'<div style="margin-top:.6rem;color:#6B6F7B;font-size:.88rem">💡 {used} ipucu kullandın</div></div></div>')
     st.space("small")
+    if pct >= 70 and not ex.get("confetti"):  # bir kez (sonuç ekranındaki her tıklamada değil)
+        style.html(style.confetti())
+        ex["confetti"] = True
 
     wrong = [k for k, g in ok.items() if not g]
+    if pct >= 90:
+        mood, say = "cheer", f"Muhteşem! <b>%{pct}</b> 🎉 Bir dahaki sınavda zorluğu artırmayı dene."
+    elif pct >= 70:
+        mood, say = "happy", f"<b>{c}</b> doğru, çok iyi! Kalan <b>{len(wrong)}</b> soruyu kartla pekiştirelim mi?"
+    elif pct >= 40:
+        mood, say = "think", f"<b>{c}</b> doğru, <b>{w}</b> yanlış, <b>{e}</b> boş. Yanlışlarını kart yapıp çalışmak iyi gelir."
+    else:
+        mood, say = "sad", "Bu sefer zorlandın, olur. Kaynak cümleleri kartlarla tekrar edip yeniden deneyelim!"
+    buddy.show(mood, say, nonce=f"res{pct}", menu=[("Yanlışları kartla çalış", ":material/style:", _to_cards, (wrong,))]
+               if wrong else [])
     b = st.columns([1.9, 1.3, 1.3], vertical_alignment="center")
     # Anahtarlar şart: üstteki özette de "Yeni sınav" var (aynı etiketli iki düğme Streamlit'te çakışıyordu)
     if wrong and b[0].button(f"Yanlışları tekrar çöz ({len(wrong)})", icon=":material/refresh:", type="primary",

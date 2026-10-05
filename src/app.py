@@ -1,6 +1,6 @@
 """NotaRAG arayüzü. Çalıştırma: .venv\\Scripts\\streamlit run src/app.py  →  http://localhost:8501
 
-Sayfalar (src/ui/pages): Sınav Hazırla · Belgeler · Soru Bankası · İnceleme · Rapor · Modeller ve Kota
+Sayfalar (src/ui/pages): Sınav Hazırla · Bilgi Kartları · Belgeler · Soru Bankası · İnceleme · Rapor · Modeller ve Kota
 Görsel dil: .streamlit/config.toml (tema) + src/ui/style.py (ayrıntılar); ortak soru kartı src/ui/components.py.
 """
 
@@ -22,6 +22,7 @@ st.logo(str(Path(__file__).parent / "ui" / "logo.svg"), size="large")
 pages = {
     "Çalış": [
         st.Page("ui/pages/exam.py", title="Sınav Hazırla", icon=":material/quiz:", default=True),
+        st.Page("ui/pages/cards.py", title="Bilgi Kartları", icon=":material/style:"),
     ],
     "İçerik": [
         st.Page("ui/pages/documents.py", title="Belgeler", icon=":material/library_books:"),
