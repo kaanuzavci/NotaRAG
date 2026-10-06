@@ -69,8 +69,53 @@ def test_cache_key() -> None:
         os.environ.pop("REASONING_VERIFY", None)
 
 
+def test_busy_gemini() -> None:
+    """Gemini'de 503 'yoğun' da günlük kotadan düşüyor (2026-10-06: 0 başarılı, ~20 deneme → 'günlük kota doldu'):
+    deneme sayaca yazılır, aynı model hemen yeniden sorulmaz, artan sürelerle kapatılır. Gemma (rpd yok) iki kez dener."""
+    from src.llm import router
+    from src.llm.models import ROLES
+    rec, cool, tried = [], {}, []
+
+    def busy(model, *a, **k):
+        tried.append(model)
+        raise Exception("503 UNAVAILABLE. This model is currently experiencing high demand.")
+
+    saved = (router._raw, router.has_key, router.time.sleep, ledger.record, ledger.set_cooldown, ledger.available,
+             ledger.cache_get, ledger.time_until_available)
+    router._raw, router.has_key, router.time.sleep = busy, (lambda m: True), (lambda s: None)
+    ledger.record = lambda m, tokens=0, cached=0: rec.append(m)
+    ledger.set_cooldown = lambda m, s: cool.__setitem__(m, s)
+    ledger.available = lambda m, need_tokens=0: m not in cool
+    ledger.cache_get = lambda k: None
+    ledger.time_until_available = lambda m, need_tokens=0: cool.get(m, 0.0)
+    router._busy_streak.clear()
+    ROLES["_t_busy"] = ["gemini-3.8-flash", "gemma-4-26b-a4b-it"]
+    try:
+        for expect in (900, 1800):  # ikinci yoğunlukta süre iki katı
+            tried.clear(), rec.clear(), cool.clear()
+            try:
+                call("_t_busy", "x")
+                raise AssertionError("yoğunlukta hata bekleniyordu")
+            except AllModelsExhausted as e:
+                assert e.transient  # kota değil: iş bekler, zayıf modele geçmez
+            assert tried == ["gemini-3.8-flash", "gemma-4-26b-a4b-it", "gemma-4-26b-a4b-it"]  # Gemini bir, Gemma iki
+            assert rec == ["gemini-3.8-flash"] and cool == {"gemini-3.8-flash": expect}
+        tried.clear()
+        try:  # kapalıyken Gemini hiç sorulmaz
+            call("_t_busy", "x")
+        except AllModelsExhausted:
+            pass
+        assert "gemini-3.8-flash" not in tried
+    finally:
+        (router._raw, router.has_key, router.time.sleep, ledger.record, ledger.set_cooldown, ledger.available,
+         ledger.cache_get, ledger.time_until_available) = saved
+        ROLES.pop("_t_busy", None)
+        router._busy_streak.clear()
+
+
 if __name__ == "__main__":
     test_all()
     test_family()
     test_cache_key()
+    test_busy_gemini()
     print("router: tüm testler geçti")

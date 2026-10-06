@@ -213,6 +213,7 @@ Windows, Python 3.11 sanal ortamı (`.venv`). Anahtarlar `.env` dosyasında (şa
 .venv\Scripts\python -m src.qualify <model> [--kisa]    # aday modelin yeterlilik testi → eval/yeterlilik/
 .venv\Scripts\python -m src.simulate --doc <belge> [--limit N]   # zorluk ölçümü: benzetilmiş öğrenci (Gemma; soru başına 5 çağrı)
 .venv\Scripts\python -m eval.zorluk_olcumu              # zorluk pilotu → eval/sonuclar_zorluk.md
+.venv\Scripts\python -m eval.turkishmmlu_zorluk         # zorluk sinyalleri ↔ gerçek öğrenci (TurkishMMLU, Gemma) → eval/sonuclar_turkishmmlu.md
 .venv\Scripts\python scripts\bekci.py [sn]              # iş ve kota izleyici (olayda çıkar)
 ```
 

@@ -92,6 +92,27 @@ Merdiven ve zorlaştırma soruları yalnızca kod kontrolünden geçer (LLM doğ
 - [`main()`](../eval/zorluk_olcumu.py#L105): grupları kurar, ölçer, `eval/sonuclar_zorluk.md`'yi yazar.
 - API: ~7 Gemini çağrısı (üretim), sözel soru başına 5 Gemma çağrısı (benzetim). Yanıtlar önbellekte, ölçümler `data/review/difficulty.jsonl`'de; yeniden çalıştırma kota harcamaz.
 
+### `eval/turkishmmlu_zorluk.py` — zorluk sinyalleri ↔ gerçek öğrenci
+
+**Soru:** Elimizdeki ücretsiz zorluk sinyallerinden hangisi **gerçek** öğrenci zorluğunu izliyor? Projenin kendi öğrenci verisi yok (62 çözüm, tek kişi). TurkishMMLU'nun (Yüksel ve ark. 2024) 900 soruluk alt kümesinde her lise sorusu için çevrim içi platformdaki öğrencilerin doğru oranı var. Bu, sistemin zorluk yöntemlerini dışarıdan bir ölçüte karşı sınamayı mümkün kılıyor.
+
+**Sinyaller:**
+1. Metin özellikleri (kota yok, 900 soru): uzunluk, öncül sayısı (I. II. III.), olumsuz kök, formül/sayı, şık uzunluğu, doğru şıkla en yakın çeldiricinin benzerliği.
+2. Benzetilmiş öğrenci, **kapalı kitap** (PROMPTS §8b): soruların ders notu yok, öğrenci kendi bilgisiyle cevaplar.
+3. Çaba: dikkatli çözümün düşünme token'ı. Hepsi 5 şıklı çoktan seçmeli olduğu için soru tipi karışmaz (sözel pilotta çaba tipi ölçmüştü).
+4. LLM'in kendi zorluk etiketi (PROMPTS §8c): An ve Wang'ın (2026) "LLM etiketi öğrenci zorluğunu öngörmüyor" bulgusunun Türkçe tekrarı.
+
+**Ölçüt:** öğrenci doğru oranıyla Spearman sıra korelasyonu (ρ) ve 3 düzeyde tutma oranı.
+
+- Veri `data/turkishmmlu/`'ya indirilir (635 KB). Lisans belirtilmediği için depoya girmez; yalnızca toplu sonuçlar yazılır.
+- [`sample(rows, n, seed)`](../eval/turkishmmlu_zorluk.py#L65): ders × zorluk tabakalı örneklem (ders başına `n`, varsayılan 20 → 180 soru).
+- [`features(x)`](../eval/turkishmmlu_zorluk.py#L84), [`spearman(a, b)`](../eval/turkishmmlu_zorluk.py#L109): metin özellikleri ve sıra korelasyonu (scipy yok; eşitlere ortalama sıra).
+- [`measure(x)`](../eval/turkishmmlu_zorluk.py#L138): bir soru = 4 hızlı öğrenci + 1 dikkatli öğrenci + 1 etiket çağrısı (hepsi Gemma).
+- [`run(todo)`](../eval/turkishmmlu_zorluk.py#L166): ölçülmemiş soruları ölçer, `data/turkishmmlu/olcumler.jsonl`'e ekler. Gemma yoğunsa bekler, kota dolarsa durur.
+- [`report(rows, picked)`](../eval/turkishmmlu_zorluk.py#L197): `eval/sonuclar_turkishmmlu.md`. Ayrıca sistemin benzetim kuralının (`difficulty.sim_level`) gerçek düzeylere nasıl dağıldığını gösterir.
+- API: soru başına 6 Gemma çağrısı (ayrı ücretsiz kota); `--rapor` yeni çağrı yapmaz.
+- `--parca k/m`: örneklemi `m` sürece böler. Darboğaz dakikalık sınır değil, Gemma'nın yanıt süresi (dikkatli çözüm uzun düşünüyor; soru başına ~2,5 dk). 4 paralel süreçle 180 soru ~2 saat.
+
 ### `eval/retrieval_queries.json`
 
 Elle yazılmış konu sorguları ve her birinin doğru sayfaları. Sorgu türleri: Türkçe→Türkçe, Türkçe sorgu→İngilizce slayt, İngilizce→İngilizce.

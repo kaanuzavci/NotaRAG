@@ -35,7 +35,7 @@ def patient(fn, *args, what: str = "", on_wait=None, **kwargs):
                 why = "sağlayıcı şu an yoğun (geçici, kota değil)"
             else:  # kayan pencereden hesaplanan gerçek süre; bilinmiyorsa 15 dk sonra yeniden bak
                 wait = min(e.retry_in, 3600) if e.retry_in > 0 else 900
-                why = "onaylı modellerin kotası dolu"
+                why = "onaylı modeller şu an kapalı (günlük kota ya da yoğunluk beklemesi)"
             print(f"   ⏳ {what}: {why} → {max(1, round(wait / 60))} dk bekleniyor (daha zayıf modele geçilmez)",
                   flush=True)
             if on_wait:

@@ -2,7 +2,7 @@
 
 [← 3. Bölümleme ve arama](03-bolumleme-ve-arama.md) · [Ana sayfa](README.md) · Sonraki: [5. Soru üretimi →](05-uretim.md)
 
-Projede bir LLM'e giden **her** istek tek bir fonksiyondan geçer: [`router.call(rol, istem)`](../src/llm/router.py#L249). Embedding tek istisnadır; `embedder.py` kendi isteğini atar. Bu katman dört dosyadan oluşur:
+Projede bir LLM'e giden **her** istek tek bir fonksiyondan geçer: [`router.call(rol, istem)`](../src/llm/router.py#L269). Embedding tek istisnadır; `embedder.py` kendi isteğini atar. Bu katman dört dosyadan oluşur:
 
 | Dosya | Sorusu |
 |---|---|
@@ -123,7 +123,7 @@ Neden `calls` tablosuna yeni sütun eklenmedi? O sırada çalışan eski süreç
 
 ---
 
-## `src/llm/router.py` — tek kapı (324 satır)
+## `src/llm/router.py` — tek kapı (349 satır)
 
 **Ne işe yarar?** `call(rol, istem, ...)` rolün model zincirini sırayla dener. Önbelleğe bakar, kotayı denetler, sağlayıcıya göre doğru API'yi çağırır, hatayı sınıflandırır ve sonucu kaydeder. Hiçbir model cevap veremezse `AllModelsExhausted` fırlatır.
 
@@ -165,15 +165,16 @@ Neden `calls` tablosuna yeni sütun eklenmedi? O sırada çalışan eski süreç
   | `network` | Timeout / Connection / "Server disconnected" (`RemoteProtocolError`) | 15 sn bekle, aynı modeli tekrar dene |
   | `daily` | 429 + "per day" / TPD / RPD | Groq: mesajdaki süre kadar beklet; Gemini: bugün kapat |
   | `minute` | 429 (günlük değil) | Önerilen süre kadar bekle, 1 kez tekrar |
-  | `busy` | 500 / 502 / 503 / overloaded | 20 sn bekle, 1 kez tekrar; sonra sıradaki model |
+  | `busy` | 500 / 502 / 503 / overloaded | Gemini (günlük istek sınırlı): sayaca yaz, hemen tekrar etme, modeli kapat (15 → 30 → 60 → 120 dk; `_busy_rpd`). Öbürleri: 20 sn bekle, 1 kez tekrar. Sonra sıradaki model |
   | `missing` | 404 | Model yok → bugün kapat |
   | `json` | `json_validate_failed` | Token sınırını 3 katına çıkarıp 1 kez tekrar |
   | `other` | Diğer | Hatayı yukarı fırlat (beklenmeyen hata gizlenmez) |
 - [`_sync_used(model, err)`](../src/llm/router.py#L215): Groq TPD hatasındaki gerçek kullanımı deftere işler. Önce ölçüm için `record_sync`, sonra kaydımız eksikse `record_correction`.
-- [`_block(model, kind, wait)`](../src/llm/router.py#L226): kota hatasından sonra modeli kapatır. Süreli bekleme (`set_cooldown`) ya da günün geri kalanı (`mark_exhausted`).
-- [`_raw(model, prompt, image, ...)`](../src/llm/router.py#L234): tek bir modele tek çağrı. Önce `Throttle.wait`, sonra görüntü desteği kontrolü, sonra sağlayıcıya göre doğru fonksiyon.
+- [`_busy_rpd(model)`](../src/llm/router.py#L234): Gemini'de 503 "yoğun" yanıtı da günlük istek kotasından düşüyor (2026-10-06: 0 başarılı istek, ~20 yoğunluk denemesi → Google iki modeli de "günlük kota doldu" diye kapattı). Bu yüzden Gemini'nin günlük istek sınırlı modelinde yoğunluk olunca deneme sayaca yazılır (kapasite raporu Google'ınkiyle aynı kalsın), model hemen yeniden sorulmaz ve artan sürelerle kapatılır (`BUSY_COOLDOWN` = 15 dk, her ardışık yoğunlukta iki katı, en çok 120 dk). Başarılı çağrı sayacı (`_busy_streak`) sıfırlar. Groq ve Gemma'da eski davranış: 20 sn bekleyip bir kez daha.
+- [`_block(model, kind, wait)`](../src/llm/router.py#L246): kota hatasından sonra modeli kapatır. Süreli bekleme (`set_cooldown`) ya da günün geri kalanı (`mark_exhausted`).
+- [`_raw(model, prompt, image, ...)`](../src/llm/router.py#L254): tek bir modele tek çağrı. Önce `Throttle.wait`, sonra görüntü desteği kontrolü, sonra sağlayıcıya göre doğru fonksiyon.
 
-**Ana fonksiyon: [`call(role, prompt, image, json_mode, max_tokens, temperature, use_cache, think)`](../src/llm/router.py#L249)**
+**Ana fonksiyon: [`call(role, prompt, image, json_mode, max_tokens, temperature, use_cache, think)`](../src/llm/router.py#L269)**
 1. `chain = ROLES[role]`: bu rolün modelleri. `effort = reasoning(role)`: akıl yürütme düzeyi.
    - Düzey varsayılandan (`medium`) farklıysa önbellek anahtarına eklenir. Yoksa `low` denemesi eski `medium` yanıtlarını önbellekten okuyup sahte sonuç verirdi.
    - Varsayılanda eklenmez; böylece `llm.sqlite`'taki eski yanıtların anahtarı değişmez.

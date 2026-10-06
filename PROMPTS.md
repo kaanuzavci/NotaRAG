@@ -573,6 +573,32 @@ Question: {question}
 {answer_format}
 ```
 
+### 8b. Simulated student — closed book (validation only)
+
+Used by `eval/turkishmmlu_zorluk.py` to test the simulated student against **real** student difficulty: TurkishMMLU (Yüksel et al. 2024) high-school questions carry the share of students who answered correctly on an online platform, but no course notes, so the student answers from their own knowledge. Same rules as §8 otherwise (no working, shuffled options, student number). Five options.
+
+```
+You are a Turkish high-school student taking an exam (student no. {student}).
+Answer the question quickly, as you would under time pressure: do not write any
+working, explanation or steps.
+
+Question: {question}
+{options}
+Reply with only the letter of your choice (A, B, C, D or E).
+```
+
+### 8c. LLM difficulty label (validation only)
+
+Used by `eval/turkishmmlu_zorluk.py` to replicate, in Turkish, the finding that an LLM's own difficulty label barely predicts real student difficulty (An & Wang 2026, LITERATURE §7). The same kind of label the generator writes into `difficulty`.
+
+```
+How difficult is the following multiple-choice question for Turkish high-school
+students (grade {grade})? Reply with exactly one word: easy, medium or hard.
+
+Question: {question}
+{options}
+```
+
 ---
 
 ## Programmatic Checks (not LLM prompts)

@@ -223,6 +223,26 @@ def _sync_used(model: str, err: Exception) -> None:
             ledger.record_correction(model, gap)
 
 
+# Gemini'de başarısız (503 "yoğun") istek de günlük istek kotasından düşüyor: 2026-10-06'da 0 başarılı istek ve
+# ~20 '503' denemesinden sonra Google iki modeli de "günlük kota doldu" diye kapattı (ROADMAP 6'daki şüphe doğrulandı).
+# Gemini'nin günlük istek sınırlı modellerinde (rpd) yoğunluk: deneme sayaca yazılır, aynı model hemen yeniden
+# sorulmaz, artan sürelerle kapatılır (15 → 30 → 60 → 120 dk). Öbürleri (Groq, Gemma) eskisi gibi kısa bekleyip dener.
+BUSY_COOLDOWN = 900
+_busy_streak: dict[str, int] = {}
+
+
+def _busy_rpd(model: str) -> bool:
+    """Gemini'nin günlük istek sınırlı modelinde yoğunluk → sayaca yaz + kapat (True). Öbürlerinde False (kısa bekle)."""
+    spec = MODELS[model]
+    if spec.provider != "gemini" or spec.rpd is None:
+        return False
+    n = _busy_streak.get(model, 0)
+    _busy_streak[model] = n + 1
+    ledger.record(model, 0)
+    ledger.set_cooldown(model, BUSY_COOLDOWN * 2 ** min(n, 3))
+    return True
+
+
 def _block(model: str, kind: str, wait: float) -> None:
     """Kota hatası sonrası modeli kapat: süreli bekleme (Groq TPD) ya da günün geri kalanı (Gemini, yok model)."""
     if kind == "daily" and wait > 0:
@@ -281,6 +301,8 @@ def call(role: str, prompt: str, image: bytes | None = None, json_mode: bool = F
             except Exception as e:
                 kind, wait = _classify(e)
                 _block(model, kind, wait)
+                if kind == "busy":
+                    _busy_rpd(model)
                 errors.append(f"{model}: {kind}")
                 kinds.append(kind)
                 continue
@@ -291,6 +313,7 @@ def call(role: str, prompt: str, image: bytes | None = None, json_mode: bool = F
                 used = _last_usage["tokens"] or (len(prompt) // 3 + len(text) // 3 + (2000 if image is not None else 0))
                 ledger.record(model, used, cached=_last_usage["cached"])
                 _throttle.settle(model, used)
+                _busy_streak.pop(model, None)
                 if use_cache and (not json_mode or _valid_json(text)):
                     # Yarıda kesilmiş JSON önbelleğe alınmaz; yoksa bozuk cevap her seferinde geri gelirdi
                     # (Gemini 3.5 toplu üretimde düşünme token'ları çıktı sınırını doldurup JSON'u kesmişti).
@@ -308,6 +331,8 @@ def call(role: str, prompt: str, image: bytes | None = None, json_mode: bool = F
                 if kind in ("minute", "network") and attempt == 0:
                     time.sleep(min(wait + 1, 90))
                     continue
+                if kind == "busy" and _busy_rpd(model):  # Gemini: her deneme bir istek yakar → sıradaki model
+                    break
                 if kind == "busy" and attempt == 0:  # sağlayıcı yoğun (503): çoğu zaman saniyeler içinde geçer
                     time.sleep(20)
                     continue
@@ -320,5 +345,5 @@ def call(role: str, prompt: str, image: bytes | None = None, json_mode: bool = F
                     raise
                 break  # busy ya da ikinci dakikalık sınır → sıradaki model
     retry = min((ledger.time_until_available(m, est) for m in chain if m in MODELS), default=0.0)
-    raise AllModelsExhausted(f"'{role}' rolündeki modeller kullanılamıyor: {'; '.join(errors) or 'hepsi bugün dolu'}",
+    raise AllModelsExhausted(f"'{role}' rolündeki modeller kullanılamıyor: {'; '.join(errors) or 'hepsi şu an kapalı (günlük kota ya da yoğunluk beklemesi)'}",
                              kinds, retry)
