@@ -121,7 +121,7 @@ Parçalar vektöre çevrilip ChromaDB'ye konur; sınav isteğinde konu adıyla b
   - `mode="hybrid"` iken **dil kuralı** uygulanır: sorgunun dili parçanın dilinden farklıysa o parça için BM25 yok sayılır.
   - Sonuçlar RRF ile birleştirilir; parça sözlükleri döndürülür.
 
-**Dikkat:** Sınav isteğindeki asıl arama ([`request.retrieve`](../src/request.py#L51)) bu sınıfın `search` metodunu kullanmaz. Chroma koleksiyonunu doğrudan sorgular, çünkü **mesafeleri** de istiyor: "en iyi eşleşmeden 0,08'den uzak olanları alma" kuralı için. `Index`'ten yalnızca bağlantıyı, embedder'ı ve `by_id`'yi alır.
+**Dikkat:** Sınav isteğindeki asıl arama ([`request.retrieve`](../src/request.py#L52)) bu sınıfın `search` metodunu kullanmaz. Chroma koleksiyonunu doğrudan sorgular, çünkü **mesafeleri** de istiyor: "en iyi eşleşmeden 0,08'den uzak olanları alma" kuralı için. `Index`'ten yalnızca bağlantıyı, embedder'ı ve `by_id`'yi alır.
 
 ## `src/retrieval/__main__.py` — `python -m src.retrieval` (27 satır)
 

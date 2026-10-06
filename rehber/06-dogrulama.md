@@ -13,7 +13,7 @@ Kalan üç dosya doğrulayıcının kendisini sınar:
 
 ---
 
-## `src/verification/checks.py` — kod kontrolleri (188 satır)
+## `src/verification/checks.py` — kod kontrolleri (215 satır)
 
 **Ne işe yarar?** Bir soruyu, üretildiği parçalarla birlikte denetler ve `{status, rejected, flags, evidence_match, evidence_page, computed?}` döndürür.
 - `rejected` listesi boş değilse soru reddedilir.
@@ -58,6 +58,11 @@ Kalan üç dosya doğrulayıcının kendisini sınar:
 | `negative_stem` | Uyarı | "…değildir" kökü vurgulanmamış |
 | `clang_cue` | Uyarı | Doğru şık kökteki bir kelimeyi tekrar ediyor, çeldiriciler etmiyor |
 | `compute_*` | Red / Uyarı | Hesap sorularında SymPy sonucu (bölüm 5) |
+| `evidence_quote_not_found` | Uyarı | `evidence_quotes`'taki ek alıntılardan biri notta yok (soru reddedilmez, o alıntı sayılmaz) |
+
+Sonuçta ayrıca `facts` (notta bulunan **ayrı** kanıt alıntısı sayısı) ve `fact_pages` (sayfaları) var: sorunun kaç ayrı bilgiyi ya da kuralı birleştirdiğinin yapısal ölçüsü. "Zor" etiketi en az iki ister (bölüm 10).
+- [`_distinct(quotes)`](../src/verification/checks.py#L180): aynı bilgiyi tekrarlayan alıntıları eler (biri ötekini içeriyorsa ya da %85+ benzerse tek sayılır).
+- [`count_facts(quotes, chunks)`](../src/verification/checks.py#L192): ayrı alıntıları `locate_evidence` ile notta arar; bulunanların sayısı ve sayfaları.
 
 Son üç yazım kuralı [`iwf_checks(q)`](../src/verification/checks.py#L87) içindedir (Item-Writing Flaws; SAQUET'in 19 kuralından kodla güvenilir yakalanabilenler).
 
@@ -65,7 +70,7 @@ Son üç yazım kuralı [`iwf_checks(q)`](../src/verification/checks.py#L87) iç
 - **"Öz alt küme" kuralı:** "0.25'ten büyük" ile "0.75'ten büyük" %97 benzer çıkıyordu ama anlamları farklı; metin benzerlik oranı bu yüzden kullanılmaz. Aynı kelimelerin farklı sırası (sıra soran sorular) da tekrar sayılmaz.
 - **Cevap–şık tutarlılığı:** `answer_index` belirleyicidir. Gemini `answer` alanına açıklamalı cümle yazıyordu ve bir deneyde 12 geçerli soru bu yüzden boşuna reddedilmişti.
 
-**[`mark_duplicates(items, keep)`](../src/verification/checks.py#L176):** aynı partide neredeyse aynı soru metinleri varsa (token kümesi benzerliği ≥85) ilkini tutar, sonrakileri `duplicate` diye reddeder. `keep` verilirse zaten havuzda olan soruların tekrarı da reddedilir. Böylece tekrarlar doğrulamaya gidip kota harcamaz.
+**[`mark_duplicates(items, keep)`](../src/verification/checks.py#L203):** aynı partide neredeyse aynı soru metinleri varsa (token kümesi benzerliği ≥85) ilkini tutar, sonrakileri `duplicate` diye reddeder. `keep` verilirse zaten havuzda olan soruların tekrarı da reddedilir. Böylece tekrarlar doğrulamaya gidip kota harcamaz.
 
 Testler: [`tests/test_checks.py`](../tests/test_checks.py).
 

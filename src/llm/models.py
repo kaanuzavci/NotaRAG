@@ -34,6 +34,11 @@ MODELS: dict[str, ModelSpec] = {m.name: m for m in [
     ModelSpec("gemini-3.6-flash", "gemini", rpd=20, rpm=5, vision=True, tz="America/Los_Angeles"),
     ModelSpec("gemini-3.7-flash", "gemini", rpd=20, rpm=5, vision=True, tz="America/Los_Angeles"),
     ModelSpec("gemini-3.8-flash", "gemini", rpd=20, rpm=5, vision=True, tz="America/Los_Angeles"),
+    # Gemma 4 (AI Studio, aynı anahtar; 2026-10-05 model listesinde var). İçerik üretmez/doğrulamaz: zorluk ölçümünde
+    # "benzetilmiş öğrenci" (src/simulate.py) — literatürde zayıf/orta modeller öğrenci zorluğunu güçlülerden iyi taklit
+    # ediyor. Kota iddiası dakikada 30 istek / 15 bin token (topluluk listesi, doğrulanmadı) → temkinli sınırlar.
+    ModelSpec("gemma-4-26b-a4b-it", "gemini", rpd=None, rpm=15, tpm=15_000, tz="America/Los_Angeles"),
+    ModelSpec("gemma-4-31b-it", "gemini", rpd=None, rpm=15, tpm=15_000, tz="America/Los_Angeles"),
     # Groq: yanıt başlıklarından 1000 istek/gün, 8000 token/dk. Asıl bağlayıcı sınır token/gün:
     # qwen için hata mesajından "tokens per day (TPD): Limit 200000" (2026-10-03). gpt-oss için henüz görülmedi;
     # aynı varsayıldı (429 gelince mesajdaki bekleme süresi uygulanır, değer gerekirse güncellenir).

@@ -29,7 +29,8 @@ LLM'in soru ve cevabı yazdığı katman. Dört dosya:
 | `answer` | metin | Cevap (D/Y'de `"true"` / `"false"`) |
 | `evidence_quote` | metin (≥3) | Cevabın dayandığı **birebir alıntı**: "kaynak gösterme"nin kendisi |
 | `bloom_level` | `remember` / `understand` / `apply` | Bilişsel düzey (hatırlama / anlama / uygulama) |
-| `difficulty` | `easy` / `medium` / `hard` | Zorluk |
+| `evidence_quotes` | metin listesi ya da yok | Sorunun dayandığı **her ayrı bilgi/kural** için birebir alıntı; notta bulunan ayrı alıntı sayısı zorluğun yapısal ölçüsü (bölüm 10) |
+| `difficulty` | `easy` / `medium` / `hard` | Üretecin **kendi** zorluk etiketi (iddia). Ekranda görünen düzey ölçülür ve yüklenirken bindirilir (bölüm 10) |
 | `solution` | adımlar listesi | Hesap sorusunun çözümü |
 | `compute` | SymPy ifadesi | Cevabı hesaplayan ifade (ör. `binomial(6, 2)`) |
 | `option_values` | 4 SymPy ifadesi | Her şıkkın sayısal değeri |
@@ -37,23 +38,23 @@ LLM'in soru ve cevabı yazdığı katman. Dört dosya:
 | `option_notes` | 4 metin | Her çeldiricinin temsil ettiği hata ("Bu şıkkı seçtiysen: …") |
 
 **Doğrulayıcılar (validator)**
-- [`_normalize_tf`](../src/generation/schema.py#L31) (`mode="before"`, alanlar denetlenmeden **önce**): D/Y cevabı çıktı dilinde gelebilir (`"Yanlış. Çünkü…"`). İlk kelimeye bakıp `"true"` / `"false"`'a çevirir; şıkları boşaltır.
-- [`_shape`](../src/generation/schema.py#L46) (`mode="after"`, alanlar denetlendikten **sonra**):
+- [`_normalize_tf`](../src/generation/schema.py#L34) (`mode="before"`, alanlar denetlenmeden **önce**): D/Y cevabı çıktı dilinde gelebilir (`"Yanlış. Çünkü…"`). İlk kelimeye bakıp `"true"` / `"false"`'a çevirir; şıkları boşaltır.
+- [`_shape`](../src/generation/schema.py#L49) (`mode="after"`, alanlar denetlendikten **sonra**):
   - Çoktan seçmelide tam 4 **farklı** şık ve geçerli `answer_index` olmalı.
   - D/Y cevabı `true` / `false` olmalı.
   - `option_notes` bozuksa soru reddedilmez, yalnızca notlar düşer.
   - Hesap sorusu D/Y olamaz; çoktan seçmelide 4 `option_values`, kısa cevapta `answer_value` şart.
 
-[`Batch`](../src/generation/schema.py#L68): tanımlı ama kullanılmıyor.
+[`Batch`](../src/generation/schema.py#L71): tanımlı ama kullanılmıyor.
 
 ---
 
-## `src/generation/generate.py` — soru üretimi (313 satır)
+## `src/generation/generate.py` — soru üretimi (355 satır)
 
 **Ne işe yarar?** Bölümlerden **üretim birimi** kurar, PROMPTS.md §2 / §2b / §2c ile istem hazırlar ve `router.call` ile LLM'i çağırır. Dönen JSON'daki her soruyu şemadan ve kod kontrolünden geçirir, şıklarını karıştırır.
 
 **Bağlantılar**
-- ← `pipeline` (`build_units`, `batch_groups`, `generate_group`, `generate_unit`, `math_units`, `generate_worked_group`), `request` (`generate_request`, `generate_unit`, `_render`), `capacity`, `ui/data` (`has_math`), `pilot` (`generate_doc`), eval betikleri, `tests/test_compute` (`_shuffle`).
+- ← `pipeline` (`build_units`, `batch_groups`, `generate_group`, `generate_unit`, `math_units`, `generate_worked_group`), `request` (`generate_request`, `generate_unit`, `evolve_request`, `_render`), `capacity`, `ui/data` (`has_math`), `pilot` (`generate_doc`), eval betikleri, `tests/test_compute` (`_shuffle`).
 - → `router.call`, `prompts.load_prompt`, `schema.Question`, `checks.check`, `checks.mark_duplicates`.
 - 💾 Okur: `data/chunks/chunks.jsonl`, `sections.jsonl`.
 
@@ -84,17 +85,17 @@ LLM'in soru ve cevabı yazdığı katman. Dört dosya:
 ### İsteme eklenen hedef kurallar
 
 - [`BLOOM_TARGET`](../src/generation/generate.py#L100): "bütün sorular hatırlama düzeyinde" / "bütün sorular uygulama düzeyinde". Yalnızca Bloom deneyinde kullanılır.
-- [`DIFFICULTY_TARGET`](../src/generation/generate.py#L111): kolay / orta / zorun **işlemsel tanımı**.
-  - Model kendi zorluk etiketine bırakılmaz: kendi seçimiyle 33 problemin yalnızca 1'ini "zor" etiketlemişti.
-- [`_target_rules(prompt, bloom_target, difficulty)`](../src/generation/generate.py#L122): bu kuralları §2'deki `"Rules:\n"` satırının hemen altına ekler.
+- [`DIFFICULTY_TARGET`](../src/generation/generate.py#L113): kolay / orta / zorun **işlemsel, alandan bağımsız tanımı**: kolay = cevap tek cümlede, tanıma; orta = başka sözlerle anlama / karşılaştırma / iki adım; zor = notun farklı yerlerinden en az iki ayrı bilgi ya da kural, ya da üç+ adım / durum analizi, çeldiriciler "yalnızca bir bilgiyi kullananın cevabı".
+  - Bu bir **hedef**: sonuç ölçülür, etiket zorla yazılmaz. 2026-10-05'e kadar kod istenen düzeyi her soruya yazıyordu; TYT "zor" isteğinde Gemini kendi 17 sorusunun 14'üne "orta" demişti (bölüm 10).
+- [`_target_rules(prompt, bloom_target, difficulty)`](../src/generation/generate.py#L127): bu kuralları §2'deki `"Rules:\n"` satırının hemen altına ekler.
 
 ### Tek birim, tek istek (yedek yol ve sınav isteği yedeği)
 
-- [`generate_unit(unit, related, language, role, unit_index, bloom_target, n, types, difficulty)`](../src/generation/generate.py#L130): §2 istemini doldurur (soru sayısı, tip planı, bağlam, komşu metin, çıktı dili) ve `call(role, ..., json_mode=True)` çağırır.
+- [`generate_unit(unit, related, language, role, unit_index, bloom_target, n, types, difficulty)`](../src/generation/generate.py#L135): §2 istemini doldurur (soru sayısı, tip planı, bağlam, komşu metin, çıktı dili) ve `call(role, ..., json_mode=True)` çağırır.
   - Yanıt JSON değilse tek bir `invalid_json` reddi döndürür.
-  - Zorluk verildiyse her soruya o zorluğu zorla yazar.
+  - Zorluk istendiyse `requested_difficulty` alanına yazılır; sorunun `difficulty` alanı üretecin kendi iddiasıdır.
   - Sonra `_postprocess`.
-- [`_postprocess(raw, unit, model)`](../src/generation/generate.py#L152): LLM çıktısı → soru öğeleri. Her soru için:
+- [`_postprocess(raw, unit, model)`](../src/generation/generate.py#L159): LLM çıktısı → soru öğeleri. Her soru için:
   1. Temel alanlar: `unit`, `pages`, `model`, `chunk_ids`. Bunlar sayesinde doğrulayıcı aynı bağlamı görür.
   2. `Question(**item)`: şemadan geçmezse `schema` reddi.
   3. [`check(q, unit["chunks"])`](../src/verification/checks.py#L106): kod kontrolleri (bölüm 6).
@@ -105,30 +106,33 @@ LLM'in soru ve cevabı yazdığı katman. Dört dosya:
 
 Gemini'nin sınırı istek sayısıdır (günde 20), token değil. Bu yüzden bir belgenin 12 birimine kadarı tek istekte gönderilir.
 
-- [`_batch_prompt(units, start_index, language, bloom_target)`](../src/generation/generate.py#L176): §2'nin kural kısmı (`"Context:\n{context}"`'ten önceki her şey) + §2b. Her birim `### U1 — pages [..] — at most N question(s); types: ...` başlığıyla eklenir.
-- [`batch_groups(units)`](../src/generation/generate.py#L204): birimleri en çok 12 birim / 40.000 karakterlik gruplara böler.
-- [`generate_group(g, start, language, role, bloom_target)`](../src/generation/generate.py#L217): bir grup = bir istek.
+- [`_batch_prompt(units, start_index, language, bloom_target)`](../src/generation/generate.py#L183): §2'nin kural kısmı (`"Context:\n{context}"`'ten önceki her şey) + §2b. Her birim `### U1 — pages [..] — at most N question(s); types: ...` başlığıyla eklenir.
+- [`batch_groups(units)`](../src/generation/generate.py#L211): birimleri en çok 12 birim / 40.000 karakterlik gruplara böler.
+- [`generate_group(g, start, language, role, bloom_target)`](../src/generation/generate.py#L224): bir grup = bir istek.
   - Token sınırı geniş tutulur (≥32.000): Gemini 3.x önce "düşünüyor" ve düşünme token'ları çıktı sınırından düşüyor. 8 bin sınırda JSON yarıda kesilmişti.
-- [`_split_units(r, g, force)`](../src/generation/generate.py#L227): toplu yanıtı (`{"units": [{"unit": "U1", "questions": [...]}]}`) birimlere dağıtır. Her birimin sorularını **kendi** parçalarıyla `_postprocess`'ten geçirir. `force` verilirse her soruya o alanları yazar (ör. zorluk).
-- [`generate_batched(units, language, role, bloom_target)`](../src/generation/generate.py#L193): bütün grupları sırayla üretir + `mark_duplicates`. Yalnızca eval betikleri kullanır; pipeline grupları kendisi yönetir.
+- [`_split_units(r, g, force)`](../src/generation/generate.py#L234): toplu yanıtı (`{"units": [{"unit": "U1", "questions": [...]}]}`) birimlere dağıtır. Her birimin sorularını **kendi** parçalarıyla `_postprocess`'ten geçirir. `force` verilirse her soruya o alanları yazar (hesap sorusunda Bloom `apply`).
+- [`generate_batched(units, language, role, bloom_target)`](../src/generation/generate.py#L200): bütün grupları sırayla üretir + `mark_duplicates`. Yalnızca eval betikleri kullanır; pipeline grupları kendisi yönetir.
 
 ### Hesap soruları (PROMPTS.md §2c)
 
-- [`_MATH`](../src/generation/generate.py#L248) / [`math_units(units)`](../src/generation/generate.py#L252): içinde en az 4 formül işareti (`=`, `≤`, `√`, `²`, `!`, `∑`, `3 + 4` gibi işlemler) geçen birimler. Hesap sorusu yalnızca bunlardan istenir.
-- [`_worked_prompt(units, start_index, language)`](../src/generation/generate.py#L257): §2c istemi. Kısa birimden 1, uzundan 2 problem istenir.
-- [`generate_worked_group(g, start, language, role)`](../src/generation/generate.py#L296): tek istek. Her problemin Bloom düzeyi `apply` (uygulama) diye zorlanır. Cevap kod kontrolünde SymPy ile yeniden hesaplanır.
+- [`_MATH`](../src/generation/generate.py#L255) / [`math_units(units)`](../src/generation/generate.py#L259): içinde en az 4 formül işareti (`=`, `≤`, `√`, `²`, `!`, `∑`, `3 + 4` gibi işlemler) geçen birimler. Hesap sorusu yalnızca bunlardan istenir.
+- [`_worked_prompt(units, start_index, language)`](../src/generation/generate.py#L264): §2c istemi. Kısa birimden 1, uzundan 2 problem istenir.
+- [`generate_worked_group(g, start, language, role)`](../src/generation/generate.py#L338): tek istek. Her problemin Bloom düzeyi `apply` (uygulama) diye zorlanır. Cevap kod kontrolünde SymPy ile yeniden hesaplanır.
 
 ### Sınav isteği üretimi
 
-- [`_spec_blocks(spec, noun)`](../src/generation/generate.py#L268): sınav isteğinin özel sayı ve tip planlarıyla birim blokları.
-- [`generate_request(spec, language, difficulty, role, worked)`](../src/generation/generate.py#L274): [`request.run`](../src/request.py#L208) çağırır.
+- [`_spec_blocks(spec, noun)`](../src/generation/generate.py#L275): sınav isteğinin özel sayı ve tip planlarıyla birim blokları.
+- [`generate_request(spec, language, difficulty, role, worked)`](../src/generation/generate.py#L281): [`request.run`](../src/request.py#L211) çağırır.
   - `spec` listesinin her elemanı `(birim, kaç soru, tipler)` üçlüsüdür; birim = bir konunun **aramayla bulunan** parçaları.
   - `worked=False`: §2 kuralları + §2b. `worked=True`: §2c.
-  - Zorluk kuralı istemde verilir, sonuçta da zorla yazılır.
+  - Zorluk istemde hedef olarak verilir ve `requested_difficulty` alanına yazılır; düzey ölçülür (bölüm 10).
+- [`evolve_request(pairs, language, target, worked, role)`](../src/generation/generate.py#L304): **zorlaştırma** (PROMPTS.md §2d). Sınav isteğinde istenen düzeyin altında ölçülen sorular için: her soru (A: kendi parçaları) başka bir konunun notuyla (B) birlikte verilir; model somut işlemlerle (iki bilgiyi birleştir, koşul ekle, uygulamaya çevir, çeldiricileri yakın yap) yeni bir soru yazar ve her bilgi için alıntı verir.
+  - §2d bloğu §2b'nin (sözel) ya da §2c'nin (hesap) `{units}` yerine konur: çıktı şeması ve bütün kontroller aynı kalır.
+  - Neden? "Zor yaz" sıfatı işe yaramadı; Evol-Instruct'ın somut işlemleri ve çok adımlı birleştirme literatürde zorluğu artıran yollar (LITERATURE §8).
 
 ### Belgeyi birim birim üretme (pilot için)
 
-- [`generate_doc(doc, role, limit_units, output_language, bloom_target)`](../src/generation/generate.py#L303): her birim için ayrı istek (`generate_unit`). Komşu birimlerin metni çeldirici malzemesi olarak verilir. Yalnızca `pilot.py` kullanır.
+- [`generate_doc(doc, role, limit_units, output_language, bloom_target)`](../src/generation/generate.py#L345): her birim için ayrı istek (`generate_unit`). Komşu birimlerin metni çeldirici malzemesi olarak verilir. Yalnızca `pilot.py` kullanır.
 
 ---
 

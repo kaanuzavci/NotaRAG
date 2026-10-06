@@ -166,11 +166,38 @@ def check(q: Question, chunks: list[dict]) -> dict:
         rejected += r
         flags += f
 
+    facts, pages = count_facts([q.evidence_quote] + list(q.evidence_quotes or []), chunks)
+    if q.evidence_quotes and facts < len(_distinct(q.evidence_quotes)):
+        flags.append("evidence_quote_not_found")  # ek alıntılardan biri notta yok (soru reddedilmez, sayılmaz)
+
     out = {"status": "rejected" if rejected else "passed_checks", "rejected": rejected,
-           "flags": flags, "evidence_match": kind, "evidence_page": page}
+           "flags": flags, "evidence_match": kind, "evidence_page": page, "facts": facts, "fact_pages": pages}
     if computed is not None:
         out["computed"] = computed
     return out
+
+
+def _distinct(quotes: list[str]) -> list[str]:
+    """Aynı bilgiyi tekrarlayan alıntıları ele: biri ötekini içeriyorsa ya da çok benziyorsa tek sayılır."""
+    out: list[str] = []
+    for x in quotes:
+        n = norm(x or "")
+        if len(n) < 3:
+            continue
+        if not any(n in norm(y) or norm(y) in n or fuzz.ratio(n, norm(y)) >= 85 for y in out):
+            out.append(x)
+    return out
+
+
+def count_facts(quotes: list[str], chunks: list[dict]) -> tuple[int, list[int]]:
+    """Notta bulunan ayrı alıntı sayısı ve sayfaları: sorunun birleştirdiği bilgi/kural sayısının yapısal ölçüsü."""
+    found, pages = 0, set()
+    for x in _distinct(quotes):
+        kind, chunk = locate_evidence(x, chunks)
+        if kind:
+            found += 1
+            pages.add(chunk["page"])
+    return found, sorted(pages)
 
 
 def mark_duplicates(items: list[dict], keep: list[dict] = ()) -> None:

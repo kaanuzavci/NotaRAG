@@ -211,8 +211,10 @@ Windows, Python 3.11 sanal ortamı (`.venv`). Anahtarlar `.env` dosyasında (şa
 .venv\Scripts\python -m src.topics <belge ...>          # konu haritası (yoksa / kota yüzünden bölüm başlıklarına düştüyse)
 .venv\Scripts\python -m src.llm.capacity [belge]        # kalan kota, belge maliyeti
 .venv\Scripts\python -m src.qualify <model> [--kisa]    # aday modelin yeterlilik testi → eval/yeterlilik/
+.venv\Scripts\python -m src.simulate --doc <belge> [--limit N]   # zorluk ölçümü: benzetilmiş öğrenci (Gemma; soru başına 5 çağrı)
+.venv\Scripts\python -m eval.zorluk_olcumu              # zorluk pilotu → eval/sonuclar_zorluk.md
 .venv\Scripts\python scripts\bekci.py [sn]              # iş ve kota izleyici (olayda çıkar)
 ```
 
 Testler (internetsiz, API çağrısı yok): `.venv\Scripts\python -m tests.<ad>` — `test_pipeline`, `test_checks`, `test_compute`,
-`test_grading`, `test_textnorm`, `test_router`, `test_parser`, `test_cards`.
+`test_grading`, `test_textnorm`, `test_router`, `test_parser`, `test_cards`, `test_difficulty`.

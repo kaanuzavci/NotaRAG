@@ -86,6 +86,24 @@ Kota sorunu üzerine yapılan bu tarama, "token karşılığı API kullanan bir 
 
 **Projeye etkisi.** Token tabanlı API mimarisi doğru seçim; değişmesi gereken ücretsiz katmana bağımlılık. Gerçek kullanımda: ücretli katman + harcama sınırı, kullanıcı başına kullanım sınırı, belge başına bir kez üretilip paylaşılan soru havuzu. Ücretsiz katman geliştirme/test için kalır. Ticari araçlarda görmediğimiz farkımız: kanıtı sayfada gösteren, farklı model ailesiyle kör doğrulanan, kasıtlı hata testinden geçmiş, Türkçe'ye özel bir soru üretimi.
 
+## 8. Zor Soru Üretimi, Zorluk Ölçümü ve Çok Belgeli Havuz (2026-10-05)
+
+Tetikleyen gözlem: kullanıcının TYT için istediği "zor" hesap sorularının çoğu orta/kolay çıktı; Gemini'nin ham yanıtında kendi etiketleri 17 sorudan 14 orta, 1 kolay, 2 zor idi, sistem hepsini "zor" yazdı (ROADMAP 8).
+
+**Sorun genel ve iyi belgelenmiş.** 91 derste ~1.700 öğrenciyle yapılan saha çalışmasında (o3-mini, üret–yapay zekâ yargıcı–iyileştir döngüsü, 5 gerçek AP sorusu örnek olarak) üretilen sorular "kolay tarafta" kaldı; yazarlar 20 iyi adaydan en zor 10'unu seçtikleri hâlde öğrenciler yapay zekâ sorularının ~%60'ını, standart sınav sorularının ~%39'unu doğru yaptı (IRT güçlüğü −0,45 ↔ 0,35); ayırt edicilik ise biraz daha iyiydi (α 1,3 ↔ 1,2) [37]. LLM'ler zorluğu "müfredatta ne kolay olmalı"ya göre tahmin ediyor, yanılgıdan doğan zorluğu kaçırıyor ("kolay tuzağı": 100÷½'yi öğrencilerin %34'ü çözebildi, modeller kolay dedi) [38]. Metinden zorluk tahmini, tıp sınavı (USMLE) paylaşımlı görevinde en iyi ekipte bile sabit tahminin ancak çok az önüne geçti (RMSE 0,299 ↔ 0,311) [46]. Yani **"zor yaz" talimatı ve modelin kendi etiketi yetmez** — bu bizim bulgumuzla ve An–Wang [35] ile örtüşüyor.
+
+**Pratikte işe yarayanlar:**
+- **Madde modeli / otomatik madde üretimi (AIG)** — psikometrinin yerleşik yöntemi: bilişsel model → *madde modeli* (değişkenli kalıp) → bilgisayar binlerce örnek üretir. Zorluk "radikal" değişkenlerle (ölçülen beceriye dokunan: adım, kısıt, durum analizi) ayarlanır, "insidental" değişkenler (bağlam, isim, sayı yüzeyi) zorluğu değiştirmeden çeşitlilik verir; uzman kalıbı bir kez onaylar [42]. LLM'ler bu sürecin üç aşamasında (kalıbı yazma, örnekleme, eleme) kullanılıyor. Fizikte LLM + araç kullanımıyla üretilen eşdeğer (izomorf) soru bankalarının ~%73'ü öğrenci verisinde istatistiksel olarak homojen zorlukta çıktı; 17 açık modelin çözüm başarısı öğrenci başarısıyla ρ ≈ 0,59 ilişkili, en iyi ayıklayıcılar orta boy modellerdi [41]. GSM-Symbolic'te kalıba her akıl yürütme adımı (cümle) eklemek başarıyı ~10 puan, iki adım ~30 puan düşürdü — zorluk yapısal olarak ölçeklenebiliyor [43].
+- **Zorlaştırma döngüsü (Evol-Instruct):** var olan soruyu belirli işlemlerle zorlaştırmak — kısıt ekle, somutlaştır, akıl yürütme adımı artır, girdiyi karmaşıklaştır; WizardMath matematik sorularını 8 turda bu yolla evriltti [44]. "Zor yaz"dan farkı: modele soyut bir sıfat değil, somut bir işlem verilir.
+- **Fazla üret → çözdürerek ölç → seç:** büyük matematik veri setleri zorluğu, küçük bir modelin aynı soruyu kaç denemede çözebildiğiyle (ör. Llama-8B, 64 deneme) ölçüp çok kolayları atıyor [45]. Eğitimde karşılığı **benzetilmiş öğrenci**: LLM'e farklı yetenekte öğrenciler canlandırtıp yanıtlarına IRT uydurmak NAEP matematik sorularında gerçek güçlükle r = 0,75-0,82 verdi; matematikte *zayıf* model (Gemma) güçlülerden iyiydi [39]. Ama 20+ modelle yapılan başka çalışma güçlü modellerin "zorlanan öğrenciyi" canlandıramadığını, büyütmenin yardım etmediğini buldu [40] → benzetim göreli bir sinyaldir; gerçek öğrenci verisiyle doğrulanmalı.
+- **Gerçek örnekler:** saha çalışması hedef sınavdan gerçek soruları örnek olarak verdi [37]. Türkçe için TurkishMMLU: Türk lise müfredatından uzman yazımı ~9.800 soru (matematik dahil), her birinde gerçek öğrencilerin **doğru cevaplama oranı** var — zorluk ölçerimizi Türk öğrenci verisine karşı sınamak için ideal; erişim yazarlara e-postayla, lisans belirtilmemiş [47].
+- **Çeldirici ve yanılgı:** matematikte LLM'ler doğru çözümü bulup öğrenci hatasını canlandırarak çeldirici üretebiliyor ama gerçek öğrencilerin yaygın yanılgılarını öngörmede zayıflar; yanılgı sınıflandırması (Eedi) ve insan-döngüsü öneriliyor [48]. Zorluğun bir kaynağı yanılgı olduğundan [38], çeldiricide adı konmuş hata (bizdeki `option_notes`) zorluk için de kaldıraç.
+- **Bilişsel derinlik istemi:** ayrıntılı, bilişsel düzeyi işlem olarak tarif eden istem üst düzey (uygulama/analiz/yaratma) soruları ~%11,5 artırdı; tek başına sıçrama değil [49].
+
+**Çok belgeli havuz:** belgeden bir kez **bilgi grafiği** (kavram–ilişki) çıkarıp soruları grafikten üretmek token açısından ucuz ve yeniden kullanılabilir; çok adımlı (birden çok bilgiyi zincirleyen) sorular zorluk ayarı sağlıyor (KNIGHT) [50]. Değerlendirmede ölçüt planı (konu × bilişsel düzey tablosu) ve uzman/öğretmen onayı yerleşik uygulama [42].
+
+**Projeye etkisi (öneri):** (1) Hesap/matematik için soru başına LLM yerine **konu başına madde modeli** (LLM bir kez yazar, kod SymPy ile sınırsız örnek üretir, zorluk radikallerle; kalıp bir kez doğrulanır) → kota ve havuz sorunu birlikte çözülür. (2) Metin dersleri için soru üretiminden önce **kavram grafiği**; zor = çok adımlı. (3) Zorluk etiketi iddia değil **ölçüm**: zayıf/orta modelle benzetilmiş öğrenci çözümü (göreli), gerçek çözüm oranı biriktikçe kalibrasyon; mümkünse TurkishMMLU ile doğrulama. (4) Havuz **ders/koleksiyon + konu × zorluk planına** göre doldurulur (ROADMAP).
+
 ## Genel Sonuç
 
 Literatür üç ana noktada planımızı doğruluyor, bir noktada güçlendiriyor:
@@ -161,3 +179,17 @@ Not: Kaynakçadaki bazı yazarı belirtilmemiş girişlerin (özellikle 2026 tar
 34. Glamdring Research (2026). *Groq API pricing: Groq model list, September 2026.*
 35. An, Y., Wang, L. (2026). *Student Use of LLMs and the Limits of AI-Generated Question Difficulty in Data Science Courses.* arXiv:2609.27063
 36. Shintani, S. A. (2026). *Self-hosted Lecture-to-Quiz: Local LLM MCQ Generation with Deterministic Quality Control.* arXiv:2603.08729
+37. Isley, C. ve ark. (2025). *Assessing the Quality of AI-Generated Exams: A Large-Scale Field Study.* arXiv:2508.08314
+38. La Hadi, A., Alibasa, M. J., Chen, G., Asyhari, A. T. (2026). *The "Easy Trap": Why LLMs Underestimate Misconception-Driven Difficulty.* EDM 2026 (poster)
+39. Acquaye, C., Huang, Y. T., Carpuat, M., Rudinger, R. (2026). *Take Out Your Calculators: Estimating the Real Difficulty of Question Items with LLM Student Simulations.* Findings of ACL 2026, arXiv:2601.09953
+40. Li, M. ve ark. (2025). *Can LLMs Estimate Student Struggles? Human-AI Difficulty Alignment with Proficiency Simulation for Item Difficulty Prediction.* arXiv:2512.18880
+41. Liu, N. ve ark. (2026). *Scalable Generation and Validation of Isomorphic Physics Problems with GenAI.* arXiv:2602.05114
+42. Gierl, M. J., Lai, H. (2025). *Using Automated Processes to Generate Test Items* (NCME ITEMS Module 34). ncme.org
+43. Mirzadeh, I. ve ark. (2025). *GSM-Symbolic: Understanding the Limitations of Mathematical Reasoning in Large Language Models.* ICLR 2025, arXiv:2410.05229
+44. Luo, H. ve ark. (2023). *WizardMath: Empowering Mathematical Reasoning for LLMs via Reinforced Evol-Instruct.* arXiv:2308.09583; Xu, C. ve ark. (2024). *WizardLM* (Evol-Instruct), ICLR 2024, arXiv:2304.12244
+45. Albalak, A. ve ark. (2025). *Big-Math: A Large-Scale, High-Quality Math Dataset for Reinforcement Learning in Language Models.* arXiv:2502.17387
+46. Yaneva, V. ve ark. (2024). *Findings from the First Shared Task on Automated Prediction of Difficulty and Response Time for Multiple-Choice Questions* (BEA 2024). sig-edu.org/sharedtask/2024
+47. Yüksel, A. ve ark. (2024). *TurkishMMLU: Measuring Massive Multitask Language Understanding in Turkish.* Findings of EMNLP 2024, arXiv:2407.12402
+48. Feng, W. ve ark. (2024). *Exploring Automated Distractor Generation for Math Multiple-choice Questions via Large Language Models.* Findings of NAACL 2024; (2026) *Can LLMs Model Incorrect Student Reasoning? A Case Study on Distractor Generation.* arXiv:2603.15547
+49. Wang, X. ve ark. (2026). *From Memorization to Creation: Evaluating the Cognitive Depth of LLM-Generated Educational Questions.* arXiv:2606.18257
+50. Amanlou, M. ve ark. (2026). *KNIGHT: Knowledge Graph-Driven Multiple-Choice Question Generation with Adaptive Hardness Calibration.* CPAL 2026, arXiv:2602.20135

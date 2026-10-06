@@ -26,10 +26,10 @@ Bu bölüm dört dosyayı ve bir istem dosyasını anlatıyor:
 - [Satır 9 `load_dotenv(...)`](../src/config.py#L9): `.env` dosyasındaki `ANAHTAR=değer` satırlarını ortam değişkenlerine yükler.
 - [Satır 11-15](../src/config.py#L11): `GROQ_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `CEREBRAS_API_KEY`.
   - `os.getenv("X", "")` değişken yoksa boş metin döndürür; program çökmez.
-  - Anahtarı olmayan sağlayıcının modelleri [`router.has_key`](../src/llm/router.py#L79) tarafından atlanır.
+  - Anahtarı olmayan sağlayıcının modelleri [`router.has_key`](../src/llm/router.py#L82) tarafından atlanır.
 - [Satır 19-22](../src/config.py#L19): `DATA_DIR` (`data/`), `PARSED_DIR` (`data/parsed/`), `VISION_CACHE_DIR` (`data/vision_cache/`), `VISION_DPI = 150` (görsel okuma için sayfa görüntüsünün çözünürlüğü).
-- [Satır 25 `DOC_NAMES`](../src/config.py#L25): dosya adı → ekranda görünen kısa ad (ör. `"english"` → `"Genetic Algorithms"`).
-- [Satır 31 `doc_name(stem)`](../src/config.py#L31): kısa adı döndürür. Listede olmayan (arayüzden yeni yüklenmiş) belgede alt çizgileri boşluğa çevirir.
+- [Satır 25 `DOC_NAMES`](../src/config.py#L26): dosya adı → ekranda görünen kısa ad (ör. `"english"` → `"Genetic Algorithms"`).
+- [Satır 31 `doc_name(stem)`](../src/config.py#L32): kısa adı döndürür. Listede olmayan (arayüzden yeni yüklenmiş) belgede alt çizgileri boşluğa çevirir.
 
 **Neden böyle?** Anahtarlar koda yazılmaz, `.env`'de durur; `.env` de `.gitignore` sayesinde repoya girmez. Şablonu [`.env.example`](../.env.example).
 
@@ -61,7 +61,7 @@ Bu bir Markdown belgesi ama aslında kodun parçası. Her bölümün ilk kod blo
 | § | Ne için | Okuyan fonksiyon | Yer tutucular |
 |---|---|---|---|
 | 1 | Resim olan sayfayı okuma | [`vision.run_vision`](../src/ingestion/vision.py#L60) | `{text_layer}` |
-| 2 | Soru + cevap üretimi (kurallar) | [`generate_unit`](../src/generation/generate.py#L130), `_batch_prompt`, `generate_request` | `{n_questions}`, `{type_plan}`, `{context}`, `{related}`, `{output_language}` |
+| 2 | Soru + cevap üretimi (kurallar) | [`generate_unit`](../src/generation/generate.py#L135), `_batch_prompt`, `generate_request` | `{n_questions}`, `{type_plan}`, `{context}`, `{related}`, `{output_language}` |
 | 2b | Toplu üretim (çok birim, tek istek) | `_batch_prompt`, `generate_request` | `{units}` |
 | 2c | Hesap problemleri (SymPy ifadesiyle) | `_worked_prompt`, `generate_request(worked=True)` | `{output_language}`, `{units}` |
 | 3 | (Ayrılmış) sohbet modu | — kullanılmıyor | |
@@ -77,7 +77,7 @@ Bu bir Markdown belgesi ama aslında kodun parçası. Her bölümün ilk kod blo
 | "Programmatic Checks" | `checks.py`'nin açıklaması | — istem değil, belge | |
 
 **Dikkat:** kod §2'nin içinde iki sabit metne güveniyor:
-- [`_target_rules`](../src/generation/generate.py#L122) yeni kuralları `"Rules:\n"` satırının hemen altına ekler.
+- [`_target_rules`](../src/generation/generate.py#L127) yeni kuralları `"Rules:\n"` satırının hemen altına ekler.
 - `_batch_prompt` / `generate_request` kural kısmını `"Context:\n{context}"` metninden keserek alır.
 
 Bu iki ifadeyi PROMPTS.md'de değiştirirsen kural ekleme sessizce çalışmaz ya da kesme `ValueError` verir.
@@ -97,11 +97,11 @@ Bu iki ifadeyi PROMPTS.md'de değiştirirsen kural ekleme sessizce çalışmaz y
 - [Satır 10](../src/app.py#L10) `sys.path.insert(0, ...)`: Streamlit `src/app.py`'yi paket olarak değil, düz betik olarak çalıştırır. Bu durumda `from src.ui import style` çalışmaz, çünkü Python `src` paketini bilmez. Proje kökü arama yoluna eklenerek sorun çözülür.
 - [Satır 16](../src/app.py#L16) `st.set_page_config(...)`: sekme başlığı "NotaRAG", geniş düzen, kenar çubuğu açık.
 - [Satır 18](../src/app.py#L18) `style.inject()`: bütün sayfalarda geçerli CSS (bkz. bölüm 8).
-- [Satır 22-35](../src/app.py#L22) `pages`: menü üç gruptan oluşur:
-  - **Çalış:** Sınav Hazırla (varsayılan sayfa)
+- [Satır 22-36](../src/app.py#L22) `pages`: menü üç gruptan oluşur:
+  - **Çalış:** Sınav Hazırla (varsayılan sayfa), Bilgi Kartları
   - **İçerik:** Belgeler, Soru Bankası
   - **Kalite:** İnceleme, Rapor, Modeller ve Kota
-- [Satır 36-41](../src/app.py#L36): `st.navigation(...)` menüyü kurar, `nav.run()` seçilen sayfanın dosyasını çalıştırır.
+- [Satır 37-42](../src/app.py#L37): `st.navigation(...)` menüyü kurar, `nav.run()` seçilen sayfanın dosyasını çalıştırır.
 
 **Streamlit'in çalışma biçimi:** Her sayfa dosyası (ör. [`ui/pages/exam.py`](../src/ui/pages/exam.py)) en altta `render()` çağırır. Streamlit sayfayı her açtığında ve her tıklamada o dosyayı **baştan sona** yeniden çalıştırır. Ayrıntısı bölüm 8'de.
 
@@ -148,19 +148,19 @@ Adım adım ne yaptığı (konsola yazdığı `1/6 ...` satırları arayüzdeki 
   - **Kota** dolduysa `e.retry_in` kadar (en çok 1 saat; bilinmiyorsa 15 dk) bekler.
   - `on_wait(neden, saniye)` verilirse beklemeyi bildirir; sınav isteği bunu ekrana "~1 sa 40 dk sonra devam" diye yazar.
   - **Neden önemli?** Kalite kapısı gereği kota dolunca daha zayıf bir modele geçilmez; iş bekler. Bu fonksiyon o beklemeyi yapar.
-- [`_generate(units, lang)`](../src/pipeline.py#L47): önce **toplu üretim** dener. Birimler [`batch_groups`](../src/generation/generate.py#L204) ile en çok 12 birimlik gruplara bölünür; her grup Gemini'ye tek istek olarak gider.
+- [`_generate(units, lang)`](../src/pipeline.py#L47): önce **toplu üretim** dener. Birimler [`batch_groups`](../src/generation/generate.py#L211) ile en çok 12 birimlik gruplara bölünür; her grup Gemini'ye tek istek olarak gider.
   - Bir grup başarısız olursa yalnızca o grubun birimleri **birim başına üretime** (`generate_unit`, rol `"generate"` = qwen) geçer.
   - Komşu birimlerin ilk 600 karakteri `related` olarak verilir: model çeldiricileri oradan seçebilir.
   - Gruplar ayrı ayrı işlendiği için biri bozulsa diğerlerinin soruları kaybolmaz.
 - [`_batch_try(fn, what, n_units, fallback)`](../src/pipeline.py#L71): tek toplu istek denemesi. Gemini yalnızca **yoğunsa** 2, 4, 8 dk bekleyip yeniden dener. Kota gerçekten bittiyse `None` döndürür; çağıran yedek yolu seçer.
-- [`_generate_worked(units, lang)`](../src/pipeline.py#L89): hesap soruları yalnızca formüllü birimlerden ([`math_units`](../src/generation/generate.py#L252)) istenir.
+- [`_generate_worked(units, lang)`](../src/pipeline.py#L89): hesap soruları yalnızca formüllü birimlerden ([`math_units`](../src/generation/generate.py#L259)) istenir.
   - Bu iş için onaylı bir yedek model yoktur. Kota biterse adım **atlanır**; sınanmamış modele devredilmez.
   - Sonraki çalıştırmada önbellek sayesinde kalan kısım tamamlanır.
 - [`_vision_until_done(parsed_path, pdf)`](../src/pipeline.py#L110): [`run_vision`](../src/ingestion/vision.py#L60) `False` dönerse (bütün görsel modellerin kotası dolu) en kısa bekleme süresi kadar uyur ve tekrar dener. Okunacak sayfa kalmayınca çıkar.
 - [`merge_existing(old, items, chunks)`](../src/pipeline.py#L124): **"yeniden çalıştırma ekler, silmez"** kuralı. Üç liste döndürür:
   1. `stale`: parçası artık var olmayan eski sorular (belge değiştiyse) düşer.
   2. `kept`: geri kalan eskiler aynen korunur.
-  3. `new`: kimliği (`question_id`) eskilerde olmayan yeni sorular. Önbellekten aynen gelenler zaten aynı kimliği taşıdığı için elenir. [`mark_duplicates(new, keep=kept)`](../src/verification/checks.py#L176) eskilerin tekrarı olan yenileri reddeder; böylece tekrarlar doğrulamaya gidip kota harcamaz.
+  3. `new`: kimliği (`question_id`) eskilerde olmayan yeni sorular. Önbellekten aynen gelenler zaten aynı kimliği taşıdığı için elenir. [`mark_duplicates(new, keep=kept)`](../src/verification/checks.py#L203) eskilerin tekrarı olan yenileri reddeder; böylece tekrarlar doğrulamaya gidip kota harcamaz.
 
   Bu fonksiyon 2026-10-05'te bulunan bir hatayı düzeltiyor: eskiden `run` dosyanın üzerine yazıyordu ve doğrulanmış sorular, onlara bağlı kararlarla birlikte kaybolacaktı. Test: [`tests/test_pipeline.py`](../tests/test_pipeline.py).
 - [`run_all(output_language)`](../src/pipeline.py#L201): `--hepsi` ile klasördeki bütün PDF'leri sırayla işler. Soru dosyası PDF'ten yeniyse belgeyi "zaten işlenmiş" sayıp atlar. Her belgeden sonra [`doc_cost`](../src/llm/capacity.py#L39) ile tahmini token maliyetini basar.

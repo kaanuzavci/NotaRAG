@@ -10,7 +10,7 @@ Bu klasör projedeki **bütün kod dosyalarını tek tek** anlatır. Her dosya i
 
 Fonksiyon adları bağlantıdır; tıklayınca VS Code o satırı açar. Rehberi önizlemede okumak için dosya açıkken `Ctrl+Shift+V` (yan yana: `Ctrl+K V`).
 
-> Rehber **2026-10-05**'teki koda göre yazıldı. Kod değiştikçe satır numaraları kayabilir. Bağlantıları koda göre yeniden hizalamak için `python scripts\rehber_satirlari.py --yaz` çalıştır (fonksiyon adına bakarak düzeltir; internetsiz). Bağlantı yanlış satıra gidiyorsa dosyada `Ctrl+Shift+O` ile ada göre atla.
+> Rehber **2026-10-05**'teki koda göre yazıldı; 2026-10-06'da bilgi kartları ve zorluk ölçümü eklendi. Kod değiştikçe satır numaraları kayabilir. Bağlantıları koda göre yeniden hizalamak için `python scripts\rehber_satirlari.py --yaz` çalıştır (fonksiyon adına bakarak düzeltir; internetsiz). Bağlantı yanlış satıra gidiyorsa dosyada `Ctrl+Shift+O` ile ada göre atla.
 
 ## Bölümler (verinin aktığı sırayla)
 
@@ -23,8 +23,9 @@ Fonksiyon adları bağlantıdır; tıklayınca VS Code o satırı açar. Rehberi
 | 5 | [Soru üretimi](05-uretim.md) | `generation/` (4 dosya) |
 | 6 | [Doğrulama ve kalite kapısı](06-dogrulama.md) | `verification/` (4), `qualify.py` |
 | 7 | [Sınav isteği ve yardımcılar](07-sinav-istegi.md) | `topics.py`, `request.py`, `grading.py`, `review_store.py`, `export.py`, `requote.py` |
-| 8 | [Arayüz (Streamlit)](08-arayuz.md) | `ui/` (12 dosya) |
-| 9 | [Ölçüm, testler ve araçlar](09-olcum-ve-test.md) | `eval/` (5), `tests/` (7), `scripts/bekci.py` |
+| 8 | [Arayüz (Streamlit)](08-arayuz.md) | `ui/` (13 dosya), `cards.py` |
+| 9 | [Ölçüm, testler ve araçlar](09-olcum-ve-test.md) | `eval/` (6), `tests/` (9), `scripts/` (4) |
+| 10 | [Zorluk: iddia değil ölçüm](10-zorluk.md) | `difficulty.py`, `simulate.py` |
 
 Acele edenler için okuma sırası: bu sayfa → 1 (özellikle `pipeline.py`) → 7'deki `request.py` → 5 → 6. Bu beşi sistemin omurgasıdır; gerisi bu omurgaya hizmet eder.
 
@@ -32,21 +33,21 @@ Acele edenler için okuma sırası: bu sayfa → 1 (özellikle `pipeline.py`) �
 
 ## Rakamlarla proje
 
-- **67** Python dosyası var; bunların **12**'si boş `__init__.py`.
+- **80** Python dosyası var; bunların **12**'si boş `__init__.py`.
   - `__init__.py`, Python'a "bu klasör bir paket, içinden `from src.llm import ...` diye içe aktarabilirsin" der. İçinin boş olması normaldir.
-- Geriye **55 gerçek dosya** kalıyor: boş satırlar hariç yaklaşık **6.700 satır**.
+- Geriye **68 gerçek dosya** kalıyor: boş satırlar hariç yaklaşık **8.200 satır**.
 
 | Katman | Klasör | Satır | Görevi |
 |---|---|---|---|
 | PDF okuma | `src/ingestion/` | ~670 | PDF'ten metin, başlık ve tablo çıkarır; resim olan sayfayı görsel modele okutur |
 | Bölümleme | `src/chunking/` | ~120 | Metni sayfa parçalarına ve bölümlere ayırır |
 | Arama | `src/retrieval/` | ~180 | Parçaları vektöre çevirir, ChromaDB'de saklar ve arar |
-| LLM kapısı | `src/llm/` | ~560 | Bütün yapay zekâ çağrılarının geçtiği tek kapı |
-| Üretim | `src/generation/` | ~580 | Soru ve cevap üretir; hesap sorularını SymPy ile yeniden hesaplar |
-| Doğrulama | `src/verification/` | ~475 | Soruyu önce kodla, sonra başka bir model ailesiyle denetler |
-| Kök dosyalar | `src/*.py` | ~1.500 | Akışlar (pipeline, request), puanlama, dışa aktarma, Türkçe metin |
-| **Arayüz** | `src/ui/` | **~1.865** | Streamlit sayfaları ve sınav ekranı (en büyük katman) |
-| Ölçüm ve test | `eval/`, `tests/`, `scripts/` | ~770 | Deneyler, API çağırmayan testler, izleme aracı |
+| LLM kapısı | `src/llm/` | ~630 | Bütün yapay zekâ çağrılarının geçtiği tek kapı |
+| Üretim | `src/generation/` | ~625 | Soru ve cevap üretir; hesap sorularını SymPy ile yeniden hesaplar |
+| Doğrulama | `src/verification/` | ~500 | Soruyu önce kodla, sonra başka bir model ailesiyle denetler |
+| Kök dosyalar | `src/*.py` | ~1.950 | Akışlar (pipeline, request), puanlama, dışa aktarma, Türkçe metin, bilgi kartları, zorluk ölçümü |
+| **Arayüz** | `src/ui/` | **~2.260** | Streamlit sayfaları, sınav ve bilgi kartı ekranları (en büyük katman) |
+| Ölçüm ve test | `eval/`, `tests/`, `scripts/` | ~1.270 | Deneyler, API çağırmayan testler, izleme ve önizleme araçları |
 
 ---
 
@@ -72,6 +73,7 @@ AKIŞ 2: SINAV İSTEĞİ  (Sınav Hazırla sayfası → request.py)
      │                     havuzda o sayfalara bağlı, doğrulanmış soru var mı? → varsa hemen (0 token)
      │ eksik varsa request.start() → ayrı süreçte request.run():
      │                     yalnızca bulunan sayfalardan generate_request() → checks → verify_item()
+     │                     simulate.run() → zorluk ölçülür; istenen düzeyin altındaysa evolve_request() (zorlaştırma)
      ▼
    data/questions/istek_tr.jsonl  → ui/quiz.py (çöz, puanla, sonuç) → data/review/attempts.jsonl
 
@@ -90,7 +92,7 @@ Kodu okurken akılda tutman gereken beş fikir:
    - Şema: Pydantic
    - Kod kontrolü: kanıt alıntısı metinde var mı, şıklar tutarlı mı?
    - Kör doğrulama: başka aileden bir model soruyu cevap anahtarını görmeden çözer.
-5. **RAG'in "R"si (retrieval, yani arama) Akış 2'de.** Akış 1 belgenin bütün bölümlerini sırayla gezdiği için aramaya ihtiyaç duymaz. Arama [`request.retrieve`](../src/request.py#L51) içinde yapılır.
+5. **RAG'in "R"si (retrieval, yani arama) Akış 2'de.** Akış 1 belgenin bütün bölümlerini sırayla gezdiği için aramaya ihtiyaç duymaz. Arama [`request.retrieve`](../src/request.py#L52) içinde yapılır.
 
 ---
 
@@ -114,6 +116,8 @@ Modüller birbirleriyle en çok bu dosyalar üzerinden konuşur. Bir dosyanın n
 | `data/requests/<id>.json` / `.log` | Bir sınav isteğinin durumu / arka plan işinin çıktısı | `request.save`, `request.start` | exam sayfası, `scripts/bekci` |
 | `data/jobs/<belge>.json` / `.log` | Belge işleme işinin başlangıcı / çıktısı | `ui/data.start_job` | `ui/data.job_status`, `scripts/bekci` |
 | `data/review/attempts.jsonl` | Her öğrenci çözümü (soru kimliği, doğru mu, cevap, ipucu) | `request.record_attempt` | `request.item_stats` (madde analizi) |
+| `data/review/cards.jsonl` | Bilgi kartı değerlendirmeleri (Bildim / Bilemedim / Atla) | `cards.record` | `cards.history` (Leitner kutuları) |
+| `data/review/difficulty.jsonl` | Zorluk ölçümleri (benzetilmiş öğrenci: p, çaba) | `difficulty.record` (`simulate.measure`) | `difficulty.measurements` → `apply` |
 | `data/review/reports.jsonl` | "Hatalı bildir" ve kısa cevap itirazları | `request.report` | `request.reported`, `blocked_ids` |
 | `data/reviews.jsonl` | Öğretmenin onay/red kararları | `review_store.save_decision` | `review_store.decisions` |
 | `data/llm.sqlite` | Kota sayaçları + LLM yanıt önbelleği | `llm/ledger` | `llm/ledger`, `scripts/bekci` |
@@ -139,19 +143,21 @@ Sistemde dolaşan temel nesne bir **soru öğesidir** (kodda genelde `it` ya da 
   "chunk_ids": ["7.Hafta Sunu Dosyası:p015:1", "..."],   // üretimde verilen bağlam parçaları
   "q": {                                     // generation/schema.py Question (şıklar karıştırılmış)
     "question": "...", "type": "multiple_choice", "options": ["...", "...", "...", "..."],
-    "answer_index": 2, "answer": "...", "evidence_quote": "...",
+    "answer_index": 2, "answer": "...", "evidence_quote": "...", "evidence_quotes": ["...", "..."],   // ayrı bilgiler
     "bloom_level": "understand", "difficulty": "medium",
     "compute": null, "option_values": null, "solution": null, "option_notes": ["...", "", "...", "..."]
   },
   // verification/checks.py  check()
   "check": {"status": "passed_checks", "rejected": [], "flags": ["length_cue"],
             "evidence_match": "exact", "evidence_page": 16,
+            "facts": 2, "fact_pages": [15, 16],   // notta bulunan ayrı kanıt alıntısı sayısı (zorluk yapısı)
             "generated_answer_index": 0,      // karıştırmadan önceki doğru şık (konum yanlılığı ölçümü)
             "computed": {"ok": true, "value": "30240", "key_ok": true}},   // yalnızca hesap sorularında
   // verification/verify.py  verify_item()
   "verification": {"label": "verified", "why": "doğrulayıcı yalnızca anahtar şıkkı doğru buldu",
                    "verifier": "openai/gpt-oss-120b", "option_verdicts": {"A": "incorrect", "B": "...", "...": "..."}},
-  "request": "20261005-141210-ab12"          // request.run(): yalnızca sınav isteğinde üretilenlerde
+  "request": "20261005-141210-ab12",         // request.run(): yalnızca sınav isteğinde üretilenlerde
+  "requested_difficulty": "hard"             // istenen düzey (etiket artık zorla yazılmaz)
 }
 ```
 
@@ -160,6 +166,7 @@ Belleğe yüklenirken eklenen ama dosyaya yazılmayan alanlar:
 - `id`: [`review_store.question_id`](../src/review_store.py#L36) hesaplar: `sha1(model + "|" + soru metni)` değerinin ilk 12 karakteri.
 - `doc`: ilk parçanın kimliğinden çıkarılan belge adı.
 - `set`, `set_kind`: hangi dosyadan geldiği (`ui/data.question_sets`).
+- `difficulty`: etkin zorluk `{level, claim, source, …}` ([`apply`](../src/difficulty.py#L219); bölüm 10). `q.difficulty` da bu düzeye çevrilir; üretecin iddiası `claim`'de kalır. Dosya değişmez.
 
 **Soru kimliği neden önemli?** Öğretmen kararları, öğrenci çözümleri ve "hatalı bildir" kayıtları hep bu kimlikle bağlanır. Aynı model aynı soruyu yeniden üretirse kimlik aynı çıkar. Bu yüzden [`pipeline.merge_existing`](../src/pipeline.py#L124) soru dosyasının üzerine yazmaz, yeni soruları ekler. Üzerine yazsaydı bu kayıtların bağlandığı sorular kaybolurdu.
 
@@ -201,6 +208,7 @@ En çok kullanılan modüller (← kaç dosya onu içe aktarıyor):
 | `python -m src.topics [belge]` | [`topics.py`](../src/topics.py) | Evet (belge başına 1 istek) |
 | `python -m src.llm.capacity [belge]` | [`llm/capacity.py`](../src/llm/capacity.py) | Hayır |
 | `python -m src.qualify <model>` | [`qualify.py`](../src/qualify.py) | Evet |
+| `python -m src.simulate [--doc X] [--ids …] [--limit N]` | [`simulate.py`](../src/simulate.py) | Evet (Gemma; soru başına 5 çağrı) |
 | `python -m src.requote [--yaz]` | [`requote.py`](../src/requote.py) | Hayır |
 | `python -m src.generation.pilot ...` | [`generation/pilot.py`](../src/generation/pilot.py) | Evet |
 | `python -m src.verification <dosya>` | [`verification/__main__.py`](../src/verification/__main__.py) | Evet |
@@ -208,6 +216,7 @@ En çok kullanılan modüller (← kaç dosya onu içe aktarıyor):
 | `python -m eval.<ad>` | [`eval/`](../eval/) | `compute_check` hayır, diğerleri evet |
 | `python -m tests.<ad>` | [`tests/`](../tests/) | Hayır |
 | `python scripts\bekci.py` | [`scripts/bekci.py`](../scripts/bekci.py) | Hayır |
+| `streamlit run scripts/onizleme.py` + `python scripts\ekran.py <url> <png>` | [`scripts/onizleme.py`](../scripts/onizleme.py), [`scripts/ekran.py`](../scripts/ekran.py) | Hayır (arayüzü hazır veriyle açar, ekran görüntüsü alır) |
 | `python scripts\rehber_satirlari.py [--yaz]` | [`scripts/rehber_satirlari.py`](../scripts/rehber_satirlari.py) | Hayır (bu rehberin bağlantılarını koda hizalar) |
 
 **`python -m paket` nasıl çalışır?** Python bir paketi `-m` ile çalıştırınca paketin içindeki `__main__.py` dosyasını çalıştırır (ör. `python -m src.ingestion` → `src/ingestion/__main__.py`). Tek bir modülü çalıştırınca da (ör. `python -m src.pipeline`) dosyanın sonundaki `if __name__ == "__main__":` bloğu çalışır. Aynı dosya başka bir dosya tarafından içe aktarıldığında bu blok **çalışmaz**. Bu yüzden `pipeline.py` hem komut olarak çalışabilir hem de `request.py` içinden fonksiyonu kullanılabilir.
@@ -240,7 +249,7 @@ Bunlar hata değil; projenin nasıl büyüdüğünü gösteren izler. İleride t
 1. **Ölü kod** (kimse kullanmıyor):
    - [`ui/parts/system.py`](../src/ui/parts/system.py): dosyanın tamamı; yerini `ui/pages/models.py` aldı.
    - [`ui/parts/evaluation.render`](../src/ui/parts/evaluation.py#L194): Rapor sayfası alt fonksiyonları doğrudan çağırıyor.
-   - [`schema.Batch`](../src/generation/schema.py#L68), [`review_store.agreement`](../src/review_store.py#L223), `review_store.LABEL_TR`, [`style.card`](../src/ui/style.py#L291), `ui/data.DOC_SHORT`, `style.INK / PAPER / HIGHLIGHT`.
+   - [`schema.Batch`](../src/generation/schema.py#L71), [`review_store.agreement`](../src/review_store.py#L224), `review_store.LABEL_TR`, [`style.card`](../src/ui/style.py#L450), `ui/data.DOC_SHORT`, `style.INK / PAPER / HIGHLIGHT`.
 2. **Tanımlı ama hiç çağrılmayan rol:** `models.py`'deki `"judge"` (kısa cevap hakemi). Hakem istemi (§4d) aslında doğrulayıcı rolüyle çağrılıyor ([`verify_short`](../src/verification/verify.py#L174)). Arayüz bu rolü listeliyor, kod kullanmıyor.
 3. **Tekrarlanan kod:**
    - `chunks.jsonl` okuyan fonksiyonun yaklaşık 9 kopyası var (`index.load_chunks`, `generate._load`, `review_store.load_chunks`, `topics._chunks`, `pipeline.run` içinde, `verification/__main__`, `sensitivity`, `requote`, `eval/batch_compare`).

@@ -81,6 +81,12 @@ Rules:
 - "evidence_quote" must be a short, verbatim substring copied directly from
   the Context (max 25 words) that supports the answer. This will be
   programmatically verified against the Context — do not paraphrase it.
+- "evidence_quotes": every separate fact or rule of the Context that the
+  question needs, each as its own short verbatim quote (max 25 words each;
+  "evidence_quote" is one of them). One quote for a question about one fact;
+  a "hard" question needs at least two quotes from different parts of the
+  Context. Each quote is verified; the number of distinct facts found is
+  used to check the difficulty label.
 - Generate "question", "options" and "answer" text in {output_language},
   even though the Context may be in a different language. Keep
   "evidence_quote" in the Context's original language, since it must match
@@ -128,6 +134,16 @@ Rules:
   compare, or classify ideas stated in the Context), or "apply" (use a rule
   stated in the Context on a concrete case). Only produce "apply" questions
   whose solution follows entirely from the Context.
+- Label "difficulty" by what the question demands, not by the topic:
+  "easy" = the answer is stated in one sentence of the Context and the
+  student only recognises or recalls it, or does one direct step;
+  "medium" = the student must understand it in other words, compare or
+  classify, or do two steps; no single sentence answers it word for word;
+  "hard" = the student must combine at least two separate facts or rules
+  from different parts of the Context, or apply a rule to a new case in
+  three or more steps or with a case analysis, and the distractors are
+  near-misses chosen by a student who used only one of the facts. Label
+  honestly: the label is checked by measuring how students solve it.
 
 Context:
 {context}
@@ -148,6 +164,7 @@ Output ONLY valid JSON matching this schema, nothing else:
       "option_notes": ["", "string", "string", "string"],
       "answer": "string",
       "evidence_quote": "string",
+      "evidence_quotes": ["string", "string"],
       "bloom_level": "remember | understand | apply",
       "difficulty": "easy | medium | hard"
     }
@@ -194,6 +211,7 @@ Output ONLY valid JSON, nothing else:
           "option_notes": ["", "string", "string", "string"],
           "answer": "string",
           "evidence_quote": "string",
+          "evidence_quotes": ["string", "string"],
           "bloom_level": "remember | understand | apply",
           "difficulty": "easy | medium | hard"
         }
@@ -225,6 +243,10 @@ Rules:
   verbatim substring of the rule (max 25 words) in "evidence_quote"; it is
   programmatically matched against the Context. Markers like [s.12] are
   page numbers; never put them in any field.
+- "evidence_quotes": one short verbatim quote per separate rule or formula
+  of the Context that the solution uses ("evidence_quote" is one of them).
+  A problem that combines two rules has two quotes. Each is verified; the
+  number of distinct rules found is used to check the difficulty label.
 - Invent your own concrete numbers and do not copy a worked example from
   the Context. The problem must be self-contained: state every given value
   in the question. Never write "verilen tabloda", "metinde", "yukarıdaki",
@@ -252,14 +274,19 @@ Rules:
   string for the correct option.
 - short_answer: "answer" is the final value (with its unit, if any);
   "answer_value" is that value as a SymPy expression.
-- "solution": 2-4 short steps showing how the rule is applied, ending with
-  the result.
+- "solution": the short steps the solution really needs, ending with the
+  result: one step for a direct substitution, more only when the problem
+  needs them. Do not split one operation into several steps (the number of
+  steps is used as a difficulty signal).
 - Write math in plain Unicode (x², √, ·, ≤, π), never LaTeX, in
   "question", "options", "answer" and "solution".
 - Write "question", "options", "answer" and "solution" in
   {output_language}; keep "evidence_quote" in the Context's language.
-- difficulty: "easy" = one direct substitution; "medium" = two steps or
-  choosing the right rule; "hard" = combining two rules or a case analysis.
+- difficulty: "easy" = one direct substitution into one rule; "medium" =
+  two steps, or choosing the right rule among similar ones; "hard" =
+  combining two different rules (often from different topics), three or
+  more steps, or a case analysis / counting with a condition. Label
+  honestly: the label is checked by measuring how students solve it.
 
 {units}
 
@@ -282,6 +309,7 @@ Output ONLY valid JSON, nothing else:
           "compute": "sympy",
           "solution": ["step", "step"],
           "evidence_quote": "string",
+          "evidence_quotes": ["string", "string"],
           "bloom_level": "apply",
           "difficulty": "easy | medium | hard"
         }
@@ -295,6 +323,26 @@ rule that can be applied to numbers.
 ```
 
 Why this exists (2026-10-04): on a TYT mathematics summary, §2 produced 64 questions, of which only 2 were computations; the rest asked what a formula *means*. §2's evidence rule ("the answer must be stated in the Context") cannot hold for a computed result, because the numbers are new. Grounding is therefore split: the rule must be in the Context (evidence_quote), the arithmetic is checked by code, and the problem as worded is solved blindly by a verifier from another model family (§4e).
+
+## 2d. Evolve a question to the target difficulty
+
+Used by `src/request.py` when an exam asks for "medium" or "hard" and too few new questions are **measured** at that level (src/difficulty.py). The questions measured below the target are rewritten with concrete operations instead of an adjective — "write a hard question" alone did not work (TYT request, 2026-10-05: the generator itself labelled 14 of 17 "hard" problems as medium). This is Evol-Instruct's in-depth evolving (add constraints, increase reasoning steps, concretise; LITERATURE §8) plus multi-hop composition: Part B is the notes of another topic of the same exam, so the new question must combine two facts or rules (KNIGHT: multi-hop = harder). The block replaces `{units}` of §2b (text questions, after the §2 rules with the target rule) or of §2c (computed problems); the output schema and every check, verification and measurement stay the same.
+
+```
+EVOLVE TASK. Each unit below gives an existing question and its notes in
+two parts. The original falls short of the target difficulty in the rules
+above. Write ONE new question per unit that meets it, by applying at least
+two of these operations:
+- make the student combine the original's fact or rule with a DIFFERENT
+  fact or rule from Part B, so that neither one alone is enough;
+- add a condition, a constraint or a case analysis;
+- turn recall into applying the rule to a new concrete case;
+- make each distractor a near-miss: the answer of a student who used only
+  one of the facts, or who made the mistake named in its option note.
+For a unit, "the Context" is Part A plus Part B. Keep the original's
+question type. Quote every fact or rule the new question needs in
+"evidence_quotes" (at least one from each part). Do not copy the original.
+```
 
 ## 3. (Reserved) Chat Mode
 
@@ -500,6 +548,29 @@ Document:
 {document}
 
 Output ONLY valid JSON: {"topics": [{"title": "string", "pages": [1, 2]}]}
+```
+
+---
+
+## 8. Simulated student (difficulty measurement)
+
+Used by `src/simulate.py` to **measure** difficulty instead of trusting the generator's label (LITERATURE §8: LLM difficulty labels barely predict student difficulty; simulation with weaker models works better). A "class" of weaker models (Gemma 4) answers each question **open-book** — the student has the note page in front of them, so the measurement is about the thinking the question demands, not about memorising the notes — and **without hidden thinking** (`thinking_level="minimal"`): an answer that is not immediately visible (several steps, combining facts, a case analysis) is missed more often. Each sample shuffles the options and carries a student number, so samples are independent and cached. A separate "careful" pass (`thinking_level="high"`) records how many thinking tokens the question needed. `{answer_format}` depends on the type: the option letter, Doğru / Yanlış, or a short final answer.
+
+**Computed (math) questions are not simulated** — their difficulty comes from structure: the number of distinct rules quoted from the notes (`evidence_quotes`) and the solution's steps and operations (`src/difficulty.py`). Why (2026-10-05 smoke test, six TYT problems): with no working the model failed a simple salt-mixture percentage (p = 0.25: mental arithmetic) but answered a Vieta identity instantly (p = 1.0: it knows the formula) — the opposite of students, who have paper but may not know the rule; with three lines of scrap paper all four of easy and medium problems scored p = 1.0, and thinking tokens were noisy (2661 for a simple repeating decimal whose notation was ambiguous). Gemma 4 is too strong a student for high-school math (LITERATURE §8: strong models cannot simulate struggling students); a weaker model (e.g. Ministral 3B/8B) or real answers are needed there.
+
+**Text short-answer questions are not simulated either** (`difficulty.measurable`): the answer check is string matching, which cannot judge meaning. In the 2026-10-06 pilot all four samples answered "verimlerinin önemli bir kısmını kaybetme" to a key of "büyük ürün ve verim kayıpları riskine karşı savunmasızlık" — correct, but scored 0/4, a false "hard". Only multiple-choice and true/false questions are measured; for the rest the generator's label and the structural cap apply.
+
+```
+You are a student taking an exam (student no. {student}). You have just read
+your course notes below. Answer the question quickly, as you would under time
+pressure: do not write any working, explanation or steps.
+
+Course notes:
+{context}
+
+Question: {question}
+{options}
+{answer_format}
 ```
 
 ---

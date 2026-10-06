@@ -29,6 +29,9 @@ def test_all() -> None:
         pass
     assert _classify(ConnectTimeout("_ssl.c:975: The handshake operation timed out"))[0] == "network"
     assert _classify(Exception("Request timed out."))[0] == "network"
+    class RemoteProtocolError(Exception):
+        pass
+    assert _classify(RemoteProtocolError("Server disconnected without sending a response."))[0] == "network"
     # Gemini 503 'high demand' kota değil: iş yedeğe geçmeden kısa bekleyip aynı modeli denemeli
     # (2026-10-04'te matematik notunda yoğunluk 'kota dolu' sanılıp qwen'e geçilmişti)
     assert AllModelsExhausted("x", ["busy", "busy"]).transient

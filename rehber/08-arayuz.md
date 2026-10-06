@@ -2,15 +2,19 @@
 
 [← 7. Sınav isteği](07-sinav-istegi.md) · [Ana sayfa](README.md) · Sonraki: [9. Ölçüm ve testler →](09-olcum-ve-test.md)
 
-Projenin en büyük katmanı (~1.865 satır, 12 dosya). Arayüz hiçbir LLM'i doğrudan çağırmaz. Dosyaları okur, sonuçları gösterir; uzun işleri ayrı süreç olarak başlatır (`pipeline`, `request`).
+Projenin en büyük katmanı (boş satırlar hariç ~2.260 satır, 13 dosya). Arayüz hiçbir LLM'i doğrudan çağırmaz. Dosyaları okur, sonuçları gösterir; uzun işleri ayrı süreç olarak başlatır (`pipeline`, `request`).
+
+Sorulardaki zorluk etiketi, arayüze gelmeden önce ölçümle değiştirilir (`request.all_items` ve `review_store.load_set` içinde `difficulty.apply`; bölüm 10). Bu yüzden arayüzün gösterdiği "Kolay / Orta / Zor" etkin düzeydir, üretecin iddiası değil.
 
 ```
 src/app.py                 menü ve giriş (bölüm 1)
 src/ui/style.py            görsel dil: CSS + küçük HTML yardımcıları
 src/ui/data.py             arayüzün veri katmanı (dosya okuma, önbellek, arka plan işleri)
-src/ui/components.py       ortak soru kartı ve kaynak sayfa kartı
+src/ui/components.py       ortak soru kartı, kaynak sayfa kartı, bitiş özeti
 src/ui/quiz.py             sınav çözme deneyimi (başlangıç → odak modu → sonuç)
+src/cards.py               bilgi kartı mantığı: deste, aralıklı tekrar (Streamlit'siz)
 src/ui/pages/exam.py       Sınav Hazırla        (varsayılan sayfa)
+src/ui/pages/cards.py      Bilgi Kartları
 src/ui/pages/documents.py  Belgeler (PDF yükleme dahil)
 src/ui/pages/bank.py       Soru Bankası
 src/ui/pages/review.py     İnceleme (öğretmen)
@@ -37,19 +41,20 @@ Streamlit'i ilk okuyanı en çok şaşırtan şey şu: **her etkileşimde sayfa 
 
 ---
 
-## `src/ui/style.py` — görsel dil (302 satır)
+## `src/ui/style.py` — görsel dil (461 satır)
 
 **Ne işe yarar?** "Akademik baskı + fosforlu kalem" görünümü.
 - Renkler ve yazı tipleri [`.streamlit/config.toml`](../.streamlit/config.toml)'da: kâğıt zemin `#F7F4ED`, mürekkep laciverdi, Fraunces / Instrument Sans / JetBrains Mono.
 - Bu dosyada Streamlit bileşenlerinin karşılamadığı ayrıntılar var: kâğıt dokusu, sarı vurgu, kartlar, sınav ekranı düzeni.
 - Ayrıca HTML üreten küçük yardımcılar.
+- Çalışma ekranlarının (bilgi kartı, sınav) tasarım ilkesi, "v3": düz kâğıt zemin üstünde sakin kartlar. Hareket yalnızca bir anlam taşıyınca var: kart döner, değerlendirilen kart yığınına gider. Figür, konfeti ve animasyonlu emoji kullanıcı kararıyla kaldırıldı.
 
 **Bağlantılar:** ← `app.py` ve bütün `ui/` dosyaları.
 
 **İçindekiler**
 - `INK, PAPER, HIGHLIGHT`: renk sabitleri (dışarıda kullanılmıyor).
 - `STATUS`: etiket → (Türkçe ad, yazı rengi, zemin rengi).
-- `_CSS` ([satır 21-256](../src/ui/style.py#L21)): bütün özel stiller. Bölümleri:
+- `_CSS` ([satır 21-398](../src/ui/style.py#L21)): bütün özel stiller. Bölümleri:
   - kâğıt dokusu (SVG gürültü);
   - sayfa başlığı (`.nr-kicker`, `.nr-title`, çift çizgi);
   - fosforlu vurgu (`.nr-hl`);
@@ -57,18 +62,25 @@ Streamlit'i ilk okuyanı en çok şaşırtan şey şu: **her etkileşimde sayfa 
   - soru kartı (`.nr-exam`, `.nr-opt`);
   - Modeller ve Kota kutuları (`.nr-tile`, `.nr-mcard`, `.nr-meter`);
   - **sınav odak modu**: sabit yükseklikler (`.st-key-nr_answer`, `.st-key-nr_opts`), alta yapışık gezinme çubuğu (`.st-key-nr_nav`), ipucu kutusu (`.nr-hint`);
-  - sonuç ekranı (`.nr-res`, `.nr-kpi`);
-  - İnceleme sayfasının iki kart düzeni (`.nr-pair`).
-- [`inject()`](../src/ui/style.py#L259): CSS'i sayfaya basar (`app.py` çağırır).
-- [`html(markup)`](../src/ui/style.py#L265): HTML'i `st.markdown(..., unsafe_allow_html=True)` ile basar.
+  - İnceleme sayfasının iki kart düzeni (`.nr-pair`);
+  - **çalışma ekranları (v3)**: ortak renk değişkenleri (`:root` içinde `--nr-good`, `--nr-bad`, `--nr-accent`…);
+    - bilgi kartı: deste (`.nr-deck`, `.nr-stack`), dönen kart (`.nr-fc`, `.nr-flip`, `.nr-face`), yığınına giden kart (`.nr-ghost`), üç yığın (`.nr-piles`), üst şerit (`.nr-topbar`), kurulum sayıları (`.nr-ctiles`);
+    - bitiş özeti (`.nr-sum`, ölçer `.nr-m`, konu satırı `.nr-tr`): kart oturumu ve sınav sonucu ortak;
+    - sınav kartının üstündeki soru başına renkli şerit (`.nr-focus::before`);
+    - hareket azaltma tercihi (`prefers-reduced-motion`) açıksa animasyonlar kapanır.
+- `PALETTE`: altı pastel kart rengi `(açık, koyu pastel, yazı, vurgu)`. Yazı rengi her pastelde en az 7:1 karşıtlıkta.
+- [`color(i)`](../src/ui/style.py#L409): i. kartın rengi (palet döner).
+- [`color_vars(i)`](../src/ui/style.py#L413): o rengi CSS değişkenleri olarak verir (`--c1`, `--ink`, `--a`…); kart HTML'inin `style=` özniteliğine yazılır.
+- [`inject()`](../src/ui/style.py#L418): CSS'i sayfaya basar (`app.py` çağırır).
+- [`html(markup)`](../src/ui/style.py#L424): HTML'i `st.markdown(..., unsafe_allow_html=True)` ile basar.
   - Neden `st.html` değil? `st.html` içeriği ana sayfanın stillerinden yalıtıyor; sınıflar uygulanmıyordu.
   - Boş satırlar silinir: Markdown boş satırda HTML bloğunu keser.
   - `<div lang="tr">` sarmalayıcısı CSS büyük harf dönüşümünü Türkçe yapar: "ipucu" → "İPUCU" (İngilizce kuralla "IPUCU" olurdu).
-- [`esc(s)`](../src/ui/style.py#L273): HTML kaçışı (`<` → `&lt;`). Metinde `<` geçerse sayfa bozulmasın, betik enjeksiyonu olmasın.
-- [`header(kicker, title, lead, hero_word)`](../src/ui/style.py#L277): sayfa başlığı.
-- [`pill(label)`](../src/ui/style.py#L286): "Doğrulandı / İncelenmeli / Reddedildi" rozeti.
-- [`card(...)`](../src/ui/style.py#L291): kullanılmıyor.
-- [`flow(steps)`](../src/ui/style.py#L296): akış şeması (Rapor → Nasıl çalışır).
+- [`esc(s)`](../src/ui/style.py#L432): HTML kaçışı (`<` → `&lt;`). Metinde `<` geçerse sayfa bozulmasın, betik enjeksiyonu olmasın.
+- [`header(kicker, title, lead, hero_word)`](../src/ui/style.py#L436): sayfa başlığı.
+- [`pill(label)`](../src/ui/style.py#L445): "Doğrulandı / İncelenmeli / Reddedildi" rozeti.
+- [`card(...)`](../src/ui/style.py#L450): kullanılmıyor.
+- [`flow(steps)`](../src/ui/style.py#L455): akış şeması (Rapor → Nasıl çalışır).
 
 ---
 
@@ -103,12 +115,14 @@ Streamlit'i ilk okuyanı en çok şaşırtan şey şu: **her etkileşimde sayfa 
 
 ---
 
-## `src/ui/components.py` — ortak soru kartı (109 satır)
+## `src/ui/components.py` — ortak soru kartı ve bitiş özeti (187 satır)
 
-**Ne işe yarar?** Bir soruyu "basılı sınav kâğıdı" görünümünde HTML olarak üretir. İnceleme sayfası ve sınav sonuç ekranı aynı kartı kullanır.
+**Ne işe yarar?** İki ortak HTML parçası üretir:
+- Bir soruyu "basılı sınav kâğıdı" görünümünde gösteren kart. İnceleme sayfası ve sınav sonuç ekranı aynı kartı kullanır.
+- Bitiş özeti: kart oturumunun ve sınav sonucunun "nerede zorlandım?" kartı.
 
 **Bağlantılar**
-- ← `quiz`, `pages/review`, `pages/bank`.
+- ← `quiz`, `pages/review`, `pages/bank`, `pages/cards`.
 - → `style`, `data`, `textnorm.pretty_math`, `grading.safe_value`.
 
 **İçindekiler**
@@ -117,20 +131,34 @@ Streamlit'i ilk okuyanı en çok şaşırtan şey şu: **her etkileşimde sayfa 
 - [`type_label(q)`](../src/ui/components.py#L38): "Hesap sorusu" ya da tipin Türkçe adı.
 - [`_options(q, reveal, chosen)`](../src/ui/components.py#L42): şıklar. `reveal` ise doğru şık yeşil, öğrencinin yanlış seçimi kırmızı. Yanlış seçilen şıkkın notu varsa "Bu şıkkı seçtiysen: …" yazar. Kısa cevapta "Senin cevabın / Beklenen cevap" kutusu.
 - [`question_card(item, number, reveal, chosen, verdict, options)`](../src/ui/components.py#L72): kartın tamamı. Başlık (SORU N + tip + zorluk), soru, şıklar; `reveal` ise çözüm adımları, kaynak (belge + sayfa + sarı vurgulu alıntı) ve sistemin kararı.
-- [`page_card(item, png, note, reveal)`](../src/ui/components.py#L97): kaynak sayfa kartı. Kanıtın sarıyla işaretlendiği sayfa görüntüsü base64 olarak `<img>` içine gömülür.
+- [`page_card(item, png, note, reveal)`](../src/ui/components.py#L175): kaynak sayfa kartı. Kanıtın sarıyla işaretlendiği sayfa görüntüsü base64 olarak `<img>` içine gömülür.
+
+**Bitiş özeti.** Grafik ilkeleri: tek soru sorulur ("nerede zorlandım?"), her grup için tek oran (isabet) ince bir ölçer çubuğuyla gösterilir. Tek seri olduğu için tek renk (`#3A7BB8`) ve lejant yok. Her değer yazıyla da yazılır; renk tek başına anlam taşımaz. Durum renkleri (doğru yeşil, yanlış kırmızı, boş gri) yalnızca etiketli kutucuklarda.
+- `STATUS_DOT`: durum etiketi → renk. Sınavın "Doğru / Yanlış / Boş"u ile kartın "Bildim / Bilemedim / Atladım"ı aynı renkleri paylaşır.
+- `DIFF_ORDER`: ölçerlerin sırası (Kolay, Orta, Zor).
+- [`_rate(counts, skip_neutral)`](../src/ui/components.py#L105): (bilinen, payda). Kartta atlanan kart paydaya girmez (değerlendirilmedi); sınavda boş soru yanlış sayılır.
+- [`_group(records, key, labels)`](../src/ui/components.py#L110): kayıtları bir alana göre (zorluk, tip, konu) gruplayıp durum sayılarını toplar.
+- [`_detail`](../src/ui/components.py#L117): fareyle üstüne gelince görünen ayrıntı metni ("Orta — Doğru: 3 · Yanlış: 1 · Boş: 0").
+- [`_meter(name, counts, labels, skip_neutral)`](../src/ui/components.py#L121): bir ölçer (ad, yüzde, çubuk, "3 / 4"). O turda o gruptan soru yoksa "bu turda yok".
+- [`_topic_row`](../src/ui/components.py#L133): konu satırı. Yüzde %50'nin altındaysa "↻ tekrar et" işareti.
+- [`summary_html(records, labels, title, note, hero_label, hero_sub, extra_tile, by_type, skip_neutral, topics_shown)`](../src/ui/components.py#L142): özetin tamamı. `records` her soru için `{"status", "diff", "type", "topic"}`.
+  1. Başlık, not, büyük yüzde ve durum kutucukları (+ süre kutusu).
+  2. "Zorluğa göre" ölçerleri (her zaman üçü de).
+  3. `by_type` ise "Soru tipine göre" (yalnızca sınavda).
+  4. "Konulara göre" satırları, en çok zorlanılan önce. İlk 6'dan fazlası "+ N konu daha" altında katlanır.
 
 ---
 
-## `src/ui/quiz.py` — sınav çözme deneyimi (448 satır)
+## `src/ui/quiz.py` — sınav çözme deneyimi (400 satır)
 
 **Ne işe yarar?** Sınav Hazırla sayfasında sınav hazır olunca üç ekranı yönetir:
-1. **Başlangıç ekranı:** özet, tahmini süre, kısayollar.
+1. **Başlangıç ekranı:** özet, tahmini süre, kısayollar, şeffaflık notu (`TRANSPARENCY`: sorular yapay zekâyla üretildi, kaynağa bağlandı, başka modelle doğrulandı).
 2. **Odak modu:** kenar çubuğu gizli; tek soru, büyük şık düğmeleri, ilerleme çubuğu, süre sayacı, soru haritası, kademeli ipucu, klavye kısayolları.
-3. **Sonuç ekranı:** halka grafik, özet kutular, konulara göre başarı grafiği, gözden geçirme, hatalı bildir ve itiraz.
+3. **Sonuç ekranı:** ortak bitiş özeti (`components.summary_html`), gözden geçirme, hatalı bildir ve itiraz, "Kartla çalış".
 
 **Bağlantılar**
 - ← `pages/exam`.
-- → `request` (`record_attempt`, `report`), `grading.grade_short`, `components`, `data`, `style`, `altair`, `pandas`.
+- → `request` (`record_attempt`, `report`), `grading.grade_short`, `components`, `data`, `style`; "Kartla çalış" → `pages/cards`.
 
 **Durum: `st.session_state.exam` sözlüğü** (sınavın bütün hafızası)
 
@@ -148,19 +176,21 @@ Streamlit'i ilk okuyanı en çok şaşırtan şey şu: **her etkileşimde sayfa 
 | `overrides` | İtirazla doğru sayılan sorular |
 
 **Ortak fonksiyonlar**
-- [`grade(it, ans)`](../src/ui/quiz.py#L30): cevap doğru mu? ÇS'de şık sırası, D/Y'de değer, kısa cevapta `grade_short`.
-- [`topic_of(req, it)`](../src/ui/quiz.py#L44): sorunun konusu. Kanıt sayfası, aramanın hangi konu için bulduğu sayfalar arasındaysa o konu.
-- [`view(items)`](../src/ui/quiz.py#L53): ikinci denemede yalnızca yanlışlar.
-- [`hints(req, it)`](../src/ui/quiz.py#L59): **kademeli (Sokratik) ipuçları.** 1) Nereye bakmalı (konu + sayfa). 2) Kaynak cümle ya da uygulanacak kural. 3) Hesapta çözümün ilk adımı.
+- [`grade(it, ans)`](../src/ui/quiz.py#L29): cevap doğru mu? ÇS'de şık sırası, D/Y'de değer, kısa cevapta `grade_short`.
+- [`topic_of(req, it)`](../src/ui/quiz.py#L43): sorunun konusu. Kanıt sayfası, aramanın hangi konu için bulduğu sayfalar arasındaysa o konu.
+- [`view(items)`](../src/ui/quiz.py#L52): ikinci denemede yalnızca yanlışlar.
+- [`hints(req, it)`](../src/ui/quiz.py#L58): **kademeli (Sokratik) ipuçları.** 1) Nereye bakmalı (konu + sayfa). 2) Kaynak cümle ya da uygulanacak kural. 3) Hesapta çözümün ilk adımı.
 
-**1. Başlangıç:** [`start_screen(req, items)`](../src/ui/quiz.py#L86): özet kutusu ve "Sınava başla" düğmesi. Düğme fazı `"solve"` yapar.
+**1. Başlangıç:** [`start_screen(req, items)`](../src/ui/quiz.py#L85): özet kutusu ve "Sınava başla" düğmesi. Düğme fazı `"solve"` yapar.
 
 **2. Odak modu:** [`solve(req, items)`](../src/ui/quiz.py#L195)
 - `_FOCUS_CSS` kenar çubuğunu gizler ve içeriği daraltır.
 - Üst şerit: ilerleme, süre sayacı, "Çık" düğmesi.
 - Soru haritası (`st.pills`): numaraya tıklayıp soruya atlanır, cevaplananlarda ✓.
 - Soru kartı ve cevap alanı:
-  - ÇS: dört büyük düğme.
+  - Kartın üstünde soru başına değişen ince renkli şerit (`style.color(cur)`).
+  - Kartın sarmalayıcısı her soruda `div` ↔ `section` arasında değişir: tarayıcı kartı sıfırdan çizer, geçiş animasyonu her soruda oynar (React aynı etiketli öğeyi yeniden kullanıyordu).
+  - ÇS: dört büyük düğme. Şık harfi renkli rozet (`LETTER_COLORS`: mavi, turuncu, mor, gri); yeşil ve kırmızı bilerek yok, doğru/yanlış ipucu sanılmasın.
   - D/Y: iki düğme.
   - Kısa cevap: giriş kutusu + yazım yardımı.
 
@@ -181,20 +211,97 @@ Streamlit'i ilk okuyanı en çok şaşırtan şey şu: **her etkileşimde sayfa 
 
   İçerik yalnızca yeni ipucu açılınca değişir; böylece Streamlit çerçeveyi her tıklamada yeniden yüklemez ve sayaç titremez.
 
-**3. Sonuç:** [`results(req, items)`](../src/ui/quiz.py#L353)
+**3. Sonuç:** [`results(req, items)`](../src/ui/quiz.py#L316)
 1. Her soruyu puanla. İlk kez geliniyorsa `record_attempt` ile kaydet (madde analizi); `recorded=True` yap.
 2. Doğru / yanlış / boş sayıları (itirazlar doğru sayılır).
-3. Özet bloğu:
-   - [`_ring`](../src/ui/quiz.py#L290): SVG halka grafik.
-   - [`_message`](../src/ui/quiz.py#L310): yüzdeye göre mesaj.
-   - Doğru / Yanlış / Boş / Süre kutuları ve ipucu sayısı.
+3. Özet: her soru için `{durum, zorluk, tip, konu}` kaydı → `components.summary_html` (sınavda soru tipine göre ölçer de var).
+   - [`_message`](../src/ui/quiz.py#L294): yüzdeye göre başlık ve not.
+   - Süre kutusu; ipucu kullanıldıysa sayısı.
+   - Zorluk sütunu etkin düzeydir (ölçülmüş), üretecin iddiası değil.
 4. Düğmeler:
-   - "Yanlışları tekrar çöz": [`restart`](../src/ui/quiz.py#L341) `retry` ile yeni deneme açar.
+   - "Yanlışları tekrar çöz": [`restart`](../src/ui/quiz.py#L304) `retry` ile yeni deneme açar.
+   - "Kartla çalış": yanlış ve boş soruları `st.session_state.cards_preset`'e koyup Bilgi Kartları sayfasına geçer. Orada yalnızca şıksız anlaşılan sorular karta dönüşür.
    - "Baştan çöz" ve "Yeni sınav".
-5. [`_topic_chart`](../src/ui/quiz.py#L320): konulara göre yığılmış çubuk grafik (Altair) ve "tekrar etmen gereken konular".
-6. Gözden geçirme: her soru kartıyla, ardından:
+5. Gözden geçirme ("Yanlış ve boşlar / Tümü / Doğrular" süzgeci): her soru kartıyla, ardından:
    - "Hatalı bildir": `request.report`; soru inceleme bitene kadar sınavlardan çıkar.
    - Kısa cevapta "Cevabım doğruydu" itirazı: puana yansır, soru öğretmene gider.
+
+---
+
+## `src/cards.py` — bilgi kartı mantığı (106 satır)
+
+**Ne işe yarar?** NotebookLM'deki gibi bilgi kartları: önde soru, arkada cevap. Kartlar havuzdaki **doğrulanmış** sorulardan yapılır; LLM çağrısı yoktur, kota harcamaz. Bu dosyada Streamlit yok (test edilebilsin diye); ekran `pages/cards.py`'de.
+
+**Hangi soru kart olur?** Kartta şık yok. Bu yüzden yalnızca şıksız da anlaşılan sorular:
+- kısa cevap soruları;
+- kökü kendi başına soru olan çoktan seçmeliler (arka yüzde cevap = doğru şıkkın metni).
+
+Doğru / yanlış ifadeleri, "aşağıdakilerden hangisi" ve olumsuz kök ("…değildir") gibi şıklara dayanan sorular sınavda kalır.
+
+**Aralıklı tekrar (Leitner kutuları).** Her kart 1-5 arası bir kutudadır:
+- Bildim → bir üst kutu; Bilemedim → 1. kutu; Atla → değişmez.
+- Kutu yükseldikçe kart seyrekleşir: 1. kutu her oturumda, sonra 1, 3, 7, 14 gün.
+- Sonuç öğrencinin kendi değerlendirmesidir. Sınavın madde istatistiğine (`attempts.jsonl`) karışmaz; ayrı dosyaya yalnızca eklenir: `data/review/cards.jsonl` (soru kimliğine bağlı). Kutular bu kayıt baştan oynatılarak bulunur.
+
+**Bağlantılar:** ← `pages/cards`, `tests/test_cards`. → `request` (`all_items`, `usable`, `blocked_ids`), `config`.
+
+**İçindekiler**
+- `LOG`, `INTERVAL_DAYS` (kutu → gün), `RESULTS` (`good`, `bad`, `skip`).
+- `_OPTION_BOUND`: kökü şıklara dayanan soruyu yakalayan düzenli ifade ("aşağıdaki", "seçenek", "şık", "değildir", "which of"…). `\bşık\b`: "yaklaşık" yakalanmasın.
+- [`card_ok(q)`](../src/cards.py#L31): soru şıksız bir karta dönüşebilir mi?
+- [`step(state, result, t)`](../src/cards.py#L40): bir değerlendirmeden sonra kartın yeni durumu `{box, last, seen, good, bad}`. Saf fonksiyon (dosyaya dokunmaz).
+- [`history(path)`](../src/cards.py#L56): kayıt dosyasını baştan oynatır → kart kimliği → durum.
+- [`record(qid, result, path)`](../src/cards.py#L68): bir değerlendirmeyi dosyaya ekler. `path` çağrı anında okunur; testler geçici dosyaya yönlendirebilsin.
+- [`is_due(state, now)`](../src/cards.py#L76): hiç görülmemiş ya da kutusunun aralığı dolmuş kart.
+- [`next_gap(state, result)`](../src/cards.py#L81): bu sonuçtan sonra kart kaç gün sonra gelir (ekrandaki "Bildim → 3 gün sonra yeniden" ipucu).
+- [`pick(items, hist, n, now, only_due, seed)`](../src/cards.py#L86): deste. Önce zamanı gelmiş tekrar kartları (düşük kutu önce), sonra hiç görülmemişler; eşitlerde karışık.
+- [`pool(docs)`](../src/cards.py#L95): seçili belgelerdeki kart olabilen sorular. Sınavla aynı kural: doğrulanmış, reddedilmemiş, bildirilmemiş.
+- [`summary(items, hist, now)`](../src/cards.py#L103): kurulum ekranındaki sayılar (toplam, yeni, zamanı gelen, ustalaşılan = kutu ≥ 4).
+
+---
+
+## `src/ui/pages/cards.py` — Bilgi Kartları (278 satır)
+
+**Ne işe yarar?** Üç ekran:
+1. **Seçim:** belgeler, kart sayısı, "yalnızca zamanı gelenler" anahtarı; dört sayı kutusu (kart, tekrar zamanı gelen, hiç görmediğin, ustalaştığın).
+2. **Oturum:** kart ortada ve büyük. Tıklayınca döner (arkada soru özeti, cevap, varsa çözüm adımları, notundaki kaynak cümle sarı vurguyla); yine tıklayınca geri. Bilemedim / Atla / Bildim → kart ilgili yığına uçar, sıradaki desteden gelir.
+3. **Özet:** ortak bitiş özeti (`components.summary_html`): isabet, zorluğa ve konulara göre; "Bilemediklerimi çalış" ve "Yeni oturum".
+
+Klavye: Boşluk çevir · ← bilemedim · ↓ atla · → bildim.
+
+**Bağlantılar:** ← `app.py` menüsü, `quiz.results` ("Kartla çalış"). → `cards`, `request.all_items`, `components`, `data`, `style`.
+
+**Durum: `st.session_state.cards`**
+
+| Alan | Anlamı |
+|---|---|
+| `queue`, `pos` | Destedeki soru kimlikleri ve şu anki sıra |
+| `res`, `col` | Kimlik → sonuç; kimlik → kartın renk sırası (yığındaki küçük kart aynı renkte görünsün) |
+| `skipped` | Atlanan kartlar destenin sonuna bir kez eklenir; ikinci kez atlanırsa bir sonraki oturuma kalır |
+| `streak`, `best` | Üst üste "Bildim" serisi ve en uzunu |
+| `last` | Az önce değerlendirilen kart (yığına uçan "hayalet" kart bir kez çizilir) |
+| `v` | Her değerlendirmede artan sayaç; sahnenin `div`/`section` etiketini değiştirir |
+| `started`, `ended` | Süre ve "Bitir" |
+
+**İçindekiler**
+- [`_items()`](../src/ui/pages/cards.py#L29): bütün sorular (30 sn önbellek).
+- [`_topic(it)`](../src/ui/pages/cards.py#L37): kartın konusu. Bölüm adı yalnızca numaraysa ("01") belge adıyla birlikte.
+- Geri çağırmalar:
+  - [`_begin(ids)`](../src/ui/pages/cards.py#L45): yeni oturum durumu.
+  - [`_grade(result)`](../src/ui/pages/cards.py#L51): sonucu `cards.record` ile kaydeder; seriyi, yığınları ve sırayı günceller.
+  - [`_shuffle`](../src/ui/pages/cards.py#L69): kalan kartları karıştırır (ekrandaki kart yerinde kalır).
+  - [`_only_bad`](../src/ui/pages/cards.py#L76): yalnızca bilinemeyenlerle yeni tur.
+  - [`_end`](../src/ui/pages/cards.py#L82), [`_new`](../src/ui/pages/cards.py#L86): bitir, baştan.
+- HTML parçaları:
+  - [`_front(it)`](../src/ui/pages/cards.py#L92), [`_back(it)`](../src/ui/pages/cards.py#L99): kartın iki yüzü.
+  - [`_length_class(q)`](../src/ui/pages/cards.py#L115): uzun soruda yazı küçülür (`long`, `xlong`).
+  - [`_piles(cs, bump)`](../src/ui/pages/cards.py#L120): üç yığın; az önce kart düşen yığın hafifçe büyür.
+  - [`_stage(it, cs)`](../src/ui/pages/cards.py#L131): deste + kart + uçan kart + yığınlar.
+    - Kart bir `<details>` öğesidir: tıklamak onu açıp kapatır, CSS bunu 3B dönüşe çevirir. Böylece çevirmek sunucuya gitmez.
+    - Sarmalayıcı etiketi her değerlendirmede `div` ↔ `section` değişir. Tarayıcı sahneyi sıfırdan kurar: animasyon her seferinde oynar ve çevrilmiş kart bir sonraki karta çevrili geçmez.
+- [`_keys()`](../src/ui/pages/cards.py#L148): klavye kısayolları (`st.iframe` içinde küçük JavaScript). Boşluk `<details>`'i açıp kapatır; ok tuşları CSS sınıfıyla bulunan düğmeye `click()` yaptırır.
+- Ekranlar: [`_setup()`](../src/ui/pages/cards.py#L175), [`_session()`](../src/ui/pages/cards.py#L207), [`_summary()`](../src/ui/pages/cards.py#L241).
+- [`render()`](../src/ui/pages/cards.py#L263): sınavdan `cards_preset` geldiyse o sorularla oturum açar (hiçbiri karta dönüşmüyorsa bildirim gösterir); oturum varsa oturum, yoksa seçim ekranı.
 
 ---
 

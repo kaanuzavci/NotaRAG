@@ -2,7 +2,7 @@
 
 [← 3. Bölümleme ve arama](03-bolumleme-ve-arama.md) · [Ana sayfa](README.md) · Sonraki: [5. Soru üretimi →](05-uretim.md)
 
-Projede bir LLM'e giden **her** istek tek bir fonksiyondan geçer: [`router.call(rol, istem)`](../src/llm/router.py#L239). Embedding tek istisnadır; `embedder.py` kendi isteğini atar. Bu katman dört dosyadan oluşur:
+Projede bir LLM'e giden **her** istek tek bir fonksiyondan geçer: [`router.call(rol, istem)`](../src/llm/router.py#L249). Embedding tek istisnadır; `embedder.py` kendi isteğini atar. Bu katman dört dosyadan oluşur:
 
 | Dosya | Sorusu |
 |---|---|
@@ -15,7 +15,7 @@ Projede bir LLM'e giden **her** istek tek bir fonksiyondan geçer: [`router.call
 
 ---
 
-## `src/llm/models.py` — model kayıt defteri ve kalite kapısı (123 satır)
+## `src/llm/models.py` — model kayıt defteri ve kalite kapısı (135 satır)
 
 **Ne işe yarar?** Üç şeyi tanımlar:
 - Bilinen modeller ve ücretsiz kotaları.
@@ -37,8 +37,10 @@ Projede bir LLM'e giden **her** istek tek bir fonksiyondan geçer: [`router.call
   - Gemini modelleri: günde 20 istek, Pasifik gece yarısı (TR ~10:00) sıfırlanır.
   - Groq modelleri: kayan 24 saatte 200.000 token.
   - OpenRouter ücretsiz modelleri: günde 50 istek.
-- [`_chain(env, default)`](../src/llm/models.py#L56): `.env`'de `ROLE_VERIFY=model1,model2` gibi bir satır varsa zinciri elle değiştirmeye izin verir.
-- [`APPROVED`](../src/llm/models.py#L64): **kalite kapısı**. Rol → {model: kanıt}. Sıra önceliktir (ilk yazılan önce denenir).
+  - Gemma 4 (26B-A4B, 31B; aynı Gemini anahtarı): içerik üretmez, doğrulamaz; yalnızca zorluk ölçümünde **benzetilmiş öğrenci** (bölüm 10). Kota bilinmediği için temkinli dakikalık sınır.
+  - Mistral Medium 3.5: aday; hesap açıldı ama kredisi sıfır, API kapalı.
+- [`_chain(env, default)`](../src/llm/models.py#L66): `.env`'de `ROLE_VERIFY=model1,model2` gibi bir satır varsa zinciri elle değiştirmeye izin verir.
+- [`APPROVED`](../src/llm/models.py#L74): **kalite kapısı**. Rol → {model: kanıt}. Sıra önceliktir (ilk yazılan önce denenir).
 
   | Rol | Ne iş | Onaylı zincir |
   |---|---|---|
@@ -50,11 +52,12 @@ Projede bir LLM'e giden **her** istek tek bir fonksiyondan geçer: [`router.call
   | `verify_math` | Hesap sorusunu kör çözme | gpt-oss-120b → gpt-oss-20b → Nemotron |
 
   Her kanıt bir ölçümdür, örneğin "duyarlılık testi: kasıtlı hataların 17/17'si yakalandı".
-- [`CANDIDATES`](../src/llm/models.py#L100): test bekleyen ya da testi geçemeyen modeller (gerekçeleriyle). Otomatik zincire **girmezler**.
-- [`ROLES`](../src/llm/models.py#L113): rol → model adı listesi. Router bunu kullanır. Çalışma anında geçici roller de eklenir:
+- [`CANDIDATES`](../src/llm/models.py#L110): test bekleyen ya da testi geçemeyen modeller (gerekçeleriyle). Otomatik zincire **girmezler**.
+- [`ROLES`](../src/llm/models.py#L125): rol → model adı listesi. Router bunu kullanır. Çalışma anında geçici roller de eklenir:
   - `verify.verifier_role` `_verify_not_gemini` gibi roller kurar;
-  - `pilot.py` `_pilot` rolünü kurar.
-- [`reasoning(role)`](../src/llm/models.py#L116): gpt-oss'un gizli akıl yürütme düzeyi (`low` / `medium` / `high`). Diğer modeller bu ayarı yok sayar.
+  - `pilot.py` `_pilot` rolünü kurar;
+  - `simulate._role` `_sim_<model>` ölçüm rollerini kurar.
+- [`reasoning(role)`](../src/llm/models.py#L128): gpt-oss'un gizli akıl yürütme düzeyi (`low` / `medium` / `high`). Diğer modeller bu ayarı yok sayar.
   - Varsayılan `medium`, çünkü bütün onay testleri bununla yapıldı.
   - Deney için `.env`'de `REASONING_VERIFY=low` gibi bir satırla değiştirilebilir.
   - Geçici roller ana rolün ayarını alır: `_verify_not_gemini` → `verify`.
@@ -120,7 +123,7 @@ Neden `calls` tablosuna yeni sütun eklenmedi? O sırada çalışan eski süreç
 
 ---
 
-## `src/llm/router.py` — tek kapı (311 satır)
+## `src/llm/router.py` — tek kapı (324 satır)
 
 **Ne işe yarar?** `call(rol, istem, ...)` rolün model zincirini sırayla dener. Önbelleğe bakar, kotayı denetler, sağlayıcıya göre doğru API'yi çağırır, hatayı sınıflandırır ve sonucu kaydeder. Hiçbir model cevap veremezse `AllModelsExhausted` fırlatır.
 
@@ -135,45 +138,46 @@ Neden `calls` tablosuna yeni sütun eklenmedi? O sırada çalışan eski süreç
   - `retry_in`: zincirdeki ilk modelin ne zaman açılacağı (saniye).
 
   `pipeline.patient` bu alanlara bakarak ne kadar bekleyeceğine karar verir.
-- [`Result`](../src/llm/router.py#L43): dönüş değeri. `text` (yanıt), `model` (hangi model cevapladı), `cached` (önbellekten mi geldi).
+- [`Result`](../src/llm/router.py#L43): dönüş değeri. `text` (yanıt), `model` (hangi model cevapladı), `cached` (önbellekten mi geldi), `thoughts` (modelin gizli düşünme token'ı; Gemini/Gemma bildiriyorsa, önbellekten gelende 0).
 - Modül düzeyi değişkenler:
   - `_throttle`: tek `Throttle` nesnesi.
   - `_clients`: sağlayıcı istemcileri ilk kullanımda kurulup saklanır.
-  - `_last_usage`: son çağrının gerçek token sayısı (`tokens`) ve istem önbelleğinden okunan kısmı (`cached`).
-- [`_gemini()`](../src/llm/router.py#L57) / [`_groq()`](../src/llm/router.py#L64): istemcileri tembel kurar. `max_retries=0` ile Groq kütüphanesinin kendi tekrar denemesi kapatılır; tekrar politikası bizim.
-- [`_OPENAI_COMPAT`](../src/llm/router.py#L72): OpenAI uyumlu sağlayıcılar (OpenRouter, Cerebras) → (adres, anahtar).
-- [`has_key(model)`](../src/llm/router.py#L79): sağlayıcının anahtarı `.env`'de var mı? Yoksa model zincirde atlanır.
+  - `_last_usage`: son çağrının gerçek token sayısı (`tokens`), istem önbelleğinden okunan kısmı (`cached`) ve düşünme token'ı (`thoughts`).
+- [`_gemini()`](../src/llm/router.py#L59) / [`_groq()`](../src/llm/router.py#L66): istemcileri tembel kurar. `max_retries=0` ile Groq kütüphanesinin kendi tekrar denemesi kapatılır; tekrar politikası bizim.
+- [`_OPENAI_COMPAT`](../src/llm/router.py#L74): OpenAI uyumlu sağlayıcılar (OpenRouter, Cerebras) → (adres, anahtar).
+- [`has_key(model)`](../src/llm/router.py#L82): sağlayıcının anahtarı `.env`'de var mı? Yoksa model zincirde atlanır.
 - Üç sağlayıcı fonksiyonu (hepsi düz metin döndürür):
-  - [`_call_openai_compat`](../src/llm/router.py#L89): `httpx` ile `/chat/completions` isteği atar (ek kütüphane yok). Görüntü base64 olarak eklenir.
+  - [`_call_openai_compat`](../src/llm/router.py#L92): `httpx` ile `/chat/completions` isteği atar (ek kütüphane yok). Görüntü base64 olarak eklenir.
     - Nemotron'da JSON modu kapatılır: o modda cevap yazamadan sınıra dayanıyordu.
     - gpt-oss'ta `reasoning_effort` (`effort` parametresi, `models.reasoning`'den) ayarlanır.
     - `<think>…</think>` blokları silinir.
     - Yanıttaki `cached_tokens` değeri `_last_usage`'a yazılır.
-  - [`_call_gemini`](../src/llm/router.py#L124): `generate_content` çağırır. JSON modunda `response_mime_type`; gemini-2.5'te "düşünme" kapalı (`thinking_budget=0`).
-  - [`_call_groq`](../src/llm/router.py#L140): Groq sohbet API'si.
+  - [`_call_gemini`](../src/llm/router.py#L129): `generate_content` çağırır. JSON modunda `response_mime_type`; gemini-2.5'te "düşünme" kapalı (`thinking_budget=0`). `think` verilirse düşünme düzeyi (`thinking_level`) ayarlanır: Gemma 4 `minimal` (düşünmeden cevap) ya da `high` kabul ediyor; düşünme bütçesi desteklemiyor. Düşünme token'ı `_last_usage`'a yazılır.
+  - [`_call_groq`](../src/llm/router.py#L148): Groq sohbet API'si.
     - gpt-oss gizli akıl yürütme token'ları da harcadığı için en az 2000 token sınırı verilir; düzeyi `effort` belirler.
     - Groq'un istem önbelleğinden okuduğu token'lar kaydedilir.
-- [`_valid_json(text)`](../src/llm/router.py#L163): yanıt ayrıştırılabilir **ve boş olmayan** bir JSON mu? Yarıda kesilmiş ya da `{}` olan yanıt önbelleğe alınmaz; yoksa bozuk cevap her seferinde geri gelirdi.
-- [`parse_wait(s)`](../src/llm/router.py#L172): hata mesajındaki "try again in 10m28.992s" ifadesini saniyeye çevirir.
-- [`_classify(err)`](../src/llm/router.py#L181): hatayı türüne ayırır.
+- [`_valid_json(text)`](../src/llm/router.py#L171): yanıt ayrıştırılabilir **ve boş olmayan** bir JSON mu? Yarıda kesilmiş ya da `{}` olan yanıt önbelleğe alınmaz; yoksa bozuk cevap her seferinde geri gelirdi.
+- [`parse_wait(s)`](../src/llm/router.py#L180): hata mesajındaki "try again in 10m28.992s" ifadesini saniyeye çevirir.
+- [`_classify(err)`](../src/llm/router.py#L189): hatayı türüne ayırır.
 
   | Tür | Nasıl anlaşılır | Ne yapılır |
   |---|---|---|
-  | `network` | Timeout / Connection | 15 sn bekle, aynı modeli tekrar dene |
+  | `network` | Timeout / Connection / "Server disconnected" (`RemoteProtocolError`) | 15 sn bekle, aynı modeli tekrar dene |
   | `daily` | 429 + "per day" / TPD / RPD | Groq: mesajdaki süre kadar beklet; Gemini: bugün kapat |
   | `minute` | 429 (günlük değil) | Önerilen süre kadar bekle, 1 kez tekrar |
   | `busy` | 500 / 502 / 503 / overloaded | 20 sn bekle, 1 kez tekrar; sonra sıradaki model |
   | `missing` | 404 | Model yok → bugün kapat |
   | `json` | `json_validate_failed` | Token sınırını 3 katına çıkarıp 1 kez tekrar |
   | `other` | Diğer | Hatayı yukarı fırlat (beklenmeyen hata gizlenmez) |
-- [`_sync_used(model, err)`](../src/llm/router.py#L205): Groq TPD hatasındaki gerçek kullanımı deftere işler. Önce ölçüm için `record_sync`, sonra kaydımız eksikse `record_correction`.
-- [`_block(model, kind, wait)`](../src/llm/router.py#L216): kota hatasından sonra modeli kapatır. Süreli bekleme (`set_cooldown`) ya da günün geri kalanı (`mark_exhausted`).
-- [`_raw(model, prompt, image, ...)`](../src/llm/router.py#L224): tek bir modele tek çağrı. Önce `Throttle.wait`, sonra görüntü desteği kontrolü, sonra sağlayıcıya göre doğru fonksiyon.
+- [`_sync_used(model, err)`](../src/llm/router.py#L215): Groq TPD hatasındaki gerçek kullanımı deftere işler. Önce ölçüm için `record_sync`, sonra kaydımız eksikse `record_correction`.
+- [`_block(model, kind, wait)`](../src/llm/router.py#L226): kota hatasından sonra modeli kapatır. Süreli bekleme (`set_cooldown`) ya da günün geri kalanı (`mark_exhausted`).
+- [`_raw(model, prompt, image, ...)`](../src/llm/router.py#L234): tek bir modele tek çağrı. Önce `Throttle.wait`, sonra görüntü desteği kontrolü, sonra sağlayıcıya göre doğru fonksiyon.
 
-**Ana fonksiyon: [`call(role, prompt, image, json_mode, max_tokens, temperature, use_cache)`](../src/llm/router.py#L239)**
+**Ana fonksiyon: [`call(role, prompt, image, json_mode, max_tokens, temperature, use_cache, think)`](../src/llm/router.py#L249)**
 1. `chain = ROLES[role]`: bu rolün modelleri. `effort = reasoning(role)`: akıl yürütme düzeyi.
    - Düzey varsayılandan (`medium`) farklıysa önbellek anahtarına eklenir. Yoksa `low` denemesi eski `medium` yanıtlarını önbellekten okuyup sahte sonuç verirdi.
    - Varsayılanda eklenmez; böylece `llm.sqlite`'taki eski yanıtların anahtarı değişmez.
+   - `think` (Gemini/Gemma düşünme düzeyi) verilirse o da anahtara girer.
 2. **Önbellek:** zincirdeki herhangi bir modelin bu istem için kayıtlı yanıtı varsa hemen onu döndür (`cached=True`).
 3. **Taşma:** dakikalık sınırı o an dolu olan modelleri sıranın sonuna al (sıra korunur).
 4. Her model için:

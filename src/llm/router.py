@@ -44,6 +44,7 @@ class Result:
     text: str
     model: str
     cached: bool
+    thoughts: int = 0  # modelin gizli düşünme token'ları (Gemini/Gemma bildiriyorsa; önbellekten gelen yanıtta 0)
 
 
 _throttle = ledger.Throttle()
@@ -51,7 +52,8 @@ _clients: dict[str, object] = {}
 # Son çağrının sağlayıcının bildirdiği gerçek token kullanımı (gpt-oss'un gizli akıl yürütme token'ları dahil).
 # Tahmin (karakter/3) bunları saymıyordu; kota hesabı artık gerçek değerle yapılır.
 # cached: sağlayıcının istem önbelleğinden okuduğu giriş token'ları (tokens'ın içinde; ledger.prompt_cache).
-_last_usage: dict[str, int] = {"tokens": 0, "cached": 0}
+# thoughts: düşünme token'ları (zorluk ölçümünde "gereken çaba" sinyali, src/simulate.py)
+_last_usage: dict[str, int] = {"tokens": 0, "cached": 0, "thoughts": 0}
 
 
 def _gemini():
@@ -125,18 +127,21 @@ def _call_openai_compat(model: str, prompt: str, json_mode: bool, max_tokens: in
 
 
 def _call_gemini(model: str, prompt: str, image: bytes | None, json_mode: bool, max_tokens: int,
-                 temperature: float) -> str:
+                 temperature: float, think: str | None = None) -> str:
     from google.genai import types
 
     cfg = {"temperature": temperature, "max_output_tokens": max_tokens,
            "automatic_function_calling": types.AutomaticFunctionCallingConfig(disable=True)}
     if json_mode:
         cfg["response_mime_type"] = "application/json"
-    if model.startswith("gemini-2.5"):
+    if think:  # Gemma 4: 'minimal' (düşünmeden cevap) ya da 'high'; düşünme bütçesi (thinking_budget) desteklenmiyor
+        cfg["thinking_config"] = types.ThinkingConfig(thinking_level=think)
+    elif model.startswith("gemini-2.5"):
         cfg["thinking_config"] = types.ThinkingConfig(thinking_budget=0)
     contents = [types.Part.from_bytes(data=image, mime_type="image/jpeg"), prompt] if image else prompt
     r = _gemini().models.generate_content(model=model, contents=contents, config=types.GenerateContentConfig(**cfg))
     _last_usage["tokens"] = int(getattr(r.usage_metadata, "total_token_count", 0) or 0)
+    _last_usage["thoughts"] = int(getattr(r.usage_metadata, "thoughts_token_count", 0) or 0)
     return (r.text or "").strip()
 
 
@@ -189,8 +194,10 @@ def _classify(err: Exception) -> tuple[str, float]:
     """
     s = str(err)
     wait = parse_wait(s)
-    # Ağ kesintisi (telefon hotspot'unda sık): kota değil → kısa bekleyip aynı modeli tekrar dene
-    if any(x in type(err).__name__ for x in ("Timeout", "Connection")) or "timed out" in s.lower():
+    # Ağ kesintisi (telefon hotspot'unda sık): kota değil → kısa bekleyip aynı modeli tekrar dene.
+    # "Server disconnected without sending a response" (httpx RemoteProtocolError) de böyle (Gemma, 2026-10-05)
+    if (any(x in type(err).__name__ for x in ("Timeout", "Connection", "RemoteProtocol"))
+            or "timed out" in s.lower() or "disconnected" in s.lower()):
         return "network", 15
     if "429" in s or "RESOURCE_EXHAUSTED" in s or "rate_limit" in s.lower():
         if "PerDay" in s or "per day" in s.lower() or "per-day" in s.lower() or "(RPD)" in s or "(TPD)" in s:
@@ -225,22 +232,23 @@ def _block(model: str, kind: str, wait: float) -> None:
 
 
 def _raw(model: str, prompt: str, image: bytes | None, json_mode: bool, max_tokens: int, temperature: float,
-         effort: str = "medium") -> str:
+         effort: str = "medium", think: str | None = None) -> str:
     spec = MODELS[model]
     # Görüntü ~2000 giriş token'ı tutuyor (EN s53, 150 dpi: 2410 token, metin istemi dahil)
     _throttle.wait(model, len(prompt) // 3 + max_tokens + (2000 if image is not None else 0))
     if image is not None and not spec.vision:
         raise ValueError(f"{model} görüntü desteklemiyor")
-    _last_usage.update(tokens=0, cached=0)  # başarısız çağrıdan eski değer kalmasın
+    _last_usage.update(tokens=0, cached=0, thoughts=0)  # başarısız çağrıdan eski değer kalmasın
     if spec.provider == "gemini":
-        return _call_gemini(model, prompt, image, json_mode, max_tokens, temperature)
+        return _call_gemini(model, prompt, image, json_mode, max_tokens, temperature, think)
     if spec.provider in _OPENAI_COMPAT:
         return _call_openai_compat(model, prompt, json_mode, max_tokens, temperature, image, effort)
     return _call_groq(model, prompt, json_mode, max_tokens, temperature, image, effort)
 
 
 def call(role: str, prompt: str, image: bytes | None = None, json_mode: bool = False,
-         max_tokens: int = 4096, temperature: float = 0.0, use_cache: bool = True) -> Result:
+         max_tokens: int = 4096, temperature: float = 0.0, use_cache: bool = True, think: str | None = None) -> Result:
+    """think: Gemini/Gemma düşünme düzeyi ('minimal' | 'high'); verilmezse modelin varsayılanı."""
     chain = ROLES[role]
     params = {"json": json_mode, "max_tokens": max_tokens, "temperature": temperature}
     effort = reasoning(role)
@@ -248,6 +256,8 @@ def call(role: str, prompt: str, image: bytes | None = None, json_mode: bool = F
     # sonuç verirdi. Yalnızca varsayılandan farklıysa eklenir: llm.sqlite'taki eski yanıtların anahtarı değişmez.
     if effort != "medium":
         params["reasoning"] = effort
+    if think:
+        params["think"] = think
 
     if use_cache:  # zincirdeki herhangi bir modelden daha önce alınmış yanıt varsa onu kullan
         for model in chain:
@@ -277,7 +287,7 @@ def call(role: str, prompt: str, image: bytes | None = None, json_mode: bool = F
         budget = max_tokens
         for attempt in range(2):
             try:
-                text = _raw(model, prompt, image, json_mode, budget, temperature, effort)
+                text = _raw(model, prompt, image, json_mode, budget, temperature, effort, think)
                 used = _last_usage["tokens"] or (len(prompt) // 3 + len(text) // 3 + (2000 if image is not None else 0))
                 ledger.record(model, used, cached=_last_usage["cached"])
                 _throttle.settle(model, used)
@@ -285,7 +295,7 @@ def call(role: str, prompt: str, image: bytes | None = None, json_mode: bool = F
                     # Yarıda kesilmiş JSON önbelleğe alınmaz; yoksa bozuk cevap her seferinde geri gelirdi
                     # (Gemini 3.5 toplu üretimde düşünme token'ları çıktı sınırını doldurup JSON'u kesmişti).
                     ledger.cache_put(ledger.cache_key(model, prompt, image, params), model, text)
-                return Result(text, model, False)
+                return Result(text, model, False, _last_usage["thoughts"])
             except Exception as e:
                 kind, wait = _classify(e)
                 errors.append(f"{model}: {kind}")

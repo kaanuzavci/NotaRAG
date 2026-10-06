@@ -15,6 +15,9 @@ class Question(BaseModel):
     answer_index: int | None = None
     answer: str = Field(min_length=1)
     evidence_quote: str = Field(min_length=3)
+    # Sorunun dayandığı her ayrı bilgi/kural için birebir alıntı (PROMPTS.md §2): notta bulunan ayrı alıntı sayısı
+    # zorluğun yapısal ölçüsü — "zor" en az iki ayrı bilgi/kural ister (src/difficulty.py). İsteğe bağlı (eski sorular).
+    evidence_quotes: list[str] | None = None
     bloom_level: Literal["remember", "understand", "apply"] = "remember"
     difficulty: Literal["easy", "medium", "hard"] = "medium"
     # Hesap soruları (PROMPTS.md §2c): cevap kodla (SymPy) yeniden hesaplanır — src/generation/compute.py

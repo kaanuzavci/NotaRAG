@@ -106,16 +106,21 @@ BLOOM_TARGET = {
 }
 
 
-# Sınav isteğinde kullanıcının seçtiği zorluk (src/request.py). Modelin kendi etiketine bırakılmaz: hesap
-# sorularında kendi seçimiyle 33 problemin yalnızca 1'i "zor" çıktı. Tanım işlemseldir ve istemde kural olarak verilir.
+# Sınav isteğinde kullanıcının seçtiği zorluk (src/request.py): istemde işlemsel, alandan bağımsız bir hedef olarak
+# verilir. Etiket ARTIK ZORLA YAZILMAZ (2026-10-05): eskiden kod her soruya istenen düzeyi yazıyordu; TYT "zor"
+# isteğinde Gemini kendi ürettiği 17 sorunun 14'üne "orta" demişti. Üretecin etiketi korunur, düzey ölçülür
+# (src/difficulty.py, src/simulate.py); istenen düzeyde ölçülmeyen soru sınava girmez, havuza kendi düzeyiyle kalır.
 DIFFICULTY_TARGET = {
-    "easy": ("Every question must be EASY: recall of one fact, term or definition stated in the Context, "
-             "or a single direct step."),
-    "medium": ("Every question must be MEDIUM: the student must understand, compare or classify ideas stated in "
-               "the Context, or carry out two steps; not the recall of a single sentence."),
-    "hard": ("Every question must be HARD: the student must combine two ideas or rules stated in the Context, or "
-             "apply a rule in several steps or with a case analysis. It must still be fully answerable from the "
-             "Context alone."),
+    "easy": ("Target EASY questions: the answer is stated in one sentence of the Context and the student only "
+             "recognises or recalls it, or does one direct step."),
+    "medium": ("Target MEDIUM questions: the student must understand an idea in other words, compare or classify, or "
+               "carry out two steps; no single sentence of the Context answers it word for word."),
+    "hard": ("Target HARD questions: the student must combine at least two separate facts or rules from different "
+             "parts of the Context, or apply a rule to a new case in three or more steps or with a case analysis; "
+             "distractors are near-misses chosen by a student who used only one of the facts. Do not repeat the "
+             "wording of any single sentence of the Context. It must still be fully answerable from the Context alone. "
+             "If the Context does not allow a truly hard question, write the best one you can and label its real "
+             "difficulty — labels are checked by measurement."),
 }
 
 
@@ -144,9 +149,11 @@ def generate_unit(unit: dict, related: str, language: str, role: str = "generate
     except (json.JSONDecodeError, AttributeError):
         return [{"unit": unit["title"], "pages": unit["pages"], "model": r.model, "q": {"raw": r.text[:500]},
                  "check": {"status": "rejected", "rejected": ["invalid_json"], "flags": []}}]
-    if difficulty:
-        raw = [{**q, "difficulty": difficulty} if isinstance(q, dict) else q for q in raw]
-    return _postprocess(raw, unit, r.model)
+    items = _postprocess(raw, unit, r.model)
+    for it in items:  # istenen düzey ayrı saklanır; sorunun etiketi üretecin kendi iddiasıdır (ölçülür)
+        if difficulty:
+            it["requested_difficulty"] = difficulty
+    return items
 
 
 def _postprocess(raw: list, unit: dict, model: str) -> list[dict]:
@@ -287,10 +294,45 @@ def generate_request(spec: list[tuple[dict, int, list[str]]], language: str, dif
         prompt = rules + load_prompt("2b").replace("{units}", _spec_blocks(spec, "question"))
     n_total = sum(n for _, n, _ in spec)
     r = call(role, prompt, json_mode=True, max_tokens=max(32000, 1400 * n_total + 8000), temperature=0.4)
-    force = {"bloom_level": "apply"} if worked else {}
-    if difficulty:
-        force["difficulty"] = difficulty
-    return _split_units(r, [u for u, _, _ in spec], force=force or None)
+    items = _split_units(r, [u for u, _, _ in spec], force={"bloom_level": "apply"} if worked else None)
+    for it in items:  # istenen düzey ayrı saklanır; etiket zorla yazılmaz (yukarıda DIFFICULTY_TARGET notu)
+        if difficulty:
+            it["requested_difficulty"] = difficulty
+    return items
+
+
+def evolve_request(pairs: list[tuple[dict, dict]], language: str, target: str, worked: bool = False,
+                   role: str = "generate_batch") -> list[dict]:
+    """Zorlaştırma (PROMPTS.md §2d, Evol-Instruct + çok adımlı birleştirme): istenen düzeyin altında ölçülen her soru
+    (A: kendi parçaları) başka bir konunun parçalarıyla (B) birlikte verilir; yeni soru ikisini birleştirmeli.
+    pairs: [(soru, B birimi)]. Çıktı aynı şema, aynı kod kontrolleri; doğrulama ve ölçüm çağıranda (request.run)."""
+    from src import review_store as rs
+    chunks = rs.load_chunks()
+    lang = LANG_NAMES.get(language, language)
+    units, blocks = [], []
+    for k, (it, part_b) in enumerate(pairs):
+        a = [chunks[c] for c in it.get("chunk_ids", []) if c in chunks]
+        b = [c for c in part_b["chunks"] if c["id"] not in {x["id"] for x in a}]
+        q = it["q"]
+        opts = (" | Şıklar: " + " / ".join(q["options"])) if q.get("options") else ""
+        answer = q["options"][q["answer_index"]] if q.get("options") else q.get("answer", "")
+        blocks.append(f"### U{k + 1} — type: {q['type']}\nOriginal question: {q['question']}{opts} | Answer: {answer}\n"
+                      f"Part A:\n{_render(a)}\nPart B:\n{_render(b)}\n")
+        units.append({"title": it.get("unit", ""), "chunks": a + b, "pages": sorted({c["page"] for c in a + b})})
+    evolve = load_prompt("2d") + "\n\n" + "\n".join(blocks)
+    if worked:
+        prompt = _target_rules(load_prompt("2c"), difficulty=target).replace("{units}", evolve)
+    else:
+        rules = load_prompt("2")
+        rules = _target_rules(rules[:rules.index("Context:\n{context}")], difficulty=target)
+        rules = rules.replace("{n_questions}", "1 (per unit)").replace("{type_plan}", "the type given for each unit")
+        prompt = rules + load_prompt("2b").replace("{units}", evolve)
+    prompt = prompt.replace("{output_language}", lang)
+    r = call(role, prompt, json_mode=True, max_tokens=max(32000, 1400 * len(pairs) + 8000), temperature=0.5)
+    items = _split_units(r, units, force={"bloom_level": "apply"} if worked else None)
+    for it in items:
+        it["requested_difficulty"] = target
+    return items
 
 
 def generate_worked_group(g: list[dict], start: int, language: str, role: str) -> list[dict]:

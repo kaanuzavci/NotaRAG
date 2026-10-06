@@ -44,10 +44,11 @@ def question_sets() -> list[Path]:
 
 
 def load_set(path: Path) -> list[dict]:
+    from src.difficulty import apply  # etkin zorluk (ölçüm > üretecin etiketi, yapı tavanıyla); dosyaya yazılmaz
     items = [json.loads(x) for x in path.read_text(encoding="utf-8").splitlines() if x.strip()]
     for it in items:
         it["id"] = question_id(it)
-    return items
+    return apply(items)
 
 
 def load_chunks() -> dict[str, dict]:

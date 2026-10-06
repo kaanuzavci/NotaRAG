@@ -12,6 +12,7 @@ Arka plan işi: python -m src.request <istek_id>   (arayüz başlatır; ilerleme
 
 from __future__ import annotations
 
+import copy
 import json
 import math
 import random
@@ -70,12 +71,14 @@ def _jsonl(path: Path) -> list[dict]:
 
 def all_items() -> dict[str, dict]:
     """Tam akış ve istek setlerindeki tüm sorular (pilot/deney setleri havuza girmez: farklı istem ve modeller)."""
+    from src.difficulty import apply
     out = {}
     for p in sorted(QDIR.glob("*.jsonl")):
         for it in _jsonl(p):
             it["id"] = rs.question_id(it)
             it["doc"] = next(iter(it.get("chunk_ids") or []), "?").split(":")[0]
             out.setdefault(it["id"], it)
+    apply(list(out.values()))  # q["difficulty"] = etkin zorluk (ölçüm > üretecin etiketi; yapı tavanı) — src/difficulty.py
     return out
 
 
@@ -209,8 +212,6 @@ def run(req_id: str) -> None:
     from src.generation.generate import generate_request, generate_unit
     from src.llm.router import AllModelsExhausted
     from src.pipeline import patient
-    from src.verification.checks import mark_duplicates
-    from src.verification.verify import verify_item
 
     req = load(req_id)
     p = req["params"]
@@ -245,9 +246,63 @@ def run(req_id: str) -> None:
             for u, n, types in spec:  # §2 yedek: onaylı birim başına üretici (qwen), kota dolarsa bekler
                 new += patient(generate_unit, u, "", p["language"], "generate", n=n, types=types,
                                difficulty=p["difficulty"], what="üretim")
+    hit, below = _settle(req, new, chunks)
+    good = [it["id"] for it in hit]
+    have = len(set(req["pool_ids"] + good))
+    evolved = 0
+    if p["difficulty"] in ("medium", "hard") and have < p["n"] and below:
+        # İkinci tur: istenen düzeyin altında ölçülenleri somut işlemlerle zorlaştır (PROMPTS.md §2d), başka bir
+        # konunun notuyla birleştirerek; yeni sorular da aynı kontrol, doğrulama ve ölçümden geçer
+        from src.generation.generate import evolve_request
+        need = p["n"] - have
+        pairs = [(it, _part_b(it, req, chunks)) for it in below[: need + max(1, need // 2)]]
+        _progress(req, f"{len(pairs)} soru zorlaştırılıyor (istenen zorluğun altında ölçüldü)")
+        more = []
+        for worked in (False, True):
+            sub = [(it, b) for it, b in pairs if bool(it["q"].get("compute")) == worked]
+            if sub:
+                try:
+                    more += evolve_request(sub, p["language"], p["difficulty"], worked=worked)
+                except AllModelsExhausted as e:
+                    _progress(req, f"Zorlaştırma şu an yapılamadı ({'yoğunluk' if e.transient else 'kota'})")
+        if more:
+            hit2, _ = _settle(req, more, chunks)
+            good += [it["id"] for it in hit2]
+            evolved = len(hit2)
+    req = load(req_id)
+    req["new_ids"] = good
+    req["status"] = "done"
+    have = len(set(req["pool_ids"] + good))
+    level = f" ({DIFFS[p['difficulty']].lower()} olarak ölçülen)" if p["difficulty"] else ""
+    req["progress"] = (f"{len(good)} yeni soru doğrulandı{level}" +
+                       (f", {evolved} tanesi zorlaştırılarak" if evolved else "") +
+                       (f"; istenen {p['n']} sorunun {have}'i hazır" if have < p["n"] else ""))
+    save(req)
+    print(req["progress"], flush=True)
+
+
+def _part_b(it: dict, req: dict, chunks: dict[str, dict]) -> dict:
+    """Zorlaştırmada birleştirilecek ikinci not parçası: aynı sınavın başka bir konusu (tek konuysa konunun geniş
+    bağlamı)."""
+    topics = list(req["sources"])
+    t = it.get("unit") if it.get("unit") in topics else topics[0]
+    other = topics[(topics.index(t) + 1) % len(topics)] if len(topics) > 1 else t
+    return _unit(other, req["sources"][other], chunks, wide=other == t)
+
+
+def _settle(req: dict, new: list[dict], chunks: dict[str, dict]) -> tuple[list[dict], list[dict]]:
+    """Kod kontrolü → doğrulama → dosyaya yazma → (zorluk istendiyse) ölçüm.
+    → (istenen düzeyde ölçülen kullanılabilir sorular, düzeyin altında kalanlar) — ikisi de kopya (dosyadaki kayıt
+    üretecin etiketini korur; etkin düzey yüklenirken bindirilir, src/difficulty.py)."""
+    from src.llm.router import AllModelsExhausted
+    from src.pipeline import patient
+    from src.verification.checks import mark_duplicates
+    from src.verification.verify import verify_item
+
+    p = req["params"]
     mark_duplicates(new, keep=list(all_items().values()))  # havuzdakinin tekrarı doğrulamaya gitmez (kota)
     for it in new:
-        it["request"] = req_id
+        it["request"] = req["id"]
     ok = [it for it in new if it["check"]["status"] != "rejected"]
     for i, it in enumerate(ok, 1):
         _progress(req, f"Doğrulanıyor {i}/{len(ok)}")
@@ -261,15 +316,24 @@ def run(req_id: str) -> None:
     with (QDIR / f"istek_{p['language']}.jsonl").open("a", encoding="utf-8") as f:
         for it in new:
             f.write(json.dumps(it, ensure_ascii=False) + "\n")
-    good = [rs.question_id(it) for it in new if usable(it) and kind(it["q"]) in p["kinds"]]
-    req = load(req_id)
-    req["new_ids"] = good
-    req["status"] = "done"
-    have = len(set(req["pool_ids"] + good))
-    req["progress"] = (f"{len(good)} yeni soru doğrulandı" +
-                       (f"; istenen {p['n']} sorunun {have}'i hazır" if have < p["n"] else ""))
-    save(req)
-    print(req["progress"], flush=True)
+    fit = [copy.deepcopy(it) for it in new if usable(it) and kind(it["q"]) in p["kinds"]]
+    for it in fit:
+        it["id"] = rs.question_id(it)
+    if not p["difficulty"] or not fit:
+        return fit, []
+    # Zorluk iddia değil ölçüm: sözel sorularda benzetilmiş öğrenci (Gemma; ayrı ücretsiz kota), hepsinde yapı tavanı
+    # (ayrı bilgi/kural sayısı, adım). Ölçülemezse üretecin etiketi + yapı tavanı.
+    from src import simulate
+    from src.difficulty import RANK, apply
+    _progress(req, f"Zorluk ölçülüyor ({len(fit)} soru)")
+    try:
+        simulate.run(fit, chunks, log=lambda s: _progress(req, f"Zorluk {s}"))
+    except AllModelsExhausted:
+        _progress(req, "Zorluk ölçümü şu an yapılamadı; üretecin etiketi ve yapı kuralı kullanılıyor")
+    apply(fit)
+    target = RANK[p["difficulty"]]
+    return ([it for it in fit if RANK[it["q"]["difficulty"]] == target],
+            [it for it in fit if RANK[it["q"]["difficulty"]] < target])
 
 
 # ---------------------------------------------------------------- öğrenci denemeleri ve bildirimler
