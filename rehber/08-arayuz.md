@@ -45,6 +45,7 @@ Streamlit'i ilk okuyanı en çok şaşırtan şey şu: **her etkileşimde sayfa 
 
 **Ne işe yarar?** "Akademik baskı + fosforlu kalem" görünümü.
 - Renkler ve yazı tipleri [`.streamlit/config.toml`](../.streamlit/config.toml)'da: kâğıt zemin `#F7F4ED`, mürekkep laciverdi, Fraunces / Instrument Sans / JetBrains Mono.
+  - Yazı tipleri yerelden sunulur (`src/static/fonts/`, `[[theme.fontFaces]]`, `server.enableStaticServing`): internetsiz sunumda da aynı görünüm. Yalnızca latin + latin-ext (Türkçe harfler). Lisans: SIL OFL 1.1.
 - Bu dosyada Streamlit bileşenlerinin karşılamadığı ayrıntılar var: kâğıt dokusu, sarı vurgu, kartlar, sınav ekranı düzeni.
 - Ayrıca HTML üreten küçük yardımcılar.
 - Çalışma ekranlarının (bilgi kartı, sınav) tasarım ilkesi, "v3": düz kâğıt zemin üstünde sakin kartlar. Hareket yalnızca bir anlam taşıyınca var: kart döner, değerlendirilen kart yığınına gider. Figür, konfeti ve animasyonlu emoji kullanıcı kararıyla kaldırıldı.
