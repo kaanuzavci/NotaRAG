@@ -107,9 +107,9 @@ Merdiven ve zorlaştırma soruları yalnızca kod kontrolünden geçer (LLM doğ
 - Veri `data/turkishmmlu/`'ya indirilir (635 KB). Lisans belirtilmediği için depoya girmez; yalnızca toplu sonuçlar yazılır.
 - [`sample(rows, n, seed)`](../eval/turkishmmlu_zorluk.py#L65): ders × zorluk tabakalı örneklem (ders başına `n`, varsayılan 20 → 180 soru).
 - [`features(x)`](../eval/turkishmmlu_zorluk.py#L84), [`spearman(a, b)`](../eval/turkishmmlu_zorluk.py#L109): metin özellikleri ve sıra korelasyonu (scipy yok; eşitlere ortalama sıra).
-- [`measure(x)`](../eval/turkishmmlu_zorluk.py#L138): bir soru = 4 hızlı öğrenci + 1 dikkatli öğrenci + 1 etiket çağrısı (hepsi Gemma).
-- [`run(todo)`](../eval/turkishmmlu_zorluk.py#L166): ölçülmemiş soruları ölçer, `data/turkishmmlu/olcumler.jsonl`'e ekler. Gemma yoğunsa bekler, kota dolarsa durur.
-- [`report(rows, picked)`](../eval/turkishmmlu_zorluk.py#L197): `eval/sonuclar_turkishmmlu.md`. Ayrıca sistemin benzetim kuralının (`difficulty.sim_level`) gerçek düzeylere nasıl dağıldığını gösterir.
+- [`measure(x)`](../eval/turkishmmlu_zorluk.py#L153): bir soru = 4 hızlı öğrenci + 1 dikkatli öğrenci + 1 etiket çağrısı (hepsi Gemma).
+- [`run(todo)`](../eval/turkishmmlu_zorluk.py#L181): ölçülmemiş soruları ölçer, `data/turkishmmlu/olcumler.jsonl`'e ekler. Gemma yoğunsa bekler, kota dolarsa durur.
+- [`report(rows, picked)`](../eval/turkishmmlu_zorluk.py#L213): `eval/sonuclar_turkishmmlu.md`. Ayrıca sistemin benzetim kuralının (`difficulty.sim_level`) gerçek düzeylere nasıl dağıldığını gösterir.
 - API: soru başına 6 Gemma çağrısı (ayrı ücretsiz kota); `--rapor` yeni çağrı yapmaz.
 - `--parca k/m`: örneklemi `m` sürece böler. Darboğaz dakikalık sınır değil, Gemma'nın yanıt süresi (dikkatli çözüm uzun düşünüyor; soru başına ~2,5 dk). 4 paralel süreçle 180 soru ~2 saat.
 

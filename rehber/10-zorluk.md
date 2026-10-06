@@ -41,7 +41,7 @@ Soru dosyalarına (`data/questions/*.jsonl`) **hiçbir şey yazılmaz** (veri b�
 
 ### 1. Yapı: kodla ölçülen özellikler
 
-- [`features(q, check)`](../src/difficulty.py#L59): her soru için, dilden ve konudan bağımsız:
+- [`features(q, check)`](../src/difficulty.py#L63): her soru için, dilden ve konudan bağımsız:
 
 | Özellik | Ne ölçer? | Neden? |
 |---|---|---|
@@ -53,8 +53,8 @@ Soru dosyalarına (`data/questions/*.jsonl`) **hiçbir şey yazılmaz** (veri b�
 | `negation` | Olumsuz kök ("değildir") | Kayıt için (tavan kuralı değil) |
 | `distractor_sim` | Doğru şıkka en yakın çeldiricinin benzerliği | Yakın çeldirici zorlaştırır (Susanti ve Tokunaga) |
 
-- [`answer_text(q)`](../src/difficulty.py#L52): doğru cevabın metni (ÇS'de doğru şık, KC'de cevap, D/Y'de boş).
-- [`cap(q, f)`](../src/difficulty.py#L82): **tavan**, yani yapının izin verdiği en yüksek düzey ve nedeni. Kurallar sırayla:
+- [`answer_text(q)`](../src/difficulty.py#L56): doğru cevabın metni (ÇS'de doğru şık, KC'de cevap, D/Y'de boş).
+- [`cap(q, f)`](../src/difficulty.py#L86): **tavan**, yani yapının izin verdiği en yüksek düzey ve nedeni. Kurallar sırayla:
 
 | Koşul | Tavan | Neden |
 |---|---|---|
@@ -66,20 +66,21 @@ Soru dosyalarına (`data/questions/*.jsonl`) **hiçbir şey yazılmaz** (veri b�
 
 ### 2. Benzetim ve gerçek öğrenci
 
-- [`measurable(q)`](../src/difficulty.py#L101): benzetim bu soruda ölçüm verebilir mi? Yalnızca sözel ve nesnel puanlanan sorular: çoktan seçmeli ve doğru/yanlış. Kural tek yerde; `simulate.simulable` ve `effective` bunu kullanır.
-- [`sim_level(p, think)`](../src/difficulty.py#L108): benzetim ölçümünü düzeyin **alt sınırına** çevirir.
-  - Sınıfın hepsi doğruysa (`p = 1`, tavan) `None`: ölçüm bilgi vermez, etiketi iddia + yapı tavanı verir.
-  - Sınıf yanıldıysa `p < 0,40` zor, öbür durumlarda orta. `effective` iddiayla bunun büyüğünü alır: yanılma kolay iddiayı yükseltir, zor iddiayı düşürmez.
-  - Çaba (`think`) düzeye **katılmaz**, yalnızca kaydedilir. Neden: 2026-10-06 pilotunda ölçülebilir 14 sözel sorunun 14'ünde `p = 1` çıktı; çaba ise soru tipini ölçtü (D/Y 221-269, ÇS 365-545 token; ÇS içinde üretecin iddiasıyla ilişkisiz). Eski kural (300 / 900 token eşikleri) bu yüzden D/Y'yi hep kolay, ÇS'yi hep orta yapıyordu. Gerçek öğrenci verisi birikince çabanın işe yarayıp yaramadığı yeniden ölçülebilir.
-- [`record(entry)`](../src/difficulty.py#L120) / [`measurements(path)`](../src/difficulty.py#L126): ölçüm kaydı; aynı soru yeniden ölçülürse son ölçüm geçerli.
-- [`claims_from_cache(db)`](../src/difficulty.py#L142): `llm.sqlite`'taki üretim yanıtlarını tarar, "soru metni → üretecin etiketi" eşlemesi çıkarır. Eski kayıtlarda zorla yazılmış etiketin yerine gerçek iddia buradan gelir. Dosya değişmedikçe sonuç bellekte tutulur.
-- [`elo(attempts, prior)`](../src/difficulty.py#L169): satrançtaki Elo puanının eğitimdeki kullanımı (Pelánek 2016). Her çözümde maddenin zorluğu `d` ve öğrencinin yeteneği `θ` birlikte güncellenir: doğru cevap → madde kolaylaşır, öğrenci güçlenir. Adım her güncellemede küçülür. İkinci denemeler sayılmaz. Kayıtlarda öğrenci kimliği olmadığı için tek öğrenci varsayılır.
-- [`_real()`](../src/difficulty.py#L191): `attempts.jsonl`'den Elo, düzey eşikleri benzetimle aynı.
+- [`measurable(q)`](../src/difficulty.py#L105): benzetim bu soruda ölçüm verebilir mi? Yalnızca sözel ve nesnel puanlanan sorular: çoktan seçmeli ve doğru/yanlış. Kural tek yerde; `simulate.simulable` ve `effective` bunu kullanır.
+- [`sim_level(p, think, qtype)`](../src/difficulty.py#L112): benzetim ölçümünü düzeyin **alt sınırına** çevirir; iki sinyalden zor olanı.
+  - Doğru oranı: sınıf yanıldıysa `p < 0,40` zor, öbür durumlarda orta. Hepsi doğruysa (`p = 1`, tavan) bu sinyal bilgi vermez.
+  - Çaba, **yalnızca çoktan seçmelide**: dikkatli çözüm ≥ 600 token orta, ≥ 1200 zor (`THINK_MEDIUM_MC`, `THINK_HARD_MC`). Eşikler gerçek öğrenci verisinden: TurkishMMLU'da (180 soru) ≥ 600 → %85 orta ya da zor (taban %67), ≥ 1200 → %70 zor (taban %31). Doğru/yanlışta kullanılmaz: 2026-10-06 sözel pilotunda çaba soru tipini ölçtü (D/Y 221-269, ÇS 365-545 token); eski tek eşikli kural (300 / 900) D/Y'yi hep kolay, ÇS'yi hep orta yapıyordu.
+  - İkisi de bilgi vermiyorsa `None`: etiketi iddia + yapı tavanı verir. `effective` iddiayla alt sınırın büyüğünü alır: ölçüm kolay iddiayı yükseltir, zor iddiayı düşürmez.
+  - TurkishMMLU doğrulaması (2026-10-07, 180 soru, gerçek öğrenci doğru oranı, `eval/sonuclar_turkishmmlu.md`): öğrenci zorluğuyla Spearman ρ — **çaba −0,42** [−0,54 … −0,30] (soru tipi sabitken en güçlü tek sinyal; dokuz dersin dokuzunda doğru yönde), **LLM'in zorluk etiketi −0,36** [−0,48 … −0,23] (isabet 83/180 = %46, şans %33; "zor" etiketi %73 kesin ama zorların yalnızca %20'sini yakalıyor, "kolay" etiketi %45 kesin: LLM zorluğu hafife alıyor), benzetilmiş öğrenci p +0,29 [+0,16 … +0,43] (matematikte −0,01: sinyal yok), etiket + çaba birlikte −0,46. An ve Wang'ın (2026) İngilizce bulgusundan (ρ ≈ 0,06) belirgin biçimde iyi; fark kısmen bu verinin sınav tarzı 5 şıklı lise soruları olmasından gelebilir.
+- [`record(entry)`](../src/difficulty.py#L130) / [`measurements(path)`](../src/difficulty.py#L136): ölçüm kaydı; aynı soru yeniden ölçülürse son ölçüm geçerli.
+- [`claims_from_cache(db)`](../src/difficulty.py#L152): `llm.sqlite`'taki üretim yanıtlarını tarar, "soru metni → üretecin etiketi" eşlemesi çıkarır. Eski kayıtlarda zorla yazılmış etiketin yerine gerçek iddia buradan gelir. Dosya değişmedikçe sonuç bellekte tutulur.
+- [`elo(attempts, prior)`](../src/difficulty.py#L179): satrançtaki Elo puanının eğitimdeki kullanımı (Pelánek 2016). Her çözümde maddenin zorluğu `d` ve öğrencinin yeteneği `θ` birlikte güncellenir: doğru cevap → madde kolaylaşır, öğrenci güçlenir. Adım her güncellemede küçülür. İkinci denemeler sayılmaz. Kayıtlarda öğrenci kimliği olmadığı için tek öğrenci varsayılır.
+- [`_real()`](../src/difficulty.py#L201): `attempts.jsonl`'den Elo, düzey eşikleri benzetimle aynı.
 
 ### 3. Bindirme
 
-- [`effective(it, sim, real, claims)`](../src/difficulty.py#L203): yukarıdaki sırayla etkin düzeyi seçer, tavanı uygular. Tavan düzeyi düşürdüyse `capped_from` ve `cap_why` alanlarına eski düzey ve neden yazılır. Ölçülemeyen sorularda (`measurable` değil) benzetim kaydı olsa bile yok sayılır.
-- [`apply(items)`](../src/difficulty.py#L223): her soruya `effective` sonucunu bindirir.
+- [`effective(it, sim, real, claims)`](../src/difficulty.py#L213): yukarıdaki sırayla etkin düzeyi seçer, tavanı uygular. Tavan düzeyi düşürdüyse `capped_from` ve `cap_why` alanlarına eski düzey ve neden yazılır. Ölçülemeyen sorularda (`measurable` değil) benzetim kaydı olsa bile yok sayılır.
+- [`apply(items)`](../src/difficulty.py#L234): her soruya `effective` sonucunu bindirir.
 
 ---
 

@@ -50,8 +50,12 @@ def test_fact_count() -> None:
 
 def test_levels() -> None:
     # Benzetim alt sınırdır: sınıfın hepsi doğruysa (tavan) bilgi yok; çaba düzeye katılmaz (pilotta soru tipini ölçtü)
-    assert D.sim_level(1.0, 80) is None and D.sim_level(1.0, 1500) is None
+    assert D.sim_level(1.0, 80) is None and D.sim_level(1.0, 1500) is None  # tip bilinmiyorsa çaba kullanılmaz
     assert D.sim_level(0.75) == "medium" and D.sim_level(0.5, 100) == "medium" and D.sim_level(0.25, 100) == "hard"
+    # Çaba yalnızca çoktan seçmelide alt sınır (TurkishMMLU'da ayarlandı); D/Y'de soru tipini ölçtüğü için yok
+    mc, tf = "multiple_choice", "true_false"
+    assert D.sim_level(1.0, 500, mc) is None and D.sim_level(1.0, 700, mc) == "medium" and D.sim_level(1.0, 1500, mc) == "hard"
+    assert D.sim_level(1.0, 1500, tf) is None and D.sim_level(0.25, 700, mc) == "hard"
     # Etkin düzey: ölçüm > iddia; yapı tavanı ölçümü de kısar; gerçek öğrenci verisi kısılmaz
     it = {"id": "x", "q": dict(COPY_Q)}
     assert D.effective(it)["level"] == "easy" and D.effective(it)["capped_from"] == "hard"

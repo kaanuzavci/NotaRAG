@@ -5,8 +5,8 @@ istediği düşünme ölçülür) ve çalışma yazmadan (thinking_level="minima
 "dikkatli öğrenci" (thinking_level="high") soruyu çözerken kaç düşünme token'ı harcadığını söyler → çaba.
 Literatür: güçlü modeller zorlanan öğrenciyi taklit edemiyor, zayıf modeller daha iyi (Acquaye ve ark. 2026);
 belirsizlik/tutarlılık zorluğun güçlü sinyali (Zotos ve ark. 2025). Etiket: src/difficulty.sim_level — yalnızca
-sınıf yanıldığında (alt sınır); hepsi doğruysa tavan, bilgi yok. Çaba kaydedilir, düzeye katılmaz (pilot: soru tipini
-ölçtü).
+sınıf yanıldığında ya da (yalnızca ÇS'de) çözüm çaba istediğinde alt sınır; ikisi de yoksa bilgi yok. Çaba eşikleri
+TurkishMMLU'da gerçek öğrenci verisiyle ayarlandı (eval/turkishmmlu_zorluk.py).
 
 Hesap soruları benzetilmez: Gemma 4 lise matematiğinde ya kafadan aritmetiğe takılıyor ya da (karalama kâğıdıyla)
 her şeyi çözüyor (2026-10-05 denemesi, PROMPTS.md §8) → onların zorluğu yapıdan gelir (ayrı kural sayısı, adım).
@@ -125,7 +125,7 @@ def run(items: list[dict], chunks: dict[str, dict], skip_measured: bool = True, 
                 log("⏳ benzetim: Gemma şu an yoğun (geçici, kota değil) → 2 dk bekleniyor")
                 time.sleep(120)
         out.append(e)
-        log(f"ölçüldü {i}/{len(todo)} · {it['id']} · p={e['p']} çaba={e['think']} → {D.sim_level(e['p']) or 'tavan (bilgi yok)'}")
+        log(f"ölçüldü {i}/{len(todo)} · {it['id']} · p={e['p']} çaba={e['think']} → {D.sim_level(e['p'], e['think'], it['q'].get('type')) or 'bilgi yok (hepsi doğru, çaba düşük)'}")
     return out
 
 

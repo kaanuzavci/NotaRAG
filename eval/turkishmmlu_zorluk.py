@@ -204,9 +204,10 @@ def _fmt(r: float | None) -> str:
     return "–" if r is None else f"{r:+.2f}"
 
 
-def _sim_level(p: float) -> str:
-    """src/difficulty.sim_level ile aynı kural; tavan = 'bilgi yok'."""
-    return "tavan" if p >= 1 else ("hard" if p < 0.40 else "medium")
+def _sim_level(p: float, think: float | None = None) -> str:
+    """src/difficulty.sim_level (hepsi çoktan seçmeli); bilgi yoksa 'tavan'."""
+    from src.difficulty import sim_level
+    return sim_level(p, think, "multiple_choice") or "tavan"
 
 
 def report(rows: list[dict], picked: list[dict]) -> None:
@@ -270,10 +271,12 @@ def report(rows: list[dict], picked: list[dict]) -> None:
                          f"%{100 * sum(e['p'] >= 1 for e, _ in g) / len(g):.0f} | {statistics.mean(ths) if ths else 0:.0f} | "
                          + " / ".join(str(labs.count(v)) for v in LEVELS) + " |")
         # Sistemin kuralı (difficulty.sim_level: alt sınır) ile gerçek düzey
-        lines += ["", "Sistemin benzetim kuralı (yanılma varsa alt sınır, hepsi doğruysa bilgi yok) → gerçek düzey dağılımı:", "",
+        lines += ["", "Sistemin benzetim kuralı (difficulty.sim_level: yanılma ya da ÇS'de çaba ≥ 600 / 1200 → alt sınır; "
+                  "ikisi de yoksa bilgi yok) → gerçek düzey dağılımı. Not: çaba eşikleri bu veriden seçildi; aynı veride "
+                  "gösterilen isabet iyimserdir.", "",
                   "| Benzetim sonucu | n | gerçek kolay / orta / zor | ort. öğrenci doğru oranı |", "|---|---|---|---|"]
         for s in ("tavan", "medium", "hard"):
-            g = [x for e, x in zip(m, got) if _sim_level(e["p"]) == s]
+            g = [x for e, x in zip(m, got) if _sim_level(e["p"], e["think"]) == s]
             if g:
                 lines.append(f"| {s if s == 'tavan' else TR[s]} | {len(g)} | "
                              + " / ".join(str(sum(x['level'] == lvl for x in g)) for lvl in LEVELS)

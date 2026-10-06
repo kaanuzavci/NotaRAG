@@ -4,7 +4,7 @@ Etiketi eldeki en güvenilir katman verir, kaynağı yanında saklanır (arayüz
   1. Gerçek öğrenci — çözüm kayıtlarından (attempts.jsonl, ilk denemeler) Elo; yeterli kayıt varsa (MIN_REAL).
   2. Benzetilmiş öğrenci — src/simulate.py: bir model sınıfının hızlı-cevap doğru oranı (p). Yalnızca sınıf
      yanıldığında söz sahibi (alt sınır); hepsi doğruysa (tavan) bilgi vermez. Dikkatli çözümün düşünme token'ı
-     (çaba) kaydedilir ama düzeye katılmaz (sim_level).
+     (çaba) yalnızca çoktan seçmelide ve TurkishMMLU'da ayarlanmış eşiklerle alt sınır olur (sim_level).
   3. Üretecin kendi etiketi — önbellekteki ham yanıttan (sınav isteğinde kod eskiden etiketi zorla yazıyordu).
 Bunlara her soruda kodla (kota yok) açıklanabilir bir **tavan** uygulanır: ör. cevabı kaynak cümlede aynen yazılı ve
 o cümleyi tekrar eden soru "kolay"dan zor olamaz; hatırlama düzeyindeki soru "zor" olamaz. Gerçek öğrenci verisi
@@ -37,6 +37,10 @@ RANK = {lvl: i for i, lvl in enumerate(LEVELS)}
 MIN_REAL = 5            # gerçek öğrenci etiketi için en az ilk-deneme sayısı
 # Doğru oranı eşikleri: gerçek öğrencide p ≥ 0,75 kolay, < 0,40 zor; benzetimde p < 0,40 zor (sim_level).
 P_EASY, P_HARD = 0.75, 0.40
+# Çaba eşikleri, YALNIZCA çoktan seçmeli: TurkishMMLU'da (180 lise sorusu, gerçek öğrenci doğru oranı,
+# eval/sonuclar_turkishmmlu.md) dikkatli çözüm ≥ 600 token → %85 orta ya da zor (taban %67); ≥ 1200 → %70 zor
+# (taban %31), %94 orta ya da zor. Doğru/yanlışta kalibrasyon yok (sözel pilotta çaba soru tipini ölçtü).
+THINK_MEDIUM_MC, THINK_HARD_MC = 600, 1200
 
 _STOP = set("ve veya ile bir bu şu da de mi mu mü için gibi göre olan olarak ise ki en daha çok ne nedir hangi hangisi "
             "hangisidir kaç kaçtir aşağıdakilerden the a an of to in is are and or for which what how".split())
@@ -105,14 +109,20 @@ def measurable(q: dict) -> bool:
     return not q.get("compute") and q.get("type") in ("multiple_choice", "true_false")
 
 
-def sim_level(p: float, think: float | None = None) -> str | None:
-    """Benzetim → düzeyin alt sınırı. Sınıfın hepsi doğruysa (tavan) None: ölçüm bilgi vermez, iddia + yapı tavanı
-    geçerli. 2026-10-06 pilotu: ölçülebilir 14 sözel sorunun 14'ünde p = 1 (Gemma 4 açık kitapta öğrenciden çok
-    güçlü). Çaba (think) düzeye katılmaz: aynı pilotta soru tipini ölçtü (D/Y 221-269, ÇS 365-545 token; ÇS içinde
-    üretecin iddiasıyla ilişkisiz) → gerçek öğrenci verisiyle ayarlanana kadar yalnızca kaydedilir."""
-    if p >= 1.0:
-        return None
-    return "hard" if p < P_HARD else "medium"
+def sim_level(p: float, think: float | None = None, qtype: str | None = None) -> str | None:
+    """Benzetim → düzeyin alt sınırı; ikisinden zor olanı:
+    - doğru oranı: sınıf yanıldıysa p < 0,40 zor, öbür durumda orta; hepsi doğruysa (tavan) bilgi yok. 2026-10-06
+      pilotu: ölçülebilir 14 sözel sorunun 14'ünde p = 1 (Gemma 4 açık kitapta öğrenciden çok güçlü).
+    - çaba, yalnızca çoktan seçmeli (qtype): ≥ THINK_MEDIUM_MC orta, ≥ THINK_HARD_MC zor (TurkishMMLU'da soru tipi
+      sabitken çaba gerçek zorluğun en güçlü tek sinyaliydi, ρ = −0,42). Doğru/yanlışta kullanılmaz: sözel pilotta
+      çaba soru tipini ölçtü (D/Y 221-269, ÇS 365-545 token).
+    İkisi de bilgi vermiyorsa None: iddia + yapı tavanı geçerli."""
+    by_p = None if p >= 1.0 else ("hard" if p < P_HARD else "medium")
+    by_t = None
+    if qtype == "multiple_choice" and think:
+        by_t = "hard" if think >= THINK_HARD_MC else ("medium" if think >= THINK_MEDIUM_MC else None)
+    found = [x for x in (by_p, by_t) if x]
+    return max(found, key=RANK.get) if found else None
 
 
 # ---------------------------------------------------------------- kayıtlar
@@ -210,11 +220,12 @@ def effective(it: dict, sim: dict | None = None, real: dict | None = None, claim
     if not measurable(q):
         sim = None  # hesap ve sözel kısa cevap benzetilmez (measurable): yapı + iddia
     level, source = claim, "üretici"
-    if sim and sim.get("level"):  # sınıf yanıldı: düzey en az ölçülen kadar (alt sınır)
-        level, source = max(claim, sim["level"], key=RANK.get), "benzetim"
+    lower = sim_level(sim["p"], sim.get("think"), q.get("type")) if sim else None
+    if lower:  # sınıf yanıldı ya da çözüm çaba istedi: düzey en az ölçülen kadar (alt sınır)
+        level, source = max(claim, lower, key=RANK.get), "benzetim"
     out = {"level": level, "source": source, "claim": claim}
     if sim:
-        out.update(p=sim["p"], think=sim.get("think"), sim_ceiling=not sim.get("level"))
+        out.update(p=sim["p"], think=sim.get("think"), sim_ceiling=not lower)
     if RANK[level] > RANK[top]:
         out.update(level=top, capped_from=level, cap_why=why)
     return out
