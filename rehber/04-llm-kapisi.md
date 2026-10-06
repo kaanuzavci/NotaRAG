@@ -162,7 +162,7 @@ Neden `calls` tablosuna yeni sütun eklenmedi? O sırada çalışan eski süreç
 
   | Tür | Nasıl anlaşılır | Ne yapılır |
   |---|---|---|
-  | `network` | Timeout / Connection / "Server disconnected" (`RemoteProtocolError`) | 15 sn bekle, aynı modeli tekrar dene |
+  | `network` | Timeout / Connect(ion) / "Server disconnected" (`RemoteProtocolError`) / DNS ("getaddrinfo failed": internet tamamen gitti) | 15 sn bekle, aynı modeli tekrar dene |
   | `daily` | 429 + "per day" / TPD / RPD | Groq: mesajdaki süre kadar beklet; Gemini: bugün kapat |
   | `minute` | 429 (günlük değil) | Önerilen süre kadar bekle, 1 kez tekrar |
   | `busy` | 500 / 502 / 503 / overloaded | Gemini (günlük istek sınırlı): sayaca yaz, hemen tekrar etme, modeli kapat (15 → 30 → 60 → 120 dk; `_busy_rpd`). Öbürleri: 20 sn bekle, 1 kez tekrar. Sonra sıradaki model |

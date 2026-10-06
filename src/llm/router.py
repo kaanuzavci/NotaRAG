@@ -202,8 +202,11 @@ def _classify(err: Exception) -> tuple[str, float]:
     wait = parse_wait(s)
     # Ağ kesintisi (telefon hotspot'unda sık): kota değil → kısa bekleyip aynı modeli tekrar dene.
     # "Server disconnected without sending a response" (httpx RemoteProtocolError) de böyle (Gemma, 2026-10-05)
-    if (any(x in type(err).__name__ for x in ("Timeout", "Connection", "RemoteProtocol"))
-            or "timed out" in s.lower() or "disconnected" in s.lower()):
+    # İnternet tamamen gidince httpx 'ConnectError: [Errno 11001] getaddrinfo failed' (DNS) veriyor; 'Connection'
+    # aranınca yakalanmıyor, 'other' sayılıp süreci çökertiyordu (2026-10-06, dört ölçüm süreci)
+    if (any(x in type(err).__name__ for x in ("Timeout", "Connect", "RemoteProtocol"))
+            or any(x in s.lower() for x in ("timed out", "disconnected", "getaddrinfo", "name or service not known",
+                                            "temporary failure in name resolution"))):
         return "network", 15
     if "429" in s or "RESOURCE_EXHAUSTED" in s or "rate_limit" in s.lower():
         if "PerDay" in s or "per day" in s.lower() or "per-day" in s.lower() or "(RPD)" in s or "(TPD)" in s:

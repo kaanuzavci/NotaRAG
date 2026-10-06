@@ -32,6 +32,11 @@ def test_all() -> None:
     class RemoteProtocolError(Exception):
         pass
     assert _classify(RemoteProtocolError("Server disconnected without sending a response."))[0] == "network"
+    # İnternet kesilince DNS hatası: süreci çökertmemeli, ağ beklemesi sayılmalı (2026-10-06)
+    class ConnectError(Exception):
+        pass
+    assert _classify(ConnectError("[Errno 11001] getaddrinfo failed"))[0] == "network"
+    assert _classify(OSError("[Errno -3] Temporary failure in name resolution"))[0] == "network"
     # Gemini 503 'high demand' kota değil: iş yedeğe geçmeden kısa bekleyip aynı modeli denemeli
     # (2026-10-04'te matematik notunda yoğunluk 'kota dolu' sanılıp qwen'e geçilmişti)
     assert AllModelsExhausted("x", ["busy", "busy"]).transient
