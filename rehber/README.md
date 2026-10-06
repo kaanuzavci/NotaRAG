@@ -166,7 +166,7 @@ Belleğe yüklenirken eklenen ama dosyaya yazılmayan alanlar:
 - `id`: [`review_store.question_id`](../src/review_store.py#L36) hesaplar: `sha1(model + "|" + soru metni)` değerinin ilk 12 karakteri.
 - `doc`: ilk parçanın kimliğinden çıkarılan belge adı.
 - `set`, `set_kind`: hangi dosyadan geldiği (`ui/data.question_sets`).
-- `difficulty`: etkin zorluk `{level, claim, source, …}` ([`apply`](../src/difficulty.py#L219); bölüm 10). `q.difficulty` da bu düzeye çevrilir; üretecin iddiası `claim`'de kalır. Dosya değişmez.
+- `difficulty`: etkin zorluk `{level, claim, source, …}` ([`apply`](../src/difficulty.py#L223); bölüm 10). `q.difficulty` da bu düzeye çevrilir; üretecin iddiası `claim`'de kalır. Dosya değişmez.
 
 **Soru kimliği neden önemli?** Öğretmen kararları, öğrenci çözümleri ve "hatalı bildir" kayıtları hep bu kimlikle bağlanır. Aynı model aynı soruyu yeniden üretirse kimlik aynı çıkar. Bu yüzden [`pipeline.merge_existing`](../src/pipeline.py#L124) soru dosyasının üzerine yazmaz, yeni soruları ekler. Üzerine yazsaydı bu kayıtların bağlandığı sorular kaybolurdu.
 

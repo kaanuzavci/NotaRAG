@@ -85,11 +85,11 @@
 
 Merdiven ve zorlaştırma soruları yalnızca kod kontrolünden geçer (LLM doğrulaması yok; burada ölçülen şey zorluk).
 
-- [`_pick(items, n, seed)`](../eval/zorluk_olcumu.py#L39): iddiaya göre dengeli örneklem.
-- [`_ladder(units, worked)`](../eval/zorluk_olcumu.py#L53): her düzey için `generate_request` → etkin düzey.
-- [`_units_text()`](../eval/zorluk_olcumu.py#L64): her sözel belgeden yeterince uzun bir birim.
-- [`_cell`](../eval/zorluk_olcumu.py#L72), [`_table`](../eval/zorluk_olcumu.py#L83): tablo satırı ve grup tablosu; istenen düzeye göre "tutan" sayısı, ortalama bilgi sayısı, ortalama p.
-- [`main()`](../eval/zorluk_olcumu.py#L102): grupları kurar, ölçer, `eval/sonuclar_zorluk.md`'yi yazar.
+- [`_pick(items, n, seed)`](../eval/zorluk_olcumu.py#L41): iddiaya göre dengeli örneklem.
+- [`_ladder(units, worked)`](../eval/zorluk_olcumu.py#L55): her düzey için `generate_request` → etkin düzey.
+- [`_units_text()`](../eval/zorluk_olcumu.py#L67): her sözel belgeden yeterince uzun bir birim.
+- [`_cell`](../eval/zorluk_olcumu.py#L75), [`_table`](../eval/zorluk_olcumu.py#L86): tablo satırı ve grup tablosu; istenen düzeye göre "tutan" sayısı, ortalama bilgi sayısı, ortalama p.
+- [`main()`](../eval/zorluk_olcumu.py#L105): grupları kurar, ölçer, `eval/sonuclar_zorluk.md`'yi yazar.
 - API: ~7 Gemini çağrısı (üretim), sözel soru başına 5 Gemma çağrısı (benzetim). Yanıtlar önbellekte, ölçümler `data/review/difficulty.jsonl`'de; yeniden çalıştırma kota harcamaz.
 
 ### `eval/retrieval_queries.json`

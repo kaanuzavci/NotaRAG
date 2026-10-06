@@ -11,13 +11,14 @@ Merdiven ve zorlaştırma soruları yalnızca kod kontrolünden geçer (LLM doğ
 Maliyet: ~7 Gemini (generate_batch), sözel soru başına 5 Gemma çağrısı. Yanıtlar önbellekte, ölçümler
 data/review/difficulty.jsonl'de; yeniden çalıştırma kota harcamaz.
 
-Kullanım: python -m eval.zorluk_olcumu
+Kullanım: python -m eval.zorluk_olcumu [--uretimsiz]   (--uretimsiz: yalnızca A ve C; Gemini yoğunken, kota yok)
 """
 
 from __future__ import annotations
 
 import random
 import statistics
+import sys
 
 from src import config
 from src import difficulty as D
@@ -25,6 +26,7 @@ from src import request as R
 from src import review_store as rs
 from src import simulate as S
 from src.generation.generate import build_units, evolve_request, generate_request, math_units
+from src.pipeline import patient
 
 OUT = config.ROOT / "eval" / "sonuclar_zorluk.md"
 TYT_REQ = "20261005-225845-db0c"
@@ -54,7 +56,8 @@ def _ladder(units: list[dict], worked: bool) -> list[dict]:
     out = []
     for lvl in D.LEVELS:
         spec = [(u, 1, ["short_answer"] if worked else ["multiple_choice"]) for u in units]
-        for it in generate_request(spec, "tr", lvl, worked=worked):
+        # Gemini yoğunsa (503) bekleyip yeniden dener; daha zayıf modele geçilmez (pipeline.patient)
+        for it in patient(generate_request, spec, "tr", lvl, worked=worked, what=f"merdiven {lvl}"):
             if it["check"]["status"] != "rejected":
                 it["id"] = rs.question_id(it)
                 out.append(it)
@@ -106,24 +109,28 @@ def main() -> None:
     C = _pick([it for it in pool if it["doc"] in TEXT_DOCS and S.simulable(it)], 12)
     print("C · sözel havuz:", len(C), flush=True)
     S.run(C, chunks, log=lambda s: print("  " + s, flush=True), waits=15)
-    D1 = _ladder(_units_text(), worked=False)
-    print("D1 · sözel merdiven:", len(D1), flush=True)
-    S.run(D1, chunks, log=lambda s: print("  " + s, flush=True), waits=15)
-    rnd = random.Random(5)
-    mu = math_units(build_units("tyt-matematik"))
-    D2 = _ladder(rnd.sample(mu, min(3, len(mu))), worked=True)
-    print("D2 · hesap merdiveni:", len(D2), flush=True)
+    gen = "--uretimsiz" not in sys.argv
+    D1, D2 = [], []
+    if gen:
+        D1 = _ladder(_units_text(), worked=False)
+        print("D1 · sözel merdiven:", len(D1), flush=True)
+        S.run(D1, chunks, log=lambda s: print("  " + s, flush=True), waits=15)
+        rnd = random.Random(5)
+        mu = math_units(build_units("tyt-matematik"))
+        D2 = _ladder(rnd.sample(mu, min(3, len(mu))), worked=True)
+        print("D2 · hesap merdiveni:", len(D2), flush=True)
     sims = D.measurements()
     D.apply(C)
     mid = [it for it in C if it["q"]["difficulty"] == "medium"][:3]
     E = []
-    if mid:
+    if mid and gen:
         by_doc = {it["doc"]: it for it in pool if it["doc"] in TEXT_DOCS}
         pairs = []
         for it in mid:
             other = next((x for d, x in by_doc.items() if d != it["doc"]), it)
             pairs.append((it, {"chunks": [chunks[c] for c in other["chunk_ids"] if c in chunks]}))
-        E = [x for x in evolve_request(pairs, "tr", "hard") if x["check"]["status"] != "rejected"]
+        E = [x for x in patient(evolve_request, pairs, "tr", "hard", what="zorlaştırma")
+             if x["check"]["status"] != "rejected"]
         for x in E:
             x["id"] = rs.question_id(x)
         S.run(E, chunks, log=lambda s: print("  " + s, flush=True), waits=15)
@@ -133,15 +140,18 @@ def main() -> None:
         D.apply(g)
 
     lines = ["# Zorluk ölçümü pilotu", "",
-             "Etkin düzey = ölçüm (sözel sorularda benzetilmiş öğrenci: Gemma 4 sınıfı, kaynak açık, çalışma yazmadan; "
-             "p = doğru oranı, çaba = dikkatli çözümün düşünme token'ı) ya da üretecin iddiası; ikisine de yapı tavanı "
-             "(src/difficulty.py): **zor için en az iki ayrı bilgi/kural ya da çok adımlı hesap**. Hesap soruları "
-             "benzetilmez (Gemma 4 lise matematiğinde doyuyor, PROMPTS §8). \"Bilgi\" = notta bulunan ayrı kanıt alıntısı.",
+             "Etkin düzey = ölçüm (sözel ÇS ve D/Y'de benzetilmiş öğrenci: Gemma 4 sınıfı, kaynak açık, çalışma yazmadan; "
+             "p = doğru oranı; hepsi doğruysa tavan, bilgi yok; çaba = dikkatli çözümün düşünme token'ı, yalnızca kayıt) ya da üretecin iddiası; ikisine de yapı tavanı "
+             "(src/difficulty.py): **zor için en az iki ayrı bilgi/kural ya da çok adımlı hesap**. Hesap ve sözel "
+             "kısa cevap benzetilmez (Gemma 4 lise matematiğinde doyuyor; kısa cevap metin eşleşmesiyle puanlanıyor, PROMPTS §8). \"Bilgi\" = notta bulunan ayrı kanıt alıntısı.",
              ""]
     lines += _table("A · TYT 'zor' isteği (hesap)", A, sims, "Elle sütunu: Claude'un değerlendirmesi, öğrenci verisi değil.")
     lines += _table("C · Sözel havuz örneklemi", C, sims)
-    lines += _table("D1 · Sözel merdiven (yeni tanımlarla üretim)", D1, sims)
-    lines += _table("D2 · Hesap merdiveni (yeni tanımlarla üretim)", D2, sims)
+    if gen:
+        lines += _table("D1 · Sözel merdiven (yeni tanımlarla üretim)", D1, sims)
+        lines += _table("D2 · Hesap merdiveni (yeni tanımlarla üretim)", D2, sims)
+    else:
+        lines += ["_D1, D2, E (üretim gerektiren gruplar) bu çalıştırmada yok: `--uretimsiz`._", ""]
     if E:
         lines += _table("E · Zorlaştırma (orta → zor, PROMPTS §2d)", E, sims,
                         "Kaynak: C'de orta ölçülen sorular, başka bir belgenin notuyla birleştirildi.")

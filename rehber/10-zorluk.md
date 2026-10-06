@@ -35,13 +35,13 @@ Soru dosyalarına (`data/questions/*.jsonl`) **hiçbir şey yazılmaz** (veri b�
 - 💾 Okur: `data/review/difficulty.jsonl` (ölçümler), `data/review/attempts.jsonl` (çözümler), `data/llm.sqlite` (ham yanıtlar). Yazar: `difficulty.jsonl` (yalnızca ekler).
 
 **Sabitler**
-- [`LEVELS`](../src/difficulty.py#L34) / [`RANK`](../src/difficulty.py#L35): `easy < medium < hard` sıralaması (karşılaştırma için 0, 1, 2).
-- [`MIN_REAL`](../src/difficulty.py#L36) `= 5`: gerçek öğrenci etiketi için en az ilk deneme sayısı.
-- [`P_EASY`](../src/difficulty.py#L39), [`THINK_MEDIUM`](../src/difficulty.py#L40): benzetim eşikleri (aşağıda).
+- [`LEVELS`](../src/difficulty.py#L35) / [`RANK`](../src/difficulty.py#L36): `easy < medium < hard` sıralaması (karşılaştırma için 0, 1, 2).
+- [`MIN_REAL`](../src/difficulty.py#L37) `= 5`: gerçek öğrenci etiketi için en az ilk deneme sayısı.
+- [`P_EASY`](../src/difficulty.py#L39): doğru oranı eşikleri (`P_EASY` = 0,75, `P_HARD` = 0,40).
 
 ### 1. Yapı: kodla ölçülen özellikler
 
-- [`features(q, check)`](../src/difficulty.py#L60): her soru için, dilden ve konudan bağımsız:
+- [`features(q, check)`](../src/difficulty.py#L59): her soru için, dilden ve konudan bağımsız:
 
 | Özellik | Ne ölçer? | Neden? |
 |---|---|---|
@@ -53,8 +53,8 @@ Soru dosyalarına (`data/questions/*.jsonl`) **hiçbir şey yazılmaz** (veri b�
 | `negation` | Olumsuz kök ("değildir") | Kayıt için (tavan kuralı değil) |
 | `distractor_sim` | Doğru şıkka en yakın çeldiricinin benzerliği | Yakın çeldirici zorlaştırır (Susanti ve Tokunaga) |
 
-- [`answer_text(q)`](../src/difficulty.py#L53): doğru cevabın metni (ÇS'de doğru şık, KC'de cevap, D/Y'de boş).
-- [`cap(q, f)`](../src/difficulty.py#L83): **tavan**, yani yapının izin verdiği en yüksek düzey ve nedeni. Kurallar sırayla:
+- [`answer_text(q)`](../src/difficulty.py#L52): doğru cevabın metni (ÇS'de doğru şık, KC'de cevap, D/Y'de boş).
+- [`cap(q, f)`](../src/difficulty.py#L82): **tavan**, yani yapının izin verdiği en yüksek düzey ve nedeni. Kurallar sırayla:
 
 | Koşul | Tavan | Neden |
 |---|---|---|
@@ -66,17 +66,20 @@ Soru dosyalarına (`data/questions/*.jsonl`) **hiçbir şey yazılmaz** (veri b�
 
 ### 2. Benzetim ve gerçek öğrenci
 
-- [`measurable(q)`](../src/difficulty.py#L102): benzetim bu soruda ölçüm verebilir mi? Yalnızca sözel ve nesnel puanlanan sorular: çoktan seçmeli ve doğru/yanlış. Kural tek yerde; `simulate.simulable` ve `effective` bunu kullanır.
-- [`sim_level(p, think)`](../src/difficulty.py#L109): benzetim ölçümünü düzeye çevirir. `p` (hızlı cevabın doğru oranı) ≥ 0,75 kolay, < 0,40 zor; `think` (dikkatli çözümün düşünme token'ı) ≥ 300 orta, ≥ 900 zor; **ikisinden zor olanı** alınır.
-- [`record(entry)`](../src/difficulty.py#L118) / [`measurements(path)`](../src/difficulty.py#L124): ölçüm kaydı; aynı soru yeniden ölçülürse son ölçüm geçerli.
-- [`claims_from_cache(db)`](../src/difficulty.py#L140): `llm.sqlite`'taki üretim yanıtlarını tarar, "soru metni → üretecin etiketi" eşlemesi çıkarır. Eski kayıtlarda zorla yazılmış etiketin yerine gerçek iddia buradan gelir. Dosya değişmedikçe sonuç bellekte tutulur.
-- [`elo(attempts, prior)`](../src/difficulty.py#L167): satrançtaki Elo puanının eğitimdeki kullanımı (Pelánek 2016). Her çözümde maddenin zorluğu `d` ve öğrencinin yeteneği `θ` birlikte güncellenir: doğru cevap → madde kolaylaşır, öğrenci güçlenir. Adım her güncellemede küçülür. İkinci denemeler sayılmaz. Kayıtlarda öğrenci kimliği olmadığı için tek öğrenci varsayılır.
-- [`_real()`](../src/difficulty.py#L189): `attempts.jsonl`'den Elo, düzey eşikleri benzetimle aynı.
+- [`measurable(q)`](../src/difficulty.py#L101): benzetim bu soruda ölçüm verebilir mi? Yalnızca sözel ve nesnel puanlanan sorular: çoktan seçmeli ve doğru/yanlış. Kural tek yerde; `simulate.simulable` ve `effective` bunu kullanır.
+- [`sim_level(p, think)`](../src/difficulty.py#L108): benzetim ölçümünü düzeyin **alt sınırına** çevirir.
+  - Sınıfın hepsi doğruysa (`p = 1`, tavan) `None`: ölçüm bilgi vermez, etiketi iddia + yapı tavanı verir.
+  - Sınıf yanıldıysa `p < 0,40` zor, öbür durumlarda orta. `effective` iddiayla bunun büyüğünü alır: yanılma kolay iddiayı yükseltir, zor iddiayı düşürmez.
+  - Çaba (`think`) düzeye **katılmaz**, yalnızca kaydedilir. Neden: 2026-10-06 pilotunda ölçülebilir 14 sözel sorunun 14'ünde `p = 1` çıktı; çaba ise soru tipini ölçtü (D/Y 221-269, ÇS 365-545 token; ÇS içinde üretecin iddiasıyla ilişkisiz). Eski kural (300 / 900 token eşikleri) bu yüzden D/Y'yi hep kolay, ÇS'yi hep orta yapıyordu. Gerçek öğrenci verisi birikince çabanın işe yarayıp yaramadığı yeniden ölçülebilir.
+- [`record(entry)`](../src/difficulty.py#L120) / [`measurements(path)`](../src/difficulty.py#L126): ölçüm kaydı; aynı soru yeniden ölçülürse son ölçüm geçerli.
+- [`claims_from_cache(db)`](../src/difficulty.py#L142): `llm.sqlite`'taki üretim yanıtlarını tarar, "soru metni → üretecin etiketi" eşlemesi çıkarır. Eski kayıtlarda zorla yazılmış etiketin yerine gerçek iddia buradan gelir. Dosya değişmedikçe sonuç bellekte tutulur.
+- [`elo(attempts, prior)`](../src/difficulty.py#L169): satrançtaki Elo puanının eğitimdeki kullanımı (Pelánek 2016). Her çözümde maddenin zorluğu `d` ve öğrencinin yeteneği `θ` birlikte güncellenir: doğru cevap → madde kolaylaşır, öğrenci güçlenir. Adım her güncellemede küçülür. İkinci denemeler sayılmaz. Kayıtlarda öğrenci kimliği olmadığı için tek öğrenci varsayılır.
+- [`_real()`](../src/difficulty.py#L191): `attempts.jsonl`'den Elo, düzey eşikleri benzetimle aynı.
 
 ### 3. Bindirme
 
-- [`effective(it, sim, real, claims)`](../src/difficulty.py#L201): yukarıdaki sırayla etkin düzeyi seçer, tavanı uygular. Tavan düzeyi düşürdüyse `capped_from` ve `cap_why` alanlarına eski düzey ve neden yazılır. Ölçülemeyen sorularda (`measurable` değil) benzetim kaydı olsa bile yok sayılır.
-- [`apply(items)`](../src/difficulty.py#L219): her soruya `effective` sonucunu bindirir.
+- [`effective(it, sim, real, claims)`](../src/difficulty.py#L203): yukarıdaki sırayla etkin düzeyi seçer, tavanı uygular. Tavan düzeyi düşürdüyse `capped_from` ve `cap_why` alanlarına eski düzey ve neden yazılır. Ölçülemeyen sorularda (`measurable` değil) benzetim kaydı olsa bile yok sayılır.
+- [`apply(items)`](../src/difficulty.py#L223): her soruya `effective` sonucunu bindirir.
 
 ---
 
@@ -86,7 +89,7 @@ Soru dosyalarına (`data/questions/*.jsonl`) **hiçbir şey yazılmaz** (veri b�
 - **açık kitap** çözer: kaynak sayfa önünde, yani ezber değil sorunun istediği düşünme ölçülür;
 - **çalışma yazmadan** çözer (`thinking_level="minimal"`): cevap hemen görünmüyorsa (birden çok bilgi, çok adım) daha sık yanılır.
 
-Doğru oranı `p`. Ayrıca bir "dikkatli öğrenci" (`thinking_level="high"`) soruyu çözerken kaç düşünme token'ı harcadığını söyler: çaba. İstem PROMPTS.md §8.
+Doğru oranı `p`. Ayrıca bir "dikkatli öğrenci" (`thinking_level="high"`) soruyu çözerken kaç düşünme token'ı harcadığını söyler: çaba (kaydedilir, düzeye katılmaz; yukarıda `sim_level`). İstem PROMPTS.md §8.
 
 Neden Gemma? Literatür, güçlü modellerin zorlanan öğrenciyi taklit edemediğini, zayıfların daha iyi olduğunu söylüyor; Gemma aynı anahtarda ve kotası ayrı.
 
@@ -99,14 +102,14 @@ Neden Gemma? Literatür, güçlü modellerin zorlanan öğrenciyi taklit edemedi
 - → `router.call(..., think=...)`, `prompts.load_prompt("8")`, `grading.grade_short`, `difficulty.record`.
 - 💾 Yazar: `data/review/difficulty.jsonl`. Yanıtlar `llm.sqlite`'ta önbellekte; yeniden çalıştırma kota harcamaz.
 
-- [`CLASS`](../src/simulate.py#L34) / [`CAREFUL`](../src/simulate.py#L35): sınıf (model, örneklem sayısı) ve dikkatli öğrenci.
-- [`_role(model)`](../src/simulate.py#L42): geçici ölçüm rolü. Model meşgulse (503) örneklem sınıftaki öbür modele geçer. Bu bir kalite kapısı rolü değil: model içerik üretmiyor, doğrulamıyor, yalnızca ölçüyor.
-- [`simulable(it)`](../src/simulate.py#L48): `difficulty.measurable`.
-- [`_prompt(it, context, student)`](../src/simulate.py#L52): §8 istemi. Her örneklem şıkları **farklı karıştırır** ve öğrenci numarası taşır, böylece örneklemler bağımsızdır (önbellekten aynı cevap gelmez) ve modelin harf yanlılığı ölçümü bozmaz.
-- [`correct(it, reply, perm)`](../src/simulate.py#L65): cevap doğru mu? ÇS'de yanıttaki ilk şık harfi karıştırma geri çevrilerek kontrol edilir; D/Y'de "doğru/yanlış"; KC'de sınavdaki puanlama kuralı (`grade_short`; bugün yalnızca testte kullanılıyor, KC benzetilmiyor).
-- [`context_of(it, chunks)`](../src/simulate.py#L80): sorunun parçaları, doğrulayıcının gördüğü bağlamla aynı.
-- [`measure(it, chunks)`](../src/simulate.py#L84): bir soru = 4 hızlı + 1 dikkatli çağrı. Dikkatli çağrı önbelleğe bakmaz: önbellekten gelen yanıt düşünme token'ını taşımaz, çaba ölçülemezdi.
-- [`run(items, chunks, skip_measured, log, waits)`](../src/simulate.py#L106): ölçülmemiş ölçülebilir soruları ölçer.
+- [`CLASS`](../src/simulate.py#L36) / [`CAREFUL`](../src/simulate.py#L37): sınıf (model, örneklem sayısı) ve dikkatli öğrenci.
+- [`_role(model)`](../src/simulate.py#L44): geçici ölçüm rolü. Model meşgulse (503) örneklem sınıftaki öbür modele geçer. Bu bir kalite kapısı rolü değil: model içerik üretmiyor, doğrulamıyor, yalnızca ölçüyor.
+- [`simulable(it)`](../src/simulate.py#L50): `difficulty.measurable`.
+- [`_prompt(it, context, student)`](../src/simulate.py#L54): §8 istemi. Her örneklem şıkları **farklı karıştırır** ve öğrenci numarası taşır, böylece örneklemler bağımsızdır (önbellekten aynı cevap gelmez) ve modelin harf yanlılığı ölçümü bozmaz.
+- [`correct(it, reply, perm)`](../src/simulate.py#L67): cevap doğru mu? ÇS'de yanıttaki ilk şık harfi karıştırma geri çevrilerek kontrol edilir; D/Y'de "doğru/yanlış"; KC'de sınavdaki puanlama kuralı (`grade_short`; bugün yalnızca testte kullanılıyor, KC benzetilmiyor).
+- [`context_of(it, chunks)`](../src/simulate.py#L82): sorunun parçaları, doğrulayıcının gördüğü bağlamla aynı.
+- [`measure(it, chunks)`](../src/simulate.py#L86): bir soru = 4 hızlı + 1 dikkatli çağrı. Dikkatli çağrı önbelleğe bakmaz: önbellekten gelen yanıt düşünme token'ını taşımaz, çaba ölçülemezdi.
+- [`run(items, chunks, skip_measured, log, waits)`](../src/simulate.py#L108): ölçülmemiş ölçülebilir soruları ölçer.
   - Gemma geçici yoğunsa (503, iki model birden) 2 dk bekleyip yeniden dener, en çok `waits` kez. Önceki örneklemler önbellekte olduğu için yeniden deneme yalnızca eksik çağrıları yapar.
   - Kota doluysa ya da yoğunluk sürerse ölçüm durur; sınav beklemez. Ölçülemeyen soruda etiketi iddia + yapı tavanı verir.
 

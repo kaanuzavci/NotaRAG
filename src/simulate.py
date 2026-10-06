@@ -4,7 +4,9 @@ Zayıf/orta modellerden bir "sınıf" (Gemma 4) her soruyu kaynak sayfası önü
 istediği düşünme ölçülür) ve çalışma yazmadan (thinking_level="minimal") cevaplar → doğru oranı p. Ayrıca bir
 "dikkatli öğrenci" (thinking_level="high") soruyu çözerken kaç düşünme token'ı harcadığını söyler → çaba.
 Literatür: güçlü modeller zorlanan öğrenciyi taklit edemiyor, zayıf modeller daha iyi (Acquaye ve ark. 2026);
-belirsizlik/tutarlılık zorluğun güçlü sinyali (Zotos ve ark. 2025). Etiket: src/difficulty.sim_level.
+belirsizlik/tutarlılık zorluğun güçlü sinyali (Zotos ve ark. 2025). Etiket: src/difficulty.sim_level — yalnızca
+sınıf yanıldığında (alt sınır); hepsi doğruysa tavan, bilgi yok. Çaba kaydedilir, düzeye katılmaz (pilot: soru tipini
+ölçtü).
 
 Hesap soruları benzetilmez: Gemma 4 lise matematiğinde ya kafadan aritmetiğe takılıyor ya da (karalama kâğıdıyla)
 her şeyi çözüyor (2026-10-05 denemesi, PROMPTS.md §8) → onların zorluğu yapıdan gelir (ayrı kural sayısı, adım).
@@ -123,7 +125,7 @@ def run(items: list[dict], chunks: dict[str, dict], skip_measured: bool = True, 
                 log("⏳ benzetim: Gemma şu an yoğun (geçici, kota değil) → 2 dk bekleniyor")
                 time.sleep(120)
         out.append(e)
-        log(f"ölçüldü {i}/{len(todo)} · {it['id']} · p={e['p']} çaba={e['think']} → {D.sim_level(e['p'], e['think'])}")
+        log(f"ölçüldü {i}/{len(todo)} · {it['id']} · p={e['p']} çaba={e['think']} → {D.sim_level(e['p']) or 'tavan (bilgi yok)'}")
     return out
 
 

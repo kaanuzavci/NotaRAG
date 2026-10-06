@@ -49,9 +49,9 @@ def test_fact_count() -> None:
 
 
 def test_levels() -> None:
-    assert D.sim_level(1.0, 80) == "easy"
-    assert D.sim_level(1.0, 400) == "medium"  # hızlı cevap doğru ama çözüm çaba istiyor (Vieta)
-    assert D.sim_level(0.5, 100) == "medium" and D.sim_level(0.25, 100) == "hard" and D.sim_level(1.0, 1500) == "hard"
+    # Benzetim alt sınırdır: sınıfın hepsi doğruysa (tavan) bilgi yok; çaba düzeye katılmaz (pilotta soru tipini ölçtü)
+    assert D.sim_level(1.0, 80) is None and D.sim_level(1.0, 1500) is None
+    assert D.sim_level(0.75) == "medium" and D.sim_level(0.5, 100) == "medium" and D.sim_level(0.25, 100) == "hard"
     # Etkin düzey: ölçüm > iddia; yapı tavanı ölçümü de kısar; gerçek öğrenci verisi kısılmaz
     it = {"id": "x", "q": dict(COPY_Q)}
     assert D.effective(it)["level"] == "easy" and D.effective(it)["capped_from"] == "hard"
@@ -59,6 +59,14 @@ def test_levels() -> None:
     text_q = {**COPY_Q, "evidence_quote": "Ürün rotasyonu toprağı korur", "bloom_level": "understand", "difficulty": "easy"}
     e = D.effective({"id": "y", "q": text_q, "check": {"facts": 2}}, sim=sim)
     assert e["source"] == "benzetim" and e["level"] == "hard"
+    # Tavan: hepsi doğru → iddia geçerli (ölçüm düşürmez); bir yanılma kolay iddiayı ortaya çıkarır, zoru düşürmez
+    ceil = {"p": 1.0, "think": 400, "level": None}
+    e = D.effective({"id": "y", "q": text_q, "check": {"facts": 2}}, sim=ceil)
+    assert e["source"] == "üretici" and e["level"] == "easy" and e["sim_ceiling"]
+    one_miss = {"p": 0.75, "think": 400, "level": "medium"}
+    assert D.effective({"id": "y", "q": text_q, "check": {"facts": 2}}, sim=one_miss)["level"] == "medium"
+    hard_claim = {**text_q, "difficulty": "hard"}
+    assert D.effective({"id": "y", "q": hard_claim, "check": {"facts": 2}}, sim=one_miss)["level"] == "hard"
     assert D.effective({"id": "y", "q": dict(APPLY_Q)}, sim=sim)["source"] == "üretici"  # hesap sorusu benzetilmez
     # Sözel kısa cevap da benzetilmez: metin eşleşmesi doğru ama farklı sözcüklü cevabı yanlış sayıyor (sahte p=0)
     sa_text = {**text_q, "type": "short_answer", "options": None, "answer_index": None, "answer": "Verim kaybı riski"}
