@@ -99,14 +99,16 @@ Neden Gemma? Literatür, güçlü modellerin zorlanan öğrenciyi taklit edemedi
 - → `router.call(..., think=...)`, `prompts.load_prompt("8")`, `grading.grade_short`, `difficulty.record`.
 - 💾 Yazar: `data/review/difficulty.jsonl`. Yanıtlar `llm.sqlite`'ta önbellekte; yeniden çalıştırma kota harcamaz.
 
-- [`CLASS`](../src/simulate.py#L33) / [`CAREFUL`](../src/simulate.py#L34): sınıf (model, örneklem sayısı) ve dikkatli öğrenci.
-- [`_role(model)`](../src/simulate.py#L41): geçici ölçüm rolü. Model meşgulse (503) örneklem sınıftaki öbür modele geçer. Bu bir kalite kapısı rolü değil: model içerik üretmiyor, doğrulamıyor, yalnızca ölçüyor.
-- [`simulable(it)`](../src/simulate.py#L47): `difficulty.measurable`.
-- [`_prompt(it, context, student)`](../src/simulate.py#L51): §8 istemi. Her örneklem şıkları **farklı karıştırır** ve öğrenci numarası taşır, böylece örneklemler bağımsızdır (önbellekten aynı cevap gelmez) ve modelin harf yanlılığı ölçümü bozmaz.
-- [`correct(it, reply, perm)`](../src/simulate.py#L64): cevap doğru mu? ÇS'de yanıttaki ilk şık harfi karıştırma geri çevrilerek kontrol edilir; D/Y'de "doğru/yanlış"; KC'de sınavdaki puanlama kuralı (`grade_short`; bugün yalnızca testte kullanılıyor, KC benzetilmiyor).
-- [`context_of(it, chunks)`](../src/simulate.py#L79): sorunun parçaları, doğrulayıcının gördüğü bağlamla aynı.
-- [`measure(it, chunks)`](../src/simulate.py#L83): bir soru = 4 hızlı + 1 dikkatli çağrı.
-- [`run(items, chunks, skip_measured, log)`](../src/simulate.py#L104): ölçülmemiş ölçülebilir soruları ölçer.
+- [`CLASS`](../src/simulate.py#L34) / [`CAREFUL`](../src/simulate.py#L35): sınıf (model, örneklem sayısı) ve dikkatli öğrenci.
+- [`_role(model)`](../src/simulate.py#L42): geçici ölçüm rolü. Model meşgulse (503) örneklem sınıftaki öbür modele geçer. Bu bir kalite kapısı rolü değil: model içerik üretmiyor, doğrulamıyor, yalnızca ölçüyor.
+- [`simulable(it)`](../src/simulate.py#L48): `difficulty.measurable`.
+- [`_prompt(it, context, student)`](../src/simulate.py#L52): §8 istemi. Her örneklem şıkları **farklı karıştırır** ve öğrenci numarası taşır, böylece örneklemler bağımsızdır (önbellekten aynı cevap gelmez) ve modelin harf yanlılığı ölçümü bozmaz.
+- [`correct(it, reply, perm)`](../src/simulate.py#L65): cevap doğru mu? ÇS'de yanıttaki ilk şık harfi karıştırma geri çevrilerek kontrol edilir; D/Y'de "doğru/yanlış"; KC'de sınavdaki puanlama kuralı (`grade_short`; bugün yalnızca testte kullanılıyor, KC benzetilmiyor).
+- [`context_of(it, chunks)`](../src/simulate.py#L80): sorunun parçaları, doğrulayıcının gördüğü bağlamla aynı.
+- [`measure(it, chunks)`](../src/simulate.py#L84): bir soru = 4 hızlı + 1 dikkatli çağrı. Dikkatli çağrı önbelleğe bakmaz: önbellekten gelen yanıt düşünme token'ını taşımaz, çaba ölçülemezdi.
+- [`run(items, chunks, skip_measured, log, waits)`](../src/simulate.py#L106): ölçülmemiş ölçülebilir soruları ölçer.
+  - Gemma geçici yoğunsa (503, iki model birden) 2 dk bekleyip yeniden dener, en çok `waits` kez. Önceki örneklemler önbellekte olduğu için yeniden deneme yalnızca eksik çağrıları yapar.
+  - Kota doluysa ya da yoğunluk sürerse ölçüm durur; sınav beklemez. Ölçülemeyen soruda etiketi iddia + yapı tavanı verir.
 
 ---
 

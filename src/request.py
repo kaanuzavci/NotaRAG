@@ -321,7 +321,7 @@ def _settle(req: dict, new: list[dict], chunks: dict[str, dict]) -> tuple[list[d
         it["id"] = rs.question_id(it)
     if not p["difficulty"] or not fit:
         return fit, []
-    # Zorluk iddia değil ölçüm: sözel sorularda benzetilmiş öğrenci (Gemma; ayrı ücretsiz kota), hepsinde yapı tavanı
+    # Zorluk iddia değil ölçüm: sözel ÇS ve D/Y'de benzetilmiş öğrenci (Gemma; ayrı ücretsiz kota), hepsinde yapı tavanı
     # (ayrı bilgi/kural sayısı, adım). Ölçülemezse üretecin etiketi + yapı tavanı.
     from src import simulate
     from src.difficulty import RANK, apply

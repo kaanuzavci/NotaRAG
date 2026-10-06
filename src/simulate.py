@@ -23,10 +23,11 @@ import random
 import re
 import statistics
 import sys
+import time
 
 from src import difficulty as D
 from src.llm.models import ROLES
-from src.llm.router import call
+from src.llm.router import AllModelsExhausted, call
 from src.prompts import load_prompt
 
 # (model, örneklem sayısı) — hızlı cevap; ve çaba ölçümü için dikkatli öğrenci
@@ -93,7 +94,8 @@ def measure(it: dict, chunks: dict[str, dict]) -> dict:
             used.append(r.model)
             ok.append(correct(it, r.text, perm))
     prompt, perm = _prompt(it, ctx, 0)
-    careful = call(_role(CAREFUL), prompt, max_tokens=6000, temperature=0.0, think="high")
+    # Önbellek yok: önbellekten gelen yanıt düşünme token'ını taşımaz (çaba ölçülemezdi). Ölçülmüş soru zaten atlanır.
+    careful = call(_role(CAREFUL), prompt, max_tokens=6000, temperature=0.0, think="high", use_cache=False)
     entry = {"id": it["id"], "kind": "sim", "p": round(sum(ok) / len(ok), 2), "k": len(ok),
              "think": careful.thoughts or None, "careful_ok": correct(it, careful.text, perm), "answers": answers,
              "models": used, "mode": "open_book_minimal"}
@@ -101,13 +103,25 @@ def measure(it: dict, chunks: dict[str, dict]) -> dict:
     return entry
 
 
-def run(items: list[dict], chunks: dict[str, dict], skip_measured: bool = True, log=print) -> list[dict]:
-    """Ölçülmemiş ölçülebilir soruları ölç (hesap ve sözel kısa cevap atlanır: difficulty.measurable)."""
+def run(items: list[dict], chunks: dict[str, dict], skip_measured: bool = True, log=print,
+        waits: int = 3) -> list[dict]:
+    """Ölçülmemiş ölçülebilir soruları ölç (hesap ve sözel kısa cevap atlanır: difficulty.measurable).
+    Gemma geçici yoğunsa (503) 2 dk bekleyip yeniden dener (en çok `waits` kez; önceki örneklemler önbellekte).
+    Kota doluysa ya da yoğunluk sürerse ölçüm durur, sınav beklemez: ölçülemeyen soruda etiket = iddia + yapı tavanı."""
     done = D.measurements() if skip_measured else {}
     todo = [it for it in items if simulable(it) and it["id"] not in done]
     out = []
     for i, it in enumerate(todo, 1):
-        e = measure(it, chunks)
+        for attempt in range(waits + 1):
+            try:
+                e = measure(it, chunks)
+                break
+            except AllModelsExhausted as ex:
+                if not ex.transient or attempt == waits:
+                    log(f"ölçüm durdu, {len(todo) - i + 1} soru ölçülmedi (etiket = iddia + yapı tavanı): {ex}")
+                    return out
+                log("⏳ benzetim: Gemma şu an yoğun (geçici, kota değil) → 2 dk bekleniyor")
+                time.sleep(120)
         out.append(e)
         log(f"ölçüldü {i}/{len(todo)} · {it['id']} · p={e['p']} çaba={e['think']} → {D.sim_level(e['p'], e['think'])}")
     return out

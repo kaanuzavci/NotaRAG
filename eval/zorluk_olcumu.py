@@ -105,10 +105,10 @@ def main() -> None:
     A = [it for it in pool if it.get("request") == TYT_REQ or it["id"] in MANUAL]
     C = _pick([it for it in pool if it["doc"] in TEXT_DOCS and S.simulable(it)], 12)
     print("C · sözel havuz:", len(C), flush=True)
-    S.run(C, chunks, log=lambda s: print("  " + s, flush=True))
+    S.run(C, chunks, log=lambda s: print("  " + s, flush=True), waits=15)
     D1 = _ladder(_units_text(), worked=False)
     print("D1 · sözel merdiven:", len(D1), flush=True)
-    S.run(D1, chunks, log=lambda s: print("  " + s, flush=True))
+    S.run(D1, chunks, log=lambda s: print("  " + s, flush=True), waits=15)
     rnd = random.Random(5)
     mu = math_units(build_units("tyt-matematik"))
     D2 = _ladder(rnd.sample(mu, min(3, len(mu))), worked=True)
@@ -126,7 +126,7 @@ def main() -> None:
         E = [x for x in evolve_request(pairs, "tr", "hard") if x["check"]["status"] != "rejected"]
         for x in E:
             x["id"] = rs.question_id(x)
-        S.run(E, chunks, log=lambda s: print("  " + s, flush=True))
+        S.run(E, chunks, log=lambda s: print("  " + s, flush=True), waits=15)
         D.apply(E)
     sims = D.measurements()
     for g in (A, C, D1, D2, E):
