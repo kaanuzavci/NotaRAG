@@ -23,7 +23,7 @@ TR = str.maketrans("çğıöşüÇĞİÖŞÜ ", "cgiosuCGIOSU_")
 
 
 def get(url: str, binary: bool = False):
-    time.sleep(1.0)  # nazik tarama
+    time.sleep(0.5)  # nazik tarama
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (NotaRAG ders projesi)"})
     with urllib.request.urlopen(req, timeout=90) as r:
         data = r.read()
@@ -35,7 +35,7 @@ def courses(cat: int, depth: int = 0) -> set[int]:
     found = {int(x) for x in re.findall(r"course/view\.php\?id=(\d+)", html)}
     if depth < 2 and len(found) < 40:
         subs = {int(x) for x in re.findall(r"course/index\.php\?categoryid=(\d+)", html)} - {cat}
-        for s in sorted(subs)[:8]:
+        for s in sorted(subs)[:4]:  # fakülte başına birkaç bölüm yeter (çeşitlilik), tarama kısa sürsün
             found |= courses(s, depth + 1)
     return found
 

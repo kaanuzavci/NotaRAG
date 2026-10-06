@@ -119,6 +119,16 @@ def test_scanned_pages_need_vision() -> None:
     assert d["language"] == "unknown" and d["title"] == "nr_taranmis_test"
 
 
+def test_superscript_line_does_not_crash() -> None:
+    # Tek başına '²' satırı (üs) sayfa numarası oylamasında int('²') ile ayrıştırıcıyı çökertiyordu: '²'.isdigit()
+    # True ama sayıya çevrilemez (radyoterapi fiziği notu, 2026-10-06).
+    from src.ingestion.pdf_parser import Line, _page_number_offset
+    import pymupdf
+    pages = [[Line("²", 8.0, pymupdf.Rect(0, 0, 5, 5), 0), Line(str(i), 10.0, pymupdf.Rect(0, 800, 10, 810), 1)]
+             for i in range(1, 6)]
+    assert _page_number_offset(pages) == 0
+
+
 TESTS = [v for k, v in dict(globals()).items() if k.startswith("test_")]
 
 if __name__ == "__main__":

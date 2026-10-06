@@ -124,7 +124,7 @@ Bu iki ifadeyi PROMPTS.md'de değiştirirsen kural ekleme sessizce çalışmaz y
 Adım adım ne yaptığı (konsola yazdığı `1/6 ...` satırları arayüzdeki ilerleme çubuğunu da besler):
 
 1. **PDF'i bul.** `data/sample_docs/` içinde adı ya da kök adı eşleşen dosya.
-2. **`1/6 PDF okuma`.** [`parse_pdf`](../src/ingestion/pdf_parser.py#L400) PDF'i okur, sonuç `data/parsed/<belge>.json`'a yazılır. Hemen ardından [`apply_cached_vision`](../src/ingestion/vision.py#L131) daha önce görselden okunmuş sayfaları önbellekten geri koyar. Yeniden ayrıştırma bu sayfaların okumasını kaybetmesin diye yapılır.
+2. **`1/6 PDF okuma`.** [`parse_pdf`](../src/ingestion/pdf_parser.py#L401) PDF'i okur, sonuç `data/parsed/<belge>.json`'a yazılır. Hemen ardından [`apply_cached_vision`](../src/ingestion/vision.py#L131) daha önce görselden okunmuş sayfaları önbellekten geri koyar. Yeniden ayrıştırma bu sayfaların okumasını kaybetmesin diye yapılır.
 3. **`2/6 görsel okuma`.** [`_vision_until_done`](../src/pipeline.py#L110) yalnızca henüz okunmamış resim sayfalarını okutur; kota biterse bekler.
 4. **`3/6 bölümleme`.** [`chunking.__main__.main`](../src/chunking/__main__.py#L17) **bütün** ayrıştırılmış belgeleri yeniden parçalar ve `chunks.jsonl` / `sections.jsonl` dosyalarını baştan yazar. Yereldir, hızlıdır.
 5. **`4/6 dizin`.**

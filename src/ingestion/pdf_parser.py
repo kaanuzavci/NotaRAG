@@ -326,7 +326,8 @@ def _page_number_offset(pages_lines: list[list[Line]]) -> int | None:
     """
     votes: Counter[int] = Counter()
     for pno, lines in enumerate(pages_lines, start=1):
-        votes.update({int(ln.text) - pno for ln in lines if ln.text.isdigit() and abs(int(ln.text) - pno) <= 2})
+        # isdecimal, isdigit değil: '²' isdigit() ama int('²') hata verir (fizik notu çöktü, 2026-10-06)
+        votes.update({int(ln.text) - pno for ln in lines if ln.text.isdecimal() and abs(int(ln.text) - pno) <= 2})
     if not votes:
         return None
     off, n = votes.most_common(1)[0]

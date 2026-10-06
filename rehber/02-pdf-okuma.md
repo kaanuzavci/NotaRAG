@@ -111,8 +111,9 @@ Bu dosya kendisi hiçbir LLM çağırmaz. Resim olan sayfaları yalnızca `needs
 - [`_hf_key(text)`](../src/ingestion/pdf_parser.py#L165): karşılaştırma anahtarı (küçük harf, rakamlar `#`). `"Sayfa 7"` ile `"Sayfa 8"` aynı kalıp sayılır.
 - [`_find_header_footer(pages_lines)`](../src/ingestion/pdf_parser.py#L169): belgenin ≥%40'ında (en az 3 sayfada) tekrar eden satırları bulur. Bir koşulu daha var: bulunduğu sayfalarda **en büyük yazı olmayanlar**. Bu sayede ardışık slaytlarda tekrar eden başlıklar ("Organik Tarım") silinmez.
 - [`_page_number_offset(pages_lines)`](../src/ingestion/pdf_parser.py#L321): basılı sayfa numarası ile PDF sayfa sırası arasındaki sabit farkı belge genelinde oylamayla bulur.
+  - Aday satır `isdecimal()` ile seçilir, `isdigit()` ile değil: "²" `isdigit()` geçer ama sayıya çevrilemez; üslü bir fizik notu ayrıştırıcıyı çökertiyordu (2026-10-06).
   - Eski kural her sayfada "sayfa_no ± 2" olan sayıları siliyordu; bir diyagramdaki dört `22` değeri bu yüzden silinmişti.
-- [`_page_number_line(lines, number, rect)`](../src/ingestion/pdf_parser.py#L336): o sayfada numarayı taşıyan **tek** satır (kenara en yakın aday).
+- [`_page_number_line(lines, number, rect)`](../src/ingestion/pdf_parser.py#L337): o sayfada numarayı taşıyan **tek** satır (kenara en yakın aday).
 - [`_strip_split_footer(row, hf_texts)`](../src/ingestion/pdf_parser.py#L303): tablo hücrelerine bölünerek sızmış alt bilgiyi temizler (`'2 7 Novem' | '0.286 ber 2013'`).
 
 *d) Paragraflar ve tablolar*
@@ -130,14 +131,14 @@ Bu dosya kendisi hiçbir LLM çağırmaz. Resim olan sayfaları yalnızca `needs
 - [`_garbled_formula(line)`](../src/ingestion/pdf_parser.py#L291): en az 6 kelime ve kelimelerin yarısından fazlası tek karakter (`'( ) nx x x ,... , 2 1'`) ise dağılmış formüldür. Yalnızca sayılardan oluşan satır (tablo satırı) formül sayılmaz.
 
 *f) Başlık bulma (dört kaynak, öncelik sırasıyla)*
-1. [`_toc_titles(doc)`](../src/ingestion/pdf_parser.py#L343): PDF'in içindekiler listesi (yer imleri). `"Slayt 11"` gibi içeriksiz girişler atlanır. Tarayıcı yer imleri (`"B1 Ders Kitabı 22.07.2015_Sayfa_001"`, …: sayfaların ≥%80'inde bir giriş ve rakamlar dışında hepsi aynı) başlık sayılmaz; liste hiç kullanılmaz.
-2. [`_visual_heading(lines, page_h)`](../src/ingestion/pdf_parser.py#L379): sayfanın üst %35'inde, gövdeden en az 1,2 kat büyük yazılmış satır(lar).
+1. [`_toc_titles(doc)`](../src/ingestion/pdf_parser.py#L344): PDF'in içindekiler listesi (yer imleri). `"Slayt 11"` gibi içeriksiz girişler atlanır. Tarayıcı yer imleri (`"B1 Ders Kitabı 22.07.2015_Sayfa_001"`, …: sayfaların ≥%80'inde bir giriş ve rakamlar dışında hepsi aynı) başlık sayılmaz; liste hiç kullanılmaz.
+2. [`_visual_heading(lines, page_h)`](../src/ingestion/pdf_parser.py#L380): sayfanın üst %35'inde, gövdeden en az 1,2 kat büyük yazılmış satır(lar).
    - Tek satırlık slaytta ≥24 punto satır başlıktır.
-   - Bulamazsa [`_top_band_heading`](../src/ingestion/pdf_parser.py#L370)'e bakar: gövdeyle aynı puntoda ama en üst %12'lik şeritteki satırlar.
+   - Bulamazsa [`_top_band_heading`](../src/ingestion/pdf_parser.py#L371)'e bakar: gövdeyle aynı puntoda ama en üst %12'lik şeritteki satırlar.
 3. Bulunamazsa önceki sayfanın başlığı devralınır (`heading_source = "inherited"`).
-4. [`_body_size(pages_lines)`](../src/ingestion/pdf_parser.py#L359) belgenin baskın gövde yazı boyutunu verir (karakter sayısıyla ağırlıklı medyan). Başlık ve etiket kararlarında ölçü olarak kullanılır.
+4. [`_body_size(pages_lines)`](../src/ingestion/pdf_parser.py#L360) belgenin baskın gövde yazı boyutunu verir (karakter sayısıyla ağırlıklı medyan). Başlık ve etiket kararlarında ölçü olarak kullanılır.
 
-**Ana fonksiyon: [`parse_pdf(path)`](../src/ingestion/pdf_parser.py#L400)**
+**Ana fonksiyon: [`parse_pdf(path)`](../src/ingestion/pdf_parser.py#L401)**
 1. Dosya gerçekten PDF mi? (PyMuPDF HTML/metin de açıyor; `.pdf` adlı bir hata sayfası "1 sayfalık belge" sanılıyordu → `ValueError`.) Sonra bütün sayfaların satırlarını oku, belge genelinde üst/alt bilgi kalıplarını, içindekileri, şablon görselleri, gövde boyutunu ve sayfa numarası farkını hesapla.
 2. Her sayfa için:
    - sayfa numarası satırını ve üst/alt bilgiyi at (`removed_lines`);

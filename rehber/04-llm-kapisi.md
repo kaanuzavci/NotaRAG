@@ -2,7 +2,7 @@
 
 [← 3. Bölümleme ve arama](03-bolumleme-ve-arama.md) · [Ana sayfa](README.md) · Sonraki: [5. Soru üretimi →](05-uretim.md)
 
-Projede bir LLM'e giden **her** istek tek bir fonksiyondan geçer: [`router.call(rol, istem)`](../src/llm/router.py#L275). Embedding tek istisnadır; `embedder.py` kendi isteğini atar. Bu katman dört dosyadan oluşur:
+Projede bir LLM'e giden **her** istek tek bir fonksiyondan geçer: [`router.call(rol, istem)`](../src/llm/router.py#L278). Embedding tek istisnadır; `embedder.py` kendi isteğini atar. Bu katman dört dosyadan oluşur:
 
 | Dosya | Sorusu |
 |---|---|
@@ -169,12 +169,12 @@ Neden `calls` tablosuna yeni sütun eklenmedi? O sırada çalışan eski süreç
   | `missing` | 404 | Model yok → bugün kapat |
   | `json` | `json_validate_failed` | Token sınırını 3 katına çıkarıp 1 kez tekrar |
   | `other` | Diğer | Hatayı yukarı fırlat (beklenmeyen hata gizlenmez) |
-- [`_sync_used(model, err)`](../src/llm/router.py#L221): Groq TPD hatasındaki gerçek kullanımı deftere işler. Önce ölçüm için `record_sync`, sonra kaydımız eksikse `record_correction`.
-- [`_busy_rpd(model)`](../src/llm/router.py#L240): Gemini'de 503 "yoğun" yanıtı da günlük istek kotasından düşüyor (2026-10-06: 0 başarılı istek, ~20 yoğunluk denemesi → Google iki modeli de "günlük kota doldu" diye kapattı). Bu yüzden Gemini'nin günlük istek sınırlı modelinde yoğunluk olunca deneme sayaca yazılır (kapasite raporu Google'ınkiyle aynı kalsın), model hemen yeniden sorulmaz ve artan sürelerle kapatılır (`BUSY_COOLDOWN` = 15 dk, her ardışık yoğunlukta iki katı, en çok 120 dk). Başarılı çağrı sayacı (`_busy_streak`) sıfırlar. Groq ve Gemma'da eski davranış: 20 sn bekleyip bir kez daha.
-- [`_block(model, kind, wait)`](../src/llm/router.py#L252): kota hatasından sonra modeli kapatır. Süreli bekleme (`set_cooldown`) ya da günün geri kalanı (`mark_exhausted`).
-- [`_raw(model, prompt, image, ...)`](../src/llm/router.py#L260): tek bir modele tek çağrı. Önce `Throttle.wait`, sonra görüntü desteği kontrolü, sonra sağlayıcıya göre doğru fonksiyon.
+- [`_sync_used(model, err)`](../src/llm/router.py#L224): Groq TPD hatasındaki gerçek kullanımı deftere işler. Önce ölçüm için `record_sync`, sonra kaydımız eksikse `record_correction`.
+- [`_busy_rpd(model)`](../src/llm/router.py#L243): Gemini'de 503 "yoğun" yanıtı da günlük istek kotasından düşüyor (2026-10-06: 0 başarılı istek, ~20 yoğunluk denemesi → Google iki modeli de "günlük kota doldu" diye kapattı). Bu yüzden Gemini'nin günlük istek sınırlı modelinde yoğunluk olunca deneme sayaca yazılır (kapasite raporu Google'ınkiyle aynı kalsın), model hemen yeniden sorulmaz ve artan sürelerle kapatılır (`BUSY_COOLDOWN` = 15 dk, her ardışık yoğunlukta iki katı, en çok 120 dk). Başarılı çağrı sayacı (`_busy_streak`) sıfırlar. Groq ve Gemma'da eski davranış: 20 sn bekleyip bir kez daha.
+- [`_block(model, kind, wait)`](../src/llm/router.py#L255): kota hatasından sonra modeli kapatır. Süreli bekleme (`set_cooldown`) ya da günün geri kalanı (`mark_exhausted`).
+- [`_raw(model, prompt, image, ...)`](../src/llm/router.py#L263): tek bir modele tek çağrı. Önce `Throttle.wait`, sonra görüntü desteği kontrolü, sonra sağlayıcıya göre doğru fonksiyon.
 
-**Ana fonksiyon: [`call(role, prompt, image, json_mode, max_tokens, temperature, use_cache, think)`](../src/llm/router.py#L275)**
+**Ana fonksiyon: [`call(role, prompt, image, json_mode, max_tokens, temperature, use_cache, think)`](../src/llm/router.py#L278)**
 1. `chain = ROLES[role]`: bu rolün modelleri. `effort = reasoning(role)`: akıl yürütme düzeyi.
    - Düzey varsayılandan (`medium`) farklıysa önbellek anahtarına eklenir. Yoksa `low` denemesi eski `medium` yanıtlarını önbellekten okuyup sahte sonuç verirdi.
    - Varsayılanda eklenmez; böylece `llm.sqlite`'taki eski yanıtların anahtarı değişmez.
