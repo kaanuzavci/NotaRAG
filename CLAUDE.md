@@ -2,6 +2,7 @@
 
 "RAG Tabanlı Ders Dokümanlarından Soru ve Cevap Üretim Sistemi" (üniversite projesi, **teslim 3 Ocak 2027**). Sistem PDF ders
 notlarından soru **ve** cevap üretir, doğrular, sınav olarak sunar; kullanıcı dokümana soru sormaz (chat modu kapsam dışı).
+Odak **metinli (bilgisayarda yazılmış) PDF**; el yazısı ve taranmış notlar sonraki aşamada (kullanıcı kararı, 2026-10-07).
 Kullanıcı Türkçe yazar; arayüz, belgeler ve istem dışı metinler Türkçe.
 
 ## Önce oku
@@ -13,6 +14,8 @@ Kullanıcı Türkçe yazar; arayüz, belgeler ve istem dışı metinler Türkçe
 - **rehber/**: dosya dosya kod rehberi (kullanıcı kodu öğrenmek için okuyor). Kod değiştirince ilgili bölümü güncelle
   (yeni/silinen fonksiyon, değişen davranış), sonra `python scripts\rehber_satirlari.py --yaz` ile satır bağlantılarını hizala.
   Kullanıcıya hangi dosyaları neden değiştirdiğini ve nereye bağlandığını anlat.
+- **data/kaynak_veri/BENIOKU.md**: indirilmiş deney verisi (MEB/ÖSYM soruları, Açık Ders notları, Belebele, TurkishMMLU…),
+  `data/kaynaklar/` makaleler, `wheelhouse/` kurulmamış paketler (`pip install --no-index --find-links wheelhouse <paket>`).
 
 ## Çalıştırma (Windows, PowerShell 5.1, `.venv` Python 3.11)
 - Arayüz arka planda: `Start-Process .venv\Scripts\streamlit.exe -ArgumentList "run src/app.py --server.headless true --server.port 8501" -RedirectStandardOutput data\streamlit.log -RedirectStandardError data\streamlit.err.log -WindowStyle Hidden`
@@ -21,6 +24,10 @@ Kullanıcı Türkçe yazar; arayüz, belgeler ve istem dışı metinler Türkçe
   Sınav istekleri → `data/requests/<id>.log`. İzleme: `python scripts\bekci.py` arka planda; çıkınca kullanıcıya bildir, yeniden başlat.
 - Arayüzü görerek kontrol: `streamlit run scripts/onizleme.py --server.port 8502` (hazır verili ekranlar, `?v=session|flip|summary|quiz|results|setup`) + `python scripts\ekran.py <url> <png>` (görünmez Edge + CDP; Read ile bak). Tasarım değişikliğini kullanıcıya göstermeden önce bununla bak.
 - Kota durumu: `python -m src.llm.capacity`. Testler (API çağırmaz): `python -m tests.<ad>` (README §8'deki liste).
+- **Uzun ölçüm/deney** (`eval/*`): ayrı Windows süreci olarak başlat (`Start-Process … -WindowStyle Hidden`, günlük `data/*.log`);
+  Bash arka plan görevi VS Code / oturum yeniden başlayınca ölüyor. Betikler kaldığı yerden devam eder (`data/<deney>/olcumler.jsonl`),
+  4 parça paralel en hızlısı (`--parca k/4`); örnek komut ROADMAP "Yeni oturumda ilk işler"de. Süreç asılı kalırsa ilerleme
+  dosyasının satır sayısı artmaz: `tasklist` + günlüğe bak, gerekirse durdurup yeniden başlat (veri kaybolmaz).
 
 ## Kurallar
 - **Anahtarlar** yalnızca `.env` (ileride `secrets/vertex.json`); asla tam anahtar yazdırma (maskele), kullanıcıdan sohbete
@@ -28,9 +35,11 @@ Kullanıcı Türkçe yazar; arayüz, belgeler ve istem dışı metinler Türkçe
 - **Kalite kapısı**: bir rolde yalnızca `APPROVED` modeller (`src/llm/models.py`); kota dolunca daha zayıf modele geçilmez,
   iş bekler. Yeni model → `python -m src.qualify <model>` + kanıtıyla `APPROVED`. **Aile kuralı**: doğrulayıcı üreticiden farklı aileden.
 - **Kota pahalı**: her LLM çağrısı ücretsiz kotadan yer. Belge işleme / toplu üretim gibi büyük işleri başlatmadan önce
-  kullanıcıya söyle; yanıtlar `data/llm.sqlite`'ta önbellekli.
+  kullanıcıya söyle; yanıtlar `data/llm.sqlite`'ta önbellekli. Gemini'de **başarısız (503) istek de günlük kotadan düşer**: elle
+  sık yeniden deneme döngüsü kurma (router zaten artan sürelerle bekler). Gemma (ölçüm rolü) ayrı ve bol kotalı ama 31B bazen çok yavaş.
 - **Yasak yollar** (kullanıcı kararı / sağlayıcı kuralları): yerel LLM/GPU iş yükü (dizüstü RTX 4060), BYOK, birden çok hesap
-  ya da anahtar döndürme. İnternet hotspot: büyük indirmelerden (onlarca MB+) önce sor.
+  ya da anahtar döndürme. İnternet çoğunlukla hotspot: büyük indirmelerden (onlarca MB+) önce sor. Yerel OCR (Tesseract) ve
+  yerel ONNX modelleri (`pymupdf_layout`) indirildi ama kullanılmadan önce kullanıcı onayı ister.
 - **Veri bütünlüğü**: soru kimliği = sha1(model|soru metni)[:12]; insan kararları, çözüm kayıtları (`data/review/attempts.jsonl`)
   ve bildirimler bu kimliğe bağlı → `data/questions/*.jsonl` üzerine yazılmaz (`pipeline.merge_existing` ekler).
 - **Kod yazımı**: kaçış karakteri içeren Python kodunu bash heredoc ile yazma (`\b`, `\\` bozuldu) → Edit/Write kullan.

@@ -29,6 +29,7 @@ Hedefimiz "her soruyu doğru üreten" bir sistem değil; **hangi sorusuna güven
 - Model eğitimi / fine-tuning (hazır embedding + LLM API'leri kullanılıyor)
 - Ders dokümanı dışı genel bilgi ile soru/cevap üretimi
 - Kullanıcının dokümana serbest soru sorduğu chat modu (şimdilik kapsam dışı; mimari ileride eklenmesine engel değil)
+- El yazısı ve taranmış (yalnızca görüntü) ders notları (şimdilik; odak metinli PDF — kullanıcı kararı 2026-10-07). Taranmış sayfalar algılanıp görsel okumaya ayrılır, ama bu belge türleri ayrıca denenmez
 
 ## 3. Mimari
 
@@ -214,6 +215,9 @@ Windows, Python 3.11 sanal ortamı (`.venv`). Anahtarlar `.env` dosyasında (şa
 .venv\Scripts\python -m src.simulate --doc <belge> [--limit N]   # zorluk ölçümü: benzetilmiş öğrenci (Gemma; soru başına 5 çağrı)
 .venv\Scripts\python -m eval.zorluk_olcumu              # zorluk pilotu → eval/sonuclar_zorluk.md
 .venv\Scripts\python -m eval.turkishmmlu_zorluk         # zorluk sinyalleri ↔ gerçek öğrenci (TurkishMMLU, Gemma) → eval/sonuclar_turkishmmlu.md
+.venv\Scripts\python -m eval.kaynak_etkisi             # kaynak desteğinin cevap doğruluğuna etkisi (Belebele-TR + havuz, Gemma) → eval/sonuclar_kaynak_etkisi.md
+.venv\Scripts\python -m eval.uc_adim                   # uzman zorluk adımları ↔ sistem (MEB 3 Adım, Gemma) → eval/sonuclar_uc_adim.md
+# eval betikleri kaldığı yerden devam eder; uzun ölçümde --parca k/4 ile 4 ayrı süreç (ROADMAP "Yeni oturumda ilk işler")
 .venv\Scripts\python scripts\bekci.py [sn]              # iş ve kota izleyici (olayda çıkar)
 ```
 

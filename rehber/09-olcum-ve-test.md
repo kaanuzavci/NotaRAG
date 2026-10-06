@@ -113,6 +113,23 @@ Merdiven ve zorlaştırma soruları yalnızca kod kontrolünden geçer (LLM doğ
 - API: soru başına 6 Gemma çağrısı (ayrı ücretsiz kota); `--rapor` yeni çağrı yapmaz.
 - `--parca k/m`: örneklemi `m` sürece böler. Darboğaz dakikalık sınır değil, Gemma'nın yanıt süresi (dikkatli çözüm uzun düşünüyor; soru başına ~2,5 dk). 4 paralel süreçle 180 soru ~2 saat.
 
+### `eval/kaynak_etkisi.py` — kaynak desteğinin cevap doğruluğuna etkisi (ödev gereksinimi)
+
+**Soru:** Kaynak metin, modelin cevap doğruluğunu ne kadar değiştiriyor? Aynı soru Gemma 4 26B-A4B'ye (düşünmeden, sıcaklık 0) üç koşulda sorulur: **kaynaksız** (PROMPTS §6), **doğru kaynakla** ve **yanlış kaynakla** (başka bir sorunun kaynağı: arama yanlış sayfa getirirse; §6c).
+
+- Veri: Belebele-TR'den 300 okuduğunu anlama sorusu (insan yazımı, paragraflı) ve havuzun doğrulanmış 122 çoktan seçmeli sorusu (kaynak = sorunun üretildiği not sayfaları; sözel ve hesap ayrı).
+- Ölçüt: doğruluk (%95 Wilson aralığı); "kaynağa muhtaç" (doğru kaynakla doğru, kaynaksız yanlış) ve "yanlış kaynağın zararı" (kaynaksız doğru, yanlış kaynakla yanlış) oranları; havuzda belge ve etkin zorluğa göre.
+- Gemma 4 31B gece aşırı yüklüyken (basit çağrı 26-40 sn) cevaplayıcı 26B-A4B'ye alındı.
+- Soru başına 3 Gemma çağrısı; `--parca k/m`, `--rapor`; ölçümler `data/kaynak_etkisi/olcumler.jsonl`.
+
+### `eval/uc_adim.py` — uzman zorluk adımları ↔ sistemin sinyalleri
+
+**Soru:** MEB 3 Adım Soru Bankası'nda her konunun soruları uzmanlarca 1 → 2 → 3. adımda zorlaşır. TurkishMMLU deneyindeki sinyaller (benzetilmiş öğrenci p, çaba, LLM etiketi, `difficulty.sim_level`) bu uzman sıralamasını izliyor mu?
+
+- Soru çıkarma (kota yok): sayfa başlığından adım ve konu, satır başındaki `N.` ile soru sınırı, `A)…E)` ile şıklar; cevap anahtarı kitabın sonunda konu konu (konu adıyla eşleştirilir, sıra güvenilmez). Görsele dayanan sorular (harita, grafik, tablo, şekil…) atlanır. Tarih 629, Coğrafya 295, Felsefe 155 soru; Biyoloji'nin anahtar biçimi farklı.
+- [`_keys(doc)`](../eval/uc_adim.py#L44), [`_tests(doc)`](../eval/uc_adim.py#L77), [`extract()`](../eval/uc_adim.py#L112): çıkarma; `--cikar` yalnızca sayıları yazar.
+- Ölçüm `turkishmmlu_zorluk.measure` ile (soru başına 6 Gemma çağrısı); ders × adım başına `--n` (varsayılan 10) soru.
+
 ### `eval/retrieval_queries.json`
 
 Elle yazılmış konu sorguları ve her birinin doğru sayfaları. Sorgu türleri: Türkçe→Türkçe, Türkçe sorgu→İngilizce slayt, İngilizce→İngilizce.

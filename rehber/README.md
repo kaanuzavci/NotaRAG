@@ -24,7 +24,7 @@ Fonksiyon adları bağlantıdır; tıklayınca VS Code o satırı açar. Rehberi
 | 6 | [Doğrulama ve kalite kapısı](06-dogrulama.md) | `verification/` (4), `qualify.py` |
 | 7 | [Sınav isteği ve yardımcılar](07-sinav-istegi.md) | `topics.py`, `request.py`, `grading.py`, `review_store.py`, `export.py`, `requote.py` |
 | 8 | [Arayüz (Streamlit)](08-arayuz.md) | `ui/` (13 dosya), `cards.py` |
-| 9 | [Ölçüm, testler ve araçlar](09-olcum-ve-test.md) | `eval/` (6), `tests/` (9), `scripts/` (4) |
+| 9 | [Ölçüm, testler ve araçlar](09-olcum-ve-test.md) | `eval/` (9), `tests/` (9), `scripts/` (6) |
 | 10 | [Zorluk: iddia değil ölçüm](10-zorluk.md) | `difficulty.py`, `simulate.py` |
 
 Acele edenler için okuma sırası: bu sayfa → 1 (özellikle `pipeline.py`) → 7'deki `request.py` → 5 → 6. Bu beşi sistemin omurgasıdır; gerisi bu omurgaya hizmet eder.
