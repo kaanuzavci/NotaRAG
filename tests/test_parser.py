@@ -95,6 +95,30 @@ def test_turkish_characters_intact() -> None:
     assert "Öküzden traktöre" == page(EK, 10)["heading"]
 
 
+def test_scanned_pages_need_vision() -> None:
+    # Taranmış PDF (sayfa = tek tam sayfa görüntü, metin yok) 'ok' sanılıp bölümleyicide 'boş' diye atlanıyordu:
+    # 192 sayfalık taranmış ders kitabından hiç soru çıkmazdı. Tarayıcının sayfa başına yer imleri
+    # ('…_Sayfa_001') de başlık sanılıyordu. Dil bozuk/boş katmandan değil, sonradan belirlenmeli (2026-10-06).
+    import tempfile
+    from pathlib import Path
+
+    import pymupdf
+    src = pymupdf.open(DOCS / YZ)
+    out = pymupdf.open()
+    for i in range(4):
+        pix = src[i + 2].get_pixmap(dpi=60)
+        pg = out.new_page(width=src[i + 2].rect.width, height=src[i + 2].rect.height)
+        pg.insert_image(pg.rect, pixmap=pix)
+    out.set_toc([[1, f"Ders Notu 22.07.2015_Sayfa_{i + 1:03d}", i + 1] for i in range(4)])
+    path = Path(tempfile.gettempdir()) / "nr_taranmis_test.pdf"
+    out.save(path)
+    d = parse_pdf(path)
+    assert all(p["quality"] == "needs_vision" and "scanned" in p["flags"] for p in d["pages"]), \
+        [(p["quality"], p["flags"]) for p in d["pages"]]
+    assert all(p["heading"] is None for p in d["pages"])  # yer imi başlık değil
+    assert d["language"] == "unknown" and d["title"] == "nr_taranmis_test"
+
+
 TESTS = [v for k, v in dict(globals()).items() if k.startswith("test_")]
 
 if __name__ == "__main__":

@@ -56,7 +56,7 @@ Testler: [`tests/test_textnorm.py`](../tests/test_textnorm.py).
 
 ---
 
-## `src/ingestion/pdf_parser.py` — PDF'ten yapılandırılmış sayfalara (498 satır)
+## `src/ingestion/pdf_parser.py` — PDF'ten yapılandırılmış sayfalara (528 satır)
 
 **Ne işe yarar?** PyMuPDF ile PDF'in metin katmanını okur ve her sayfa için şunları çıkarır:
 - başlık (ve başlığın nereden bulunduğu)
@@ -103,47 +103,49 @@ Bu dosya kendisi hiçbir LLM çağırmaz. Resim olan sayfaları yalnızca `needs
 *b) Görseller ve şekiller*
 - [`_template_xrefs(doc)`](../src/ingestion/pdf_parser.py#L115): sayfaların ≥%40'ında tekrar eden görseller (slayt şablonu, logo).
 - [`_content_images(page, template)`](../src/ingestion/pdf_parser.py#L123): şablon olmayan ve sayfanın %90'ından küçük görsellerin konumları.
-- [`_figure_regions(page, images)`](../src/ingestion/pdf_parser.py#L135): görseller + vektör çizim kümeleri (diyagramlar).
-- [`_cover(rects, page)`](../src/ingestion/pdf_parser.py#L149): bu alanlar sayfanın yüzde kaçını kaplıyor?
+- [`_full_page_image(page, template)`](../src/ingestion/pdf_parser.py#L135): sayfayı (%90+) kaplayan, şablon olmayan görsel var mı? Taranmış sayfa ya da tam sayfa fotoğraf. `_content_images` bunları slayt arka planı sayıp atıyor; metin de yoksa sayfa `ok` sanılıyor, bölümleyici "boş" diye atlıyordu. 2026-10-06 testinde 192 sayfalık taranmış bir ders kitabından bu yüzden hiç soru çıkmazdı.
+- [`_figure_regions(page, images)`](../src/ingestion/pdf_parser.py#L147): görseller + vektör çizim kümeleri (diyagramlar).
+- [`_cover(rects, page)`](../src/ingestion/pdf_parser.py#L161): bu alanlar sayfanın yüzde kaçını kaplıyor?
 
 *c) Üst/alt bilgi ve sayfa numarası temizliği*
-- [`_hf_key(text)`](../src/ingestion/pdf_parser.py#L153): karşılaştırma anahtarı (küçük harf, rakamlar `#`). `"Sayfa 7"` ile `"Sayfa 8"` aynı kalıp sayılır.
-- [`_find_header_footer(pages_lines)`](../src/ingestion/pdf_parser.py#L157): belgenin ≥%40'ında (en az 3 sayfada) tekrar eden satırları bulur. Bir koşulu daha var: bulunduğu sayfalarda **en büyük yazı olmayanlar**. Bu sayede ardışık slaytlarda tekrar eden başlıklar ("Organik Tarım") silinmez.
-- [`_page_number_offset(pages_lines)`](../src/ingestion/pdf_parser.py#L309): basılı sayfa numarası ile PDF sayfa sırası arasındaki sabit farkı belge genelinde oylamayla bulur.
+- [`_hf_key(text)`](../src/ingestion/pdf_parser.py#L165): karşılaştırma anahtarı (küçük harf, rakamlar `#`). `"Sayfa 7"` ile `"Sayfa 8"` aynı kalıp sayılır.
+- [`_find_header_footer(pages_lines)`](../src/ingestion/pdf_parser.py#L169): belgenin ≥%40'ında (en az 3 sayfada) tekrar eden satırları bulur. Bir koşulu daha var: bulunduğu sayfalarda **en büyük yazı olmayanlar**. Bu sayede ardışık slaytlarda tekrar eden başlıklar ("Organik Tarım") silinmez.
+- [`_page_number_offset(pages_lines)`](../src/ingestion/pdf_parser.py#L321): basılı sayfa numarası ile PDF sayfa sırası arasındaki sabit farkı belge genelinde oylamayla bulur.
   - Eski kural her sayfada "sayfa_no ± 2" olan sayıları siliyordu; bir diyagramdaki dört `22` değeri bu yüzden silinmişti.
-- [`_page_number_line(lines, number, rect)`](../src/ingestion/pdf_parser.py#L324): o sayfada numarayı taşıyan **tek** satır (kenara en yakın aday).
-- [`_strip_split_footer(row, hf_texts)`](../src/ingestion/pdf_parser.py#L291): tablo hücrelerine bölünerek sızmış alt bilgiyi temizler (`'2 7 Novem' | '0.286 ber 2013'`).
+- [`_page_number_line(lines, number, rect)`](../src/ingestion/pdf_parser.py#L336): o sayfada numarayı taşıyan **tek** satır (kenara en yakın aday).
+- [`_strip_split_footer(row, hf_texts)`](../src/ingestion/pdf_parser.py#L303): tablo hücrelerine bölünerek sızmış alt bilgiyi temizler (`'2 7 Novem' | '0.286 ber 2013'`).
 
 *d) Paragraflar ve tablolar*
-- [`_paragraphs(lines)`](../src/ingestion/pdf_parser.py#L178): aynı bloktaki satırları `join_lines` ile paragraf yapar. PowerPoint'in ayrı bloğa koyduğu devam satırlarını (küçük harfle başlayan, önceki noktalamasız biten) birleştirir.
-- [`_tables(page, hf, pno, hf_texts)`](../src/ingestion/pdf_parser.py#L234): PyMuPDF'in `find_tables()` tablo bulucusunu işlemcide çalıştırır (GPU yok, milisaniyeler sürer). Sahte tabloları eler:
+- [`_paragraphs(lines)`](../src/ingestion/pdf_parser.py#L190): aynı bloktaki satırları `join_lines` ile paragraf yapar. PowerPoint'in ayrı bloğa koyduğu devam satırlarını (küçük harfle başlayan, önceki noktalamasız biten) birleştirir.
+- [`_tables(page, hf, pno, hf_texts)`](../src/ingestion/pdf_parser.py#L246): PyMuPDF'in `find_tables()` tablo bulucusunu işlemcide çalıştırır (GPU yok, milisaniyeler sürer). Sahte tabloları eler:
   - 2×2'den küçük olanlar
   - hücrelerinin yarısından azı dolu olanlar
   - satırlarının %40'ından fazlasında tek hücre dolu olanlar
-- [`_clean_cell(cell, hf, pno)`](../src/ingestion/pdf_parser.py#L226): hücredeki üst/alt bilgiyi ve sayfa numarasını siler. 8 satırdan uzun hücre aslında başka tabloları içine almış bir "konteyner"dır; boşaltılır.
-- [`_table_md(rows)`](../src/ingestion/pdf_parser.py#L202): tabloyu Markdown tablosuna çevirir. Hücrelerin hepsi aynı sayıda alt satır içeriyorsa satır satır açar; eşleşmeler korunur.
+- [`_clean_cell(cell, hf, pno)`](../src/ingestion/pdf_parser.py#L238): hücredeki üst/alt bilgiyi ve sayfa numarasını siler. 8 satırdan uzun hücre aslında başka tabloları içine almış bir "konteyner"dır; boşaltılır.
+- [`_table_md(rows)`](../src/ingestion/pdf_parser.py#L214): tabloyu Markdown tablosuna çevirir. Hücrelerin hepsi aynı sayıda alt satır içeriyorsa satır satır açar; eşleşmeler korunur.
 
 *e) Bozuk metin dedektörleri*
-- [`_is_noisy(text)`](../src/ingestion/pdf_parser.py#L267): satırların ≥%40'ı (en az 4 satır) "parça" mı? Parça satır, 3+ harfli en az 2 kelime içermeyen satırdır. Ya da herhangi bir satır dağılmış formül mü?
+- [`_is_noisy(text)`](../src/ingestion/pdf_parser.py#L279): satırların ≥%40'ı (en az 4 satır) "parça" mı? Parça satır, 3+ harfli en az 2 kelime içermeyen satırdır. Ya da herhangi bir satır dağılmış formül mü?
   - Tablo/formül içeren sayfalarda metin katmanı bozuk geliyor ama eskiden `ok` sayılıyordu. Bu dedektör 17 sayfa buldu; incelenen 5'in 5'i gerçekten bozuktu.
-- [`_garbled_formula(line)`](../src/ingestion/pdf_parser.py#L279): en az 6 kelime ve kelimelerin yarısından fazlası tek karakter (`'( ) nx x x ,... , 2 1'`) ise dağılmış formüldür. Yalnızca sayılardan oluşan satır (tablo satırı) formül sayılmaz.
+- [`_garbled_formula(line)`](../src/ingestion/pdf_parser.py#L291): en az 6 kelime ve kelimelerin yarısından fazlası tek karakter (`'( ) nx x x ,... , 2 1'`) ise dağılmış formüldür. Yalnızca sayılardan oluşan satır (tablo satırı) formül sayılmaz.
 
 *f) Başlık bulma (dört kaynak, öncelik sırasıyla)*
-1. [`_toc_titles(doc)`](../src/ingestion/pdf_parser.py#L331): PDF'in içindekiler listesi (yer imleri). `"Slayt 11"` gibi içeriksiz girişler atlanır.
-2. [`_visual_heading(lines, page_h)`](../src/ingestion/pdf_parser.py#L361): sayfanın üst %35'inde, gövdeden en az 1,2 kat büyük yazılmış satır(lar).
+1. [`_toc_titles(doc)`](../src/ingestion/pdf_parser.py#L343): PDF'in içindekiler listesi (yer imleri). `"Slayt 11"` gibi içeriksiz girişler atlanır. Tarayıcı yer imleri (`"B1 Ders Kitabı 22.07.2015_Sayfa_001"`, …: sayfaların ≥%80'inde bir giriş ve rakamlar dışında hepsi aynı) başlık sayılmaz; liste hiç kullanılmaz.
+2. [`_visual_heading(lines, page_h)`](../src/ingestion/pdf_parser.py#L379): sayfanın üst %35'inde, gövdeden en az 1,2 kat büyük yazılmış satır(lar).
    - Tek satırlık slaytta ≥24 punto satır başlıktır.
-   - Bulamazsa [`_top_band_heading`](../src/ingestion/pdf_parser.py#L352)'e bakar: gövdeyle aynı puntoda ama en üst %12'lik şeritteki satırlar.
+   - Bulamazsa [`_top_band_heading`](../src/ingestion/pdf_parser.py#L370)'e bakar: gövdeyle aynı puntoda ama en üst %12'lik şeritteki satırlar.
 3. Bulunamazsa önceki sayfanın başlığı devralınır (`heading_source = "inherited"`).
-4. [`_body_size(pages_lines)`](../src/ingestion/pdf_parser.py#L341) belgenin baskın gövde yazı boyutunu verir (karakter sayısıyla ağırlıklı medyan). Başlık ve etiket kararlarında ölçü olarak kullanılır.
+4. [`_body_size(pages_lines)`](../src/ingestion/pdf_parser.py#L359) belgenin baskın gövde yazı boyutunu verir (karakter sayısıyla ağırlıklı medyan). Başlık ve etiket kararlarında ölçü olarak kullanılır.
 
-**Ana fonksiyon: [`parse_pdf(path)`](../src/ingestion/pdf_parser.py#L382)**
-1. Bütün sayfaların satırlarını oku, belge genelinde üst/alt bilgi kalıplarını, içindekileri, şablon görselleri, gövde boyutunu ve sayfa numarası farkını hesapla.
+**Ana fonksiyon: [`parse_pdf(path)`](../src/ingestion/pdf_parser.py#L400)**
+1. Dosya gerçekten PDF mi? (PyMuPDF HTML/metin de açıyor; `.pdf` adlı bir hata sayfası "1 sayfalık belge" sanılıyordu → `ValueError`.) Sonra bütün sayfaların satırlarını oku, belge genelinde üst/alt bilgi kalıplarını, içindekileri, şablon görselleri, gövde boyutunu ve sayfa numarası farkını hesapla.
 2. Her sayfa için:
    - sayfa numarası satırını ve üst/alt bilgiyi at (`removed_lines`);
    - başlığı bul;
    - kısa ve küçük yazılmış ya da şeklin üstünde duran satırları **şekil etiketi** (`figure_text`) olarak ayır. Bunlar silinmez, gövdeye de karışmaz.
 3. Gövde bozuksa (`_is_noisy`): önce tabloyu işlemcide çıkarmayı dene, tablo alanındaki dağınık satırları metinden düş.
 4. Kaliteye karar ver:
+   - taranmış sayfa (metin <80 karakter ve sayfayı kaplayan görsel, `_full_page_image`) → `needs_vision` + `scanned`; kapak kuralından önce gelir, çünkü taranmış notun 1. sayfası çoğu zaman içeriktir;
    - kapak (ilk sayfa, <300 karakter) → `ok` + `title_page`;
    - hâlâ bozuk → `needs_vision` + `noisy_text`;
    - yeterli metin → `ok`;
@@ -151,12 +153,14 @@ Bu dosya kendisi hiçbir LLM çağırmaz. Resim olan sayfaları yalnızca `needs
    - hiç metin yok → `empty`.
 5. Bayraklar: içindekiler benzeri sayfa (`toc_like`: satırların ≥%80'i kısa numaralı başlık), görsel ağırlıklı sayfa (`image_heavy`).
 6. Bütün sayfalar bitince satır sonu tirelerini **belge düzeyinde** çöz (`resolve_hyphens`), belge dilini ve başlığını belirle.
+   - Dil yalnızca `ok` sayfalardan hesaplanır. Taranmış notun bozuk OCR katmanı (`'rmuuumvmuuıuuuuuııui'`) Türkçe el yazısını `en` gösteriyordu, sorular İngilizce üretilirdi. Hiç sağlam sayfa yoksa dil `unknown` olur; görsel okumadan sonra `vision.apply_cached_vision` yeniden belirler.
+   - İlk sayfa görsel okuma bekliyorsa (taranmış ya da bozuk) başlık dosya adıdır.
 
 Testler: [`tests/test_parser.py`](../tests/test_parser.py). Her test bulunmuş bir hatayı sabitler.
 
 ---
 
-## `src/ingestion/vision.py` — resim olan sayfaları okuma (145 satır)
+## `src/ingestion/vision.py` — resim olan sayfaları okuma (150 satır)
 
 **Ne işe yarar?** `needs_vision` işaretli sayfaları 150 dpi JPEG'e çevirir ve görsel modele (Gemini, yedeği qwen) **PROMPTS.md §1** ile okutur. Sonucu önbelleğe yazar. Her sayfa yalnızca bir kez gönderilir.
 
@@ -181,6 +185,7 @@ Testler: [`tests/test_parser.py`](../tests/test_parser.py). Her test bulunmuş b
   - `text` = görsel okuma (snap + repair'den geçmiş);
   - eski metin `text_layer` alanına taşınır;
   - `source = "vision"`, `quality = "ok"`.
+  - Sonra belge dili görsel okunan sayfalar dahil yeniden hesaplanır (taranmış belgede okuma öncesi `unknown` ya da yanlıştı).
 
 ---
 

@@ -169,6 +169,8 @@ def run(name: str, output_language: str | None = None) -> list[dict]:
           flush=True)
 
     lang = output_language or json.loads(parsed_path.read_text(encoding="utf-8"))["language"]
+    if lang not in ("tr", "en"):  # dil anlaşılamadı (taranmış, görsel okuma bekleyen belge): arayüz dili
+        lang = "tr"
     units = build_units(pdf.stem)
     print(f"5/6 soru üretimi: {len(units)} birim, çıktı dili {lang}", flush=True)
     items = _generate(units, lang)

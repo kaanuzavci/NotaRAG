@@ -142,4 +142,9 @@ def apply_cached_vision(parsed_path: Path, pdf: Path) -> None:
             p["source"] = "vision"
             p["vision_model"] = _models().get(cache.name, _FIRST_RUN_MODEL)
             p["quality"] = "ok"
+    # Dil görsel okunan sayfalar dahil yeniden: taranmış belgede okuma öncesi metin yok ya da bozuk ('unknown' / yanlış)
+    from src.textnorm import detect_language
+    lang = detect_language(" ".join(p["text"] for p in parsed["pages"] if p["quality"] == "ok"))
+    if lang != "unknown":
+        parsed["language"] = lang
     parsed_path.write_text(json.dumps(parsed, ensure_ascii=False, indent=2), encoding="utf-8")

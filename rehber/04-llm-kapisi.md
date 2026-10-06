@@ -2,7 +2,7 @@
 
 [← 3. Bölümleme ve arama](03-bolumleme-ve-arama.md) · [Ana sayfa](README.md) · Sonraki: [5. Soru üretimi →](05-uretim.md)
 
-Projede bir LLM'e giden **her** istek tek bir fonksiyondan geçer: [`router.call(rol, istem)`](../src/llm/router.py#L269). Embedding tek istisnadır; `embedder.py` kendi isteğini atar. Bu katman dört dosyadan oluşur:
+Projede bir LLM'e giden **her** istek tek bir fonksiyondan geçer: [`router.call(rol, istem)`](../src/llm/router.py#L275). Embedding tek istisnadır; `embedder.py` kendi isteğini atar. Bu katman dört dosyadan oluşur:
 
 | Dosya | Sorusu |
 |---|---|
@@ -123,7 +123,7 @@ Neden `calls` tablosuna yeni sütun eklenmedi? O sırada çalışan eski süreç
 
 ---
 
-## `src/llm/router.py` — tek kapı (349 satır)
+## `src/llm/router.py` — tek kapı (355 satır)
 
 **Ne işe yarar?** `call(rol, istem, ...)` rolün model zincirini sırayla dener. Önbelleğe bakar, kotayı denetler, sağlayıcıya göre doğru API'yi çağırır, hatayı sınıflandırır ve sonucu kaydeder. Hiçbir model cevap veremezse `AllModelsExhausted` fırlatır.
 
@@ -143,22 +143,22 @@ Neden `calls` tablosuna yeni sütun eklenmedi? O sırada çalışan eski süreç
   - `_throttle`: tek `Throttle` nesnesi.
   - `_clients`: sağlayıcı istemcileri ilk kullanımda kurulup saklanır.
   - `_last_usage`: son çağrının gerçek token sayısı (`tokens`), istem önbelleğinden okunan kısmı (`cached`) ve düşünme token'ı (`thoughts`).
-- [`_gemini()`](../src/llm/router.py#L59) / [`_groq()`](../src/llm/router.py#L66): istemcileri tembel kurar. `max_retries=0` ile Groq kütüphanesinin kendi tekrar denemesi kapatılır; tekrar politikası bizim.
-- [`_OPENAI_COMPAT`](../src/llm/router.py#L74): OpenAI uyumlu sağlayıcılar (OpenRouter, Cerebras) → (adres, anahtar).
-- [`has_key(model)`](../src/llm/router.py#L82): sağlayıcının anahtarı `.env`'de var mı? Yoksa model zincirde atlanır.
+- [`_gemini()`](../src/llm/router.py#L60) / [`_groq()`](../src/llm/router.py#L72): istemcileri tembel kurar. `max_retries=0` ile Groq kütüphanesinin kendi tekrar denemesi kapatılır; tekrar politikası bizim. Gemini istemcisine 10 dakikalık zaman aşımı verilir (`GEMINI_TIMEOUT_MS`): yoksa kopan bağlantıda çağrı sonsuza dek asılı kalıyordu (2026-10-06: ağ değişince dört ölçüm süreci 25 dakika hiçbir şey yazmadan bekledi). Aşılınca hata `network` sayılır.
+- [`_OPENAI_COMPAT`](../src/llm/router.py#L80): OpenAI uyumlu sağlayıcılar (OpenRouter, Cerebras) → (adres, anahtar).
+- [`has_key(model)`](../src/llm/router.py#L88): sağlayıcının anahtarı `.env`'de var mı? Yoksa model zincirde atlanır.
 - Üç sağlayıcı fonksiyonu (hepsi düz metin döndürür):
-  - [`_call_openai_compat`](../src/llm/router.py#L92): `httpx` ile `/chat/completions` isteği atar (ek kütüphane yok). Görüntü base64 olarak eklenir.
+  - [`_call_openai_compat`](../src/llm/router.py#L98): `httpx` ile `/chat/completions` isteği atar (ek kütüphane yok). Görüntü base64 olarak eklenir.
     - Nemotron'da JSON modu kapatılır: o modda cevap yazamadan sınıra dayanıyordu.
     - gpt-oss'ta `reasoning_effort` (`effort` parametresi, `models.reasoning`'den) ayarlanır.
     - `<think>…</think>` blokları silinir.
     - Yanıttaki `cached_tokens` değeri `_last_usage`'a yazılır.
-  - [`_call_gemini`](../src/llm/router.py#L129): `generate_content` çağırır. JSON modunda `response_mime_type`; gemini-2.5'te "düşünme" kapalı (`thinking_budget=0`). `think` verilirse düşünme düzeyi (`thinking_level`) ayarlanır: Gemma 4 `minimal` (düşünmeden cevap) ya da `high` kabul ediyor; düşünme bütçesi desteklemiyor. Düşünme token'ı `_last_usage`'a yazılır.
-  - [`_call_groq`](../src/llm/router.py#L148): Groq sohbet API'si.
+  - [`_call_gemini`](../src/llm/router.py#L135): `generate_content` çağırır. JSON modunda `response_mime_type`; gemini-2.5'te "düşünme" kapalı (`thinking_budget=0`). `think` verilirse düşünme düzeyi (`thinking_level`) ayarlanır: Gemma 4 `minimal` (düşünmeden cevap) ya da `high` kabul ediyor; düşünme bütçesi desteklemiyor. Düşünme token'ı `_last_usage`'a yazılır.
+  - [`_call_groq`](../src/llm/router.py#L154): Groq sohbet API'si.
     - gpt-oss gizli akıl yürütme token'ları da harcadığı için en az 2000 token sınırı verilir; düzeyi `effort` belirler.
     - Groq'un istem önbelleğinden okuduğu token'lar kaydedilir.
-- [`_valid_json(text)`](../src/llm/router.py#L171): yanıt ayrıştırılabilir **ve boş olmayan** bir JSON mu? Yarıda kesilmiş ya da `{}` olan yanıt önbelleğe alınmaz; yoksa bozuk cevap her seferinde geri gelirdi.
-- [`parse_wait(s)`](../src/llm/router.py#L180): hata mesajındaki "try again in 10m28.992s" ifadesini saniyeye çevirir.
-- [`_classify(err)`](../src/llm/router.py#L189): hatayı türüne ayırır.
+- [`_valid_json(text)`](../src/llm/router.py#L177): yanıt ayrıştırılabilir **ve boş olmayan** bir JSON mu? Yarıda kesilmiş ya da `{}` olan yanıt önbelleğe alınmaz; yoksa bozuk cevap her seferinde geri gelirdi.
+- [`parse_wait(s)`](../src/llm/router.py#L186): hata mesajındaki "try again in 10m28.992s" ifadesini saniyeye çevirir.
+- [`_classify(err)`](../src/llm/router.py#L195): hatayı türüne ayırır.
 
   | Tür | Nasıl anlaşılır | Ne yapılır |
   |---|---|---|
@@ -169,12 +169,12 @@ Neden `calls` tablosuna yeni sütun eklenmedi? O sırada çalışan eski süreç
   | `missing` | 404 | Model yok → bugün kapat |
   | `json` | `json_validate_failed` | Token sınırını 3 katına çıkarıp 1 kez tekrar |
   | `other` | Diğer | Hatayı yukarı fırlat (beklenmeyen hata gizlenmez) |
-- [`_sync_used(model, err)`](../src/llm/router.py#L215): Groq TPD hatasındaki gerçek kullanımı deftere işler. Önce ölçüm için `record_sync`, sonra kaydımız eksikse `record_correction`.
-- [`_busy_rpd(model)`](../src/llm/router.py#L234): Gemini'de 503 "yoğun" yanıtı da günlük istek kotasından düşüyor (2026-10-06: 0 başarılı istek, ~20 yoğunluk denemesi → Google iki modeli de "günlük kota doldu" diye kapattı). Bu yüzden Gemini'nin günlük istek sınırlı modelinde yoğunluk olunca deneme sayaca yazılır (kapasite raporu Google'ınkiyle aynı kalsın), model hemen yeniden sorulmaz ve artan sürelerle kapatılır (`BUSY_COOLDOWN` = 15 dk, her ardışık yoğunlukta iki katı, en çok 120 dk). Başarılı çağrı sayacı (`_busy_streak`) sıfırlar. Groq ve Gemma'da eski davranış: 20 sn bekleyip bir kez daha.
-- [`_block(model, kind, wait)`](../src/llm/router.py#L246): kota hatasından sonra modeli kapatır. Süreli bekleme (`set_cooldown`) ya da günün geri kalanı (`mark_exhausted`).
-- [`_raw(model, prompt, image, ...)`](../src/llm/router.py#L254): tek bir modele tek çağrı. Önce `Throttle.wait`, sonra görüntü desteği kontrolü, sonra sağlayıcıya göre doğru fonksiyon.
+- [`_sync_used(model, err)`](../src/llm/router.py#L221): Groq TPD hatasındaki gerçek kullanımı deftere işler. Önce ölçüm için `record_sync`, sonra kaydımız eksikse `record_correction`.
+- [`_busy_rpd(model)`](../src/llm/router.py#L240): Gemini'de 503 "yoğun" yanıtı da günlük istek kotasından düşüyor (2026-10-06: 0 başarılı istek, ~20 yoğunluk denemesi → Google iki modeli de "günlük kota doldu" diye kapattı). Bu yüzden Gemini'nin günlük istek sınırlı modelinde yoğunluk olunca deneme sayaca yazılır (kapasite raporu Google'ınkiyle aynı kalsın), model hemen yeniden sorulmaz ve artan sürelerle kapatılır (`BUSY_COOLDOWN` = 15 dk, her ardışık yoğunlukta iki katı, en çok 120 dk). Başarılı çağrı sayacı (`_busy_streak`) sıfırlar. Groq ve Gemma'da eski davranış: 20 sn bekleyip bir kez daha.
+- [`_block(model, kind, wait)`](../src/llm/router.py#L252): kota hatasından sonra modeli kapatır. Süreli bekleme (`set_cooldown`) ya da günün geri kalanı (`mark_exhausted`).
+- [`_raw(model, prompt, image, ...)`](../src/llm/router.py#L260): tek bir modele tek çağrı. Önce `Throttle.wait`, sonra görüntü desteği kontrolü, sonra sağlayıcıya göre doğru fonksiyon.
 
-**Ana fonksiyon: [`call(role, prompt, image, json_mode, max_tokens, temperature, use_cache, think)`](../src/llm/router.py#L269)**
+**Ana fonksiyon: [`call(role, prompt, image, json_mode, max_tokens, temperature, use_cache, think)`](../src/llm/router.py#L275)**
 1. `chain = ROLES[role]`: bu rolün modelleri. `effort = reasoning(role)`: akıl yürütme düzeyi.
    - Düzey varsayılandan (`medium`) farklıysa önbellek anahtarına eklenir. Yoksa `low` denemesi eski `medium` yanıtlarını önbellekten okuyup sahte sonuç verirdi.
    - Varsayılanda eklenmez; böylece `llm.sqlite`'taki eski yanıtların anahtarı değişmez.

@@ -54,12 +54,18 @@ _clients: dict[str, object] = {}
 # cached: sağlayıcının istem önbelleğinden okuduğu giriş token'ları (tokens'ın içinde; ledger.prompt_cache).
 # thoughts: düşünme token'ları (zorluk ölçümünde "gereken çaba" sinyali, src/simulate.py)
 _last_usage: dict[str, int] = {"tokens": 0, "cached": 0, "thoughts": 0}
+GEMINI_TIMEOUT_MS = 600_000
 
 
 def _gemini():
     if "gemini" not in _clients:
         from google import genai
-        _clients["gemini"] = genai.Client(api_key=config.GEMINI_API_KEY)
+        # Zaman aşımı şart: yoksa kopan bağlantıda çağrı sonsuza dek asılı kalıyor (2026-10-06: ağ değişince dört
+        # ölçüm süreci 25 dk hiçbir şey yazmadan bekledi). 10 dk: düşünmeli uzun üretim çağrısına yeter.
+        # Aşılınca httpx ReadTimeout → 'network' → kısa bekleme, bir kez daha, sonra sıradaki model.
+        from google.genai import types
+        _clients["gemini"] = genai.Client(api_key=config.GEMINI_API_KEY,
+                                          http_options=types.HttpOptions(timeout=GEMINI_TIMEOUT_MS))
     return _clients["gemini"]
 
 

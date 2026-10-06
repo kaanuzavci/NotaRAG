@@ -26,7 +26,7 @@ Bu bölüm dört dosyayı ve bir istem dosyasını anlatıyor:
 - [Satır 9 `load_dotenv(...)`](../src/config.py#L9): `.env` dosyasındaki `ANAHTAR=değer` satırlarını ortam değişkenlerine yükler.
 - [Satır 11-15](../src/config.py#L11): `GROQ_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `CEREBRAS_API_KEY`.
   - `os.getenv("X", "")` değişken yoksa boş metin döndürür; program çökmez.
-  - Anahtarı olmayan sağlayıcının modelleri [`router.has_key`](../src/llm/router.py#L82) tarafından atlanır.
+  - Anahtarı olmayan sağlayıcının modelleri [`router.has_key`](../src/llm/router.py#L88) tarafından atlanır.
 - [Satır 19-22](../src/config.py#L19): `DATA_DIR` (`data/`), `PARSED_DIR` (`data/parsed/`), `VISION_CACHE_DIR` (`data/vision_cache/`), `VISION_DPI = 150` (görsel okuma için sayfa görüntüsünün çözünürlüğü).
 - [Satır 25 `DOC_NAMES`](../src/config.py#L26): dosya adı → ekranda görünen kısa ad (ör. `"english"` → `"Genetic Algorithms"`).
 - [Satır 31 `doc_name(stem)`](../src/config.py#L32): kısa adı döndürür. Listede olmayan (arayüzden yeni yüklenmiş) belgede alt çizgileri boşluğa çevirir.
@@ -124,7 +124,7 @@ Bu iki ifadeyi PROMPTS.md'de değiştirirsen kural ekleme sessizce çalışmaz y
 Adım adım ne yaptığı (konsola yazdığı `1/6 ...` satırları arayüzdeki ilerleme çubuğunu da besler):
 
 1. **PDF'i bul.** `data/sample_docs/` içinde adı ya da kök adı eşleşen dosya.
-2. **`1/6 PDF okuma`.** [`parse_pdf`](../src/ingestion/pdf_parser.py#L382) PDF'i okur, sonuç `data/parsed/<belge>.json`'a yazılır. Hemen ardından [`apply_cached_vision`](../src/ingestion/vision.py#L131) daha önce görselden okunmuş sayfaları önbellekten geri koyar. Yeniden ayrıştırma bu sayfaların okumasını kaybetmesin diye yapılır.
+2. **`1/6 PDF okuma`.** [`parse_pdf`](../src/ingestion/pdf_parser.py#L400) PDF'i okur, sonuç `data/parsed/<belge>.json`'a yazılır. Hemen ardından [`apply_cached_vision`](../src/ingestion/vision.py#L131) daha önce görselden okunmuş sayfaları önbellekten geri koyar. Yeniden ayrıştırma bu sayfaların okumasını kaybetmesin diye yapılır.
 3. **`2/6 görsel okuma`.** [`_vision_until_done`](../src/pipeline.py#L110) yalnızca henüz okunmamış resim sayfalarını okutur; kota biterse bekler.
 4. **`3/6 bölümleme`.** [`chunking.__main__.main`](../src/chunking/__main__.py#L17) **bütün** ayrıştırılmış belgeleri yeniden parçalar ve `chunks.jsonl` / `sections.jsonl` dosyalarını baştan yazar. Yereldir, hızlıdır.
 5. **`4/6 dizin`.**
@@ -163,7 +163,7 @@ Adım adım ne yaptığı (konsola yazdığı `1/6 ...` satırları arayüzdeki 
   3. `new`: kimliği (`question_id`) eskilerde olmayan yeni sorular. Önbellekten aynen gelenler zaten aynı kimliği taşıdığı için elenir. [`mark_duplicates(new, keep=kept)`](../src/verification/checks.py#L203) eskilerin tekrarı olan yenileri reddeder; böylece tekrarlar doğrulamaya gidip kota harcamaz.
 
   Bu fonksiyon 2026-10-05'te bulunan bir hatayı düzeltiyor: eskiden `run` dosyanın üzerine yazıyordu ve doğrulanmış sorular, onlara bağlı kararlarla birlikte kaybolacaktı. Test: [`tests/test_pipeline.py`](../tests/test_pipeline.py).
-- [`run_all(output_language)`](../src/pipeline.py#L201): `--hepsi` ile klasördeki bütün PDF'leri sırayla işler. Soru dosyası PDF'ten yeniyse belgeyi "zaten işlenmiş" sayıp atlar. Her belgeden sonra [`doc_cost`](../src/llm/capacity.py#L39) ile tahmini token maliyetini basar.
+- [`run_all(output_language)`](../src/pipeline.py#L203): `--hepsi` ile klasördeki bütün PDF'leri sırayla işler. Soru dosyası PDF'ten yeniyse belgeyi "zaten işlenmiş" sayıp atlar. Her belgeden sonra [`doc_cost`](../src/llm/capacity.py#L39) ile tahmini token maliyetini basar.
 - [`if __name__ == "__main__"`](../src/pipeline.py#L229): komut satırı argümanlarını okur.
 
 **Neden içe aktarmalar fonksiyonların içinde?** `request.py` bu dosyayı yalnızca `patient` için içe aktarır. Üstte `pymupdf`, `chromadb` gibi ağır kütüphaneler olsaydı sınav isteği gereksiz yere hepsini yüklerdi. Fonksiyon içi içe aktarma bu yükü yalnızca `run` çalışınca öder.

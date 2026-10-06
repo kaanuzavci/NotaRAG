@@ -132,6 +132,18 @@ def _content_images(page: pymupdf.Page, template: set[int]) -> list[pymupdf.Rect
     return rects
 
 
+def _full_page_image(page: pymupdf.Page, template: set[int]) -> bool:
+    """Sayfayı kaplayan, şablon olmayan görsel: taranmış sayfa ya da tam sayfa fotoğraf. _content_images bunları
+    slayt arka planı sayıp atıyor; metni de yoksa sayfa 'ok' sanılıyor, bölümleyici 'boş' diye atlıyordu → taranmış
+    PDF sessizce hiç soru üretmiyordu (taranmış ders kitabı, 192 sayfanın 192'si, 2026-10-06)."""
+    rot, area = page.rotation_matrix, page.rect.get_area()
+    for xref in {img[0] for img in page.get_images(full=True)} - template:
+        for r in page.get_image_rects(xref):
+            if ((r * rot) & page.rect).get_area() >= BACKGROUND_COVER * area:
+                return True
+    return False
+
+
 def _figure_regions(page: pymupdf.Page, images: list[pymupdf.Rect]) -> list[pymupdf.Rect]:
     """İçerik görselleri + vektör çizim kümeleri (diyagramlar)."""
     rot, area = page.rotation_matrix, page.rect.get_area()
@@ -329,12 +341,18 @@ def _page_number_line(lines: list[Line], number: int, rect: pymupdf.Rect) -> Lin
 
 
 def _toc_titles(doc: pymupdf.Document) -> dict[int, str]:
-    """İçindekiler listesinden sayfa → başlık. 'Slayt 11' gibi içeriksiz girişler atlanır."""
+    """İçindekiler listesinden sayfa → başlık. 'Slayt 11' gibi içeriksiz girişler atlanır.
+    Tarayıcı yer imleri ('B1 Ders Kitabı 22.07.2015_Sayfa_001', …: hemen her sayfada bir giriş, yalnızca numara
+    değişiyor) başlık değildir → hiç kullanılmaz (taranmış ders kitabı, 2026-10-06)."""
     titles = {}
     for _lvl, title, pno in doc.get_toc():
         t = clean_line(re.sub(r"^\s*(Slayt|Slide)\s*\d+\s*:?", "", title, flags=re.I))
         if len(t) >= 3 and pno not in titles:
             titles[pno] = t
+    if doc.page_count >= 3 and len(titles) >= 0.8 * doc.page_count:
+        keys = Counter(re.sub(r"\d+", "#", t) for t in titles.values())
+        if keys.most_common(1)[0][1] >= 0.8 * len(titles):
+            return {}
     return titles
 
 
@@ -382,6 +400,8 @@ def _visual_heading(lines: list[Line], page_h: float) -> tuple[str | None, set[i
 def parse_pdf(path: str | Path) -> dict:
     path = Path(path)
     doc = pymupdf.open(path)
+    if not doc.is_pdf:  # PyMuPDF HTML/metin de açıyor: '.pdf' adlı bir hata sayfası '1 sayfalık belge' sanılıyordu
+        raise ValueError(f"{path.name} bir PDF değil (biçim: {doc.metadata.get('format') or 'bilinmiyor'})")
     pages_lines = [_visual_lines(p) for p in doc]
     hf = _find_header_footer(pages_lines)
     toc = _toc_titles(doc)
@@ -445,7 +465,12 @@ def parse_pdf(path: str | Path) -> dict:
             r.get_area() >= FIGURE_MIN_COVER * area for r in figs)
 
         flags = []
-        if pno == 1 and 0 < n_chars < TITLE_PAGE_MAX_CHARS:
+        scanned = len(text) < MIN_TEXT_CHARS and _full_page_image(page, template)
+        if scanned:
+            # Taranmış sayfa: kapak olsa bile içeriği görselden okunmadan bilinmez (taranmış notun 1. sayfası çoğu
+            # zaman içerik) → görsel okuma
+            quality, flags = "needs_vision", ["scanned"]
+        elif pno == 1 and 0 < n_chars < TITLE_PAGE_MAX_CHARS:
             # kapak: ders adı, hoca, üniversite, e-posta → soru malzemesi değil, görsel okumaya da gerek yok
             quality, flags = "ok", ["title_page"]
         elif len(text) >= MIN_TEXT_CHARS and _is_noisy(prose):
@@ -478,20 +503,25 @@ def parse_pdf(path: str | Path) -> dict:
             flags=flags, removed_lines=removed,
         ))
 
-    all_text = " ".join(r.text for r in results)
+    # Dil ve başlık yalnızca sağlam sayfalardan: taranmış notun bozuk OCR katmanı ('rmuuumvmuuıuuuuuııui') Türkçe el
+    # yazısını 'en' gösteriyordu → sorular İngilizce üretilirdi (2026-10-06). Görsel okumadan sonra dil yeniden
+    # belirlenir (vision.apply_cached_vision).
+    clean = " ".join(r.text for r in results if r.quality == "ok")
     # Satır sonu tireleri belge düzeyinde: 'bü‐tün' → 'bütün' (belgede birleşik yazımı varsa), 'meta-sezgisel' kalır
-    lang = detect_language(all_text)
+    lang = detect_language(clean)
     fields = [(r, f) for r in results for f in ("text", "heading", "figure_text")]
     for (r, f), v in zip(fields, resolve_hyphens([getattr(r, f) or "" for r, f in fields], lang)):
         if getattr(r, f):
             setattr(r, f, v)
-    all_text = " ".join(r.text for r in results)
+    clean = " ".join(r.text for r in results if r.quality == "ok")
     first = [ln for ln in pages_lines[0] if _hf_key(ln.text) not in hf] if pages_lines else []
+    if results and results[0].quality == "needs_vision":
+        first = []  # kapak taranmış ya da metni bozuk: başlık dosya adından
     title = max(first, key=lambda ln: ln.size).text if first else path.stem
     return {
         "file": path.name,
         "title": title,
-        "language": detect_language(all_text),
+        "language": detect_language(clean),
         "n_pages": doc.page_count,
         "header_footer_patterns": sorted(hf),
         "pages": [asdict(r) for r in results],
