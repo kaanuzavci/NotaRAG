@@ -184,6 +184,12 @@ Tasarım değişikliği kullanıcıya gösterilmeden önce ekran görüntüsüyl
 
 ---
 
+## `scripts/ogm_indir.py` ve `scripts/auad_indir.py` — deney verisi indirme
+
+İnternet varken bir kez çalıştırılan geliştirme araçları; indirdikleri `data/kaynak_veri/`'ye gider (depoya girmez; içerik ve kaynaklar `data/kaynak_veri/BENIOKU.md`'de).
+- `ogm_indir.py`: MEB OGM Materyal'in ön yüz paketinden çıkarılan katalogdan seçili koleksiyonları indirir (MEBİ konu özetleri, 3 Adım soru bankası, kazanım kavrama, tarama, 2024 denemeleri). 3 paralel indirme, yarım kalan dosya `.part`, PDF olmayan yanıt atılır.
+- `auad_indir.py`: Ankara Üniversitesi Açık Ders (Moodle, girişsiz) — 12 fakülteden rastgele (sabit tohum) derslerin ilk haftalarının yalnızca PDF notları. İstekler sırayla ve 1 sn aralıklı.
+
 ## `scripts/rehber_satirlari.py` — bu rehberin bakımı
 
 **Ne işe yarar?** Rehberdeki fonksiyon bağlantılarının (ör. ``[`ad`](…/dosya.py#L42)``) satır numaralarını koda göre düzeltir. Kod değiştikçe fonksiyonlar aşağı yukarı kayar; bu betik sayesinde bağlantılar doğru satırı göstermeye devam eder.
