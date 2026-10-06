@@ -523,6 +523,23 @@ Options: A) {option_a}  B) {option_b}  C) {option_c}  D) {option_d}
 Respond with JSON only: {"choice": "A|B|C|D"}
 ```
 
+### 6c. Answer with a given context (source-support experiment)
+
+Used by `eval/kaynak_etkisi.py` together with §6 to measure the effect of source support on answer accuracy (the assignment requirement): the same question is answered without a source (§6), with its correct source, and with an unrelated source (what happens when retrieval brings the wrong page). The model is told to fall back on its own knowledge when the context does not help, so a wrong context measures harm, not refusal.
+
+```
+Answer the multiple-choice question using the context below. If the context
+does not help, still pick the most likely option.
+
+Context:
+{context}
+
+Question: {question}
+Options: A) {option_a}  B) {option_b}  C) {option_c}  D) {option_d}
+
+Respond with JSON only: {"choice": "A|B|C|D"}
+```
+
 ---
 
 ## 7. Topic map (study topics for the exam builder)
