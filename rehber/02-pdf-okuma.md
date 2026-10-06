@@ -152,7 +152,7 @@ Bu dosya kendisi hiçbir LLM çağırmaz. Resim olan sayfaları yalnızca `needs
    - yeterli metin → `ok`;
    - az metin + büyük görsel → `needs_vision`;
    - hiç metin yok → `empty`.
-5. Bayraklar: içindekiler benzeri sayfa (`toc_like`: satırların ≥%80'i kısa numaralı başlık), görsel ağırlıklı sayfa (`image_heavy`).
+5. Bayraklar: içindekiler benzeri sayfa (`toc_like`: satırların ≥%80'i kısa numaralı başlık), görsel ağırlıklı sayfa (`image_heavy`), taranıp OCR'lanmış sayfa (`ocr_layer`: sayfayı kaplayan görüntünün üstünde metin var; bu metin PDF'ten birebir gelmez, OCR tahminidir).
 6. Bütün sayfalar bitince satır sonu tirelerini **belge düzeyinde** çöz (`resolve_hyphens`), belge dilini ve başlığını belirle.
    - Dil yalnızca `ok` sayfalardan hesaplanır. Taranmış notun bozuk OCR katmanı (`'rmuuumvmuuıuuuuuııui'`) Türkçe el yazısını `en` gösteriyordu, sorular İngilizce üretilirdi. Hiç sağlam sayfa yoksa dil `unknown` olur; görsel okumadan sonra `vision.apply_cached_vision` yeniden belirler.
    - İlk sayfa görsel okuma bekliyorsa (taranmış ya da bozuk) başlık dosya adıdır.
@@ -176,13 +176,13 @@ Testler: [`tests/test_parser.py`](../tests/test_parser.py). Her test bulunmuş b
 - [`_render(pdf, page)`](../src/ingestion/vision.py#L38): sayfayı JPEG baytlarına çevirir.
 - [`pending_pages(parsed, pdf)`](../src/ingestion/vision.py#L43): `needs_vision` olup önbellekte henüz olmayan sayfalar.
 - [`estimate_upload_bytes(pdf, pages)`](../src/ingestion/vision.py#L49): gönderilecek toplam boyut. Mobil internet için önce sorulur.
-- [`_text_layer(page)`](../src/ingestion/vision.py#L53): ayrıştırıcının o sayfadan çıkardığı (bozuk da olsa) metin. İsteme **yazım ipucu** olarak eklenir; model kelimeleri doğru yazsın diye.
-- [`run_vision(parsed_path, pdf)`](../src/ingestion/vision.py#L60): bekleyen her sayfa için `call("vision", istem, image=...)` çağırır ve sonucu önbelleğe yazar.
+- [`_text_layer(page)`](../src/ingestion/vision.py#L53): ayrıştırıcının o sayfadan çıkardığı (bozuk da olsa) metin. İsteme **yazım ipucu** olarak eklenir; model kelimeleri doğru yazsın diye. `ocr_layer` sayfasında `(empty)` döner: OCR katmanı tahmindir (el yazısında çöp), ne ipucu ne de `snap_to_text_layer` için yazım otoritesi olur ("ΔT" doğru okuması "AT" katmanına çekilmesin).
+- [`run_vision(parsed_path, pdf)`](../src/ingestion/vision.py#L63): bekleyen her sayfa için `call("vision", istem, image=...)` çağırır ve sonucu önbelleğe yazar.
   - Bütün görsel modellerin kotası doluysa (`AllModelsExhausted`) o ana kadar okunanları uygular ve `False` döner. `pipeline._vision_until_done` bekleyip tekrar çağırır.
-- [`snap_to_text_layer(md, layer)`](../src/ingestion/vision.py#L85): görsel modelin satırı metin katmanındaki bir satıra ≥%88 benziyor ama aynı değilse, satırı metin katmanının yazımıyla değiştirir.
+- [`snap_to_text_layer(md, layer)`](../src/ingestion/vision.py#L88): görsel modelin satırı metin katmanındaki bir satıra ≥%88 benziyor ama aynı değilse, satırı metin katmanının yazımıyla değiştirir.
   - Metin katmanı PDF'ten birebir geldiği için yazımda otoritedir; görsel model `"çöpe gidiyor"` yerine `"çöp gidiyor"` yazabilir.
-- [`repair_from_layer(md, layer)`](../src/ingestion/vision.py#L105): eski önbellek kayıtlarındaki bozuk üs ve tire yazımlarını düzeltilmiş metin katmanından onarır. Yeni istek atmaz, kota harcamaz.
-- [`apply_cached_vision(parsed_path, pdf)`](../src/ingestion/vision.py#L131): internetsiz çalışır. Önbellekteki okumaları JSON'a yazar:
+- [`repair_from_layer(md, layer)`](../src/ingestion/vision.py#L108): eski önbellek kayıtlarındaki bozuk üs ve tire yazımlarını düzeltilmiş metin katmanından onarır. Yeni istek atmaz, kota harcamaz.
+- [`apply_cached_vision(parsed_path, pdf)`](../src/ingestion/vision.py#L134): internetsiz çalışır. Önbellekteki okumaları JSON'a yazar:
   - `text` = görsel okuma (snap + repair'den geçmiş);
   - eski metin `text_layer` alanına taşınır;
   - `source = "vision"`, `quality = "ok"`.

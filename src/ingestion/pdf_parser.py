@@ -466,7 +466,8 @@ def parse_pdf(path: str | Path) -> dict:
             r.get_area() >= FIGURE_MIN_COVER * area for r in figs)
 
         flags = []
-        scanned = len(text) < MIN_TEXT_CHARS and _full_page_image(page, template)
+        full_image = _full_page_image(page, template)
+        scanned = len(text) < MIN_TEXT_CHARS and full_image
         if scanned:
             # Taranmış sayfa: kapak olsa bile içeriği görselden okunmadan bilinmez (taranmış notun 1. sayfası çoğu
             # zaman içerik) → görsel okuma
@@ -497,6 +498,10 @@ def parse_pdf(path: str | Path) -> dict:
             flags.append("toc_like")
         if quality == "ok" and big_figure and _cover(images, page) >= 0.3:
             flags.append("image_heavy")
+        if full_image and not scanned:
+            # Sayfayı kaplayan görüntünün üstünde metin: taranıp OCR'lanmış sayfa. Bu metin katmanı PDF'ten birebir
+            # gelmez, OCR tahminidir (el yazısında çöp) → görsel okumada yazım otoritesi ve ipucu sayılmaz (vision.py)
+            flags.append("ocr_layer")
 
         results.append(PageResult(
             page=pno, heading=heading, heading_source=source, text=text, figure_text=figure_text,

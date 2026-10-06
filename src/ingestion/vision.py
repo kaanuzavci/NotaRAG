@@ -51,7 +51,10 @@ def estimate_upload_bytes(pdf: Path, pages: list[int]) -> int:
 
 
 def _text_layer(page: dict) -> str:
-    """Ayrıştırıcının bu sayfadan çıkardığı kesin metin; modele yazım ipucu olarak verilir."""
+    """Ayrıştırıcının bu sayfadan çıkardığı kesin metin; modele yazım ipucu olarak verilir. Taranıp OCR'lanmış
+    sayfada (ocr_layer) katman tahmindir, el yazısında çöp ('rmuuumvmuuıuuuuuııui') → ipucu verilmez."""
+    if "ocr_layer" in page.get("flags", []):
+        return "(empty)"
     parts = [page.get("heading") if page.get("heading_source") != "inherited" else None,
              page.get("text"), page.get("figure_text")]
     return "\n".join(p for p in parts if p) or "(empty)"
@@ -134,6 +137,7 @@ def apply_cached_vision(parsed_path: Path, pdf: Path) -> None:
     for p in parsed["pages"]:
         cache = _cache_path(pdf, p["page"])
         if p["quality"] == "needs_vision" and cache.exists():
+            # _text_layer OCR katmanında '(empty)' döner → yazım düzeltmesi yapılmaz (görsel okuma olduğu gibi kalır)
             text, fixed = snap_to_text_layer(cache.read_text(encoding="utf-8"), _text_layer(p))
             text = repair_from_layer(text, _text_layer(p))
             p["text_layer"] = p["text"]

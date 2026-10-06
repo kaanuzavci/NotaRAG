@@ -117,6 +117,18 @@ def test_scanned_pages_need_vision() -> None:
         [(p["quality"], p["flags"]) for p in d["pages"]]
     assert all(p["heading"] is None for p in d["pages"])  # yer imi başlık değil
     assert d["language"] == "unknown" and d["title"] == "nr_taranmis_test"
+    # Taranıp OCR'lanmış sayfa (görüntü + görünmez metin): katman tahmindir (el yazısında çöp) → 'ocr_layer';
+    # görsel okumada ne ipucu ne yazım otoritesi ('ΔT' görsel okumasını 'AT' katmanına çekmesin)
+    from src.ingestion.vision import _text_layer, snap_to_text_layer
+    ocr = pymupdf.open(path)
+    for pg in ocr:
+        pg.insert_text((40, 60), "Isi transferi denklemi Q = m c AT olarak yazilir ve birimi joule olur. " * 2,
+                       fontsize=9, render_mode=3)
+    path2 = Path(tempfile.gettempdir()) / "nr_ocr_katman_test.pdf"
+    ocr.save(path2)
+    p0 = parse_pdf(path2)["pages"][0]
+    assert "ocr_layer" in p0["flags"] and _text_layer(p0) == "(empty)"
+    assert snap_to_text_layer("Q = m c ΔT olarak yazılır", _text_layer(p0))[1] == 0
 
 
 def test_superscript_line_does_not_crash() -> None:

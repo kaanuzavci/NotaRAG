@@ -60,7 +60,7 @@ Bu bir Markdown belgesi ama aslında kodun parçası. Her bölümün ilk kod blo
 
 | § | Ne için | Okuyan fonksiyon | Yer tutucular |
 |---|---|---|---|
-| 1 | Resim olan sayfayı okuma | [`vision.run_vision`](../src/ingestion/vision.py#L60) | `{text_layer}` |
+| 1 | Resim olan sayfayı okuma | [`vision.run_vision`](../src/ingestion/vision.py#L63) | `{text_layer}` |
 | 2 | Soru + cevap üretimi (kurallar) | [`generate_unit`](../src/generation/generate.py#L135), `_batch_prompt`, `generate_request` | `{n_questions}`, `{type_plan}`, `{context}`, `{related}`, `{output_language}` |
 | 2b | Toplu üretim (çok birim, tek istek) | `_batch_prompt`, `generate_request` | `{units}` |
 | 2c | Hesap problemleri (SymPy ifadesiyle) | `_worked_prompt`, `generate_request(worked=True)` | `{output_language}`, `{units}` |
@@ -124,7 +124,7 @@ Bu iki ifadeyi PROMPTS.md'de değiştirirsen kural ekleme sessizce çalışmaz y
 Adım adım ne yaptığı (konsola yazdığı `1/6 ...` satırları arayüzdeki ilerleme çubuğunu da besler):
 
 1. **PDF'i bul.** `data/sample_docs/` içinde adı ya da kök adı eşleşen dosya.
-2. **`1/6 PDF okuma`.** [`parse_pdf`](../src/ingestion/pdf_parser.py#L401) PDF'i okur, sonuç `data/parsed/<belge>.json`'a yazılır. Hemen ardından [`apply_cached_vision`](../src/ingestion/vision.py#L131) daha önce görselden okunmuş sayfaları önbellekten geri koyar. Yeniden ayrıştırma bu sayfaların okumasını kaybetmesin diye yapılır.
+2. **`1/6 PDF okuma`.** [`parse_pdf`](../src/ingestion/pdf_parser.py#L401) PDF'i okur, sonuç `data/parsed/<belge>.json`'a yazılır. Hemen ardından [`apply_cached_vision`](../src/ingestion/vision.py#L134) daha önce görselden okunmuş sayfaları önbellekten geri koyar. Yeniden ayrıştırma bu sayfaların okumasını kaybetmesin diye yapılır.
 3. **`2/6 görsel okuma`.** [`_vision_until_done`](../src/pipeline.py#L110) yalnızca henüz okunmamış resim sayfalarını okutur; kota biterse bekler.
 4. **`3/6 bölümleme`.** [`chunking.__main__.main`](../src/chunking/__main__.py#L17) **bütün** ayrıştırılmış belgeleri yeniden parçalar ve `chunks.jsonl` / `sections.jsonl` dosyalarını baştan yazar. Yereldir, hızlıdır.
 5. **`4/6 dizin`.**
@@ -156,7 +156,7 @@ Adım adım ne yaptığı (konsola yazdığı `1/6 ...` satırları arayüzdeki 
 - [`_generate_worked(units, lang)`](../src/pipeline.py#L89): hesap soruları yalnızca formüllü birimlerden ([`math_units`](../src/generation/generate.py#L259)) istenir.
   - Bu iş için onaylı bir yedek model yoktur. Kota biterse adım **atlanır**; sınanmamış modele devredilmez.
   - Sonraki çalıştırmada önbellek sayesinde kalan kısım tamamlanır.
-- [`_vision_until_done(parsed_path, pdf)`](../src/pipeline.py#L110): [`run_vision`](../src/ingestion/vision.py#L60) `False` dönerse (bütün görsel modellerin kotası dolu) en kısa bekleme süresi kadar uyur ve tekrar dener. Okunacak sayfa kalmayınca çıkar.
+- [`_vision_until_done(parsed_path, pdf)`](../src/pipeline.py#L110): [`run_vision`](../src/ingestion/vision.py#L63) `False` dönerse (bütün görsel modellerin kotası dolu) en kısa bekleme süresi kadar uyur ve tekrar dener. Okunacak sayfa kalmayınca çıkar.
 - [`merge_existing(old, items, chunks)`](../src/pipeline.py#L124): **"yeniden çalıştırma ekler, silmez"** kuralı. Üç liste döndürür:
   1. `stale`: parçası artık var olmayan eski sorular (belge değiştiyse) düşer.
   2. `kept`: geri kalan eskiler aynen korunur.
