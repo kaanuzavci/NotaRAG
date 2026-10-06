@@ -115,6 +115,21 @@ def spearman(a: list[float], b: list[float]) -> float | None:
     return cov / ((sum((x - ma) ** 2 for x in ra) * sum((y - mb) ** 2 for y in rb)) ** 0.5)
 
 
+def spearman_ci(a: list[float], b: list[float], n_boot: int = 1000, seed: int = 3) -> tuple[float | None, float, float]:
+    """ρ ve önyükleme (bootstrap) %95 aralığı: 180 soruda ρ'nun belirsizliği ±0,15 civarı; tek sayı kesin sanılmasın."""
+    rho = spearman(a, b)
+    if rho is None:
+        return None, 0.0, 0.0
+    rnd, idx, boots = random.Random(seed), range(len(a)), []
+    for _ in range(n_boot):
+        s = [rnd.choice(idx) for _ in idx]
+        r = spearman([a[i] for i in s], [b[i] for i in s])
+        if r is not None:
+            boots.append(r)
+    boots.sort()
+    return rho, boots[int(0.025 * len(boots))], boots[int(0.975 * len(boots)) - 1]
+
+
 # ---------------------------------------------------------------- 2-4. Gemma ölçümleri
 
 def _options(x: dict, perm: list[int]) -> str:
@@ -224,12 +239,22 @@ def report(rows: list[dict], picked: list[dict]) -> None:
         p = [e["p"] for e in m]
         th = [(e["think"], x["ratio"]) for e, x in zip(m, got) if e["think"]]
         lab = [({"easy": 0, "medium": 1, "hard": 2}[e["label"]], x["ratio"]) for e, x in zip(m, got) if e["label"]]
-        lines += ["| Sinyal | ρ (öğrenci doğru oranıyla) | Beklenen işaret |", "|---|---|---|",
-                  f"| Benzetilmiş öğrenci p (kapalı kitap, düşünmeden, 4 örneklem) | {_fmt(spearman(p, r))} | + |",
-                  f"| Dikkatli çözüm doğru mu (0/1) | {_fmt(spearman([float(e['careful_ok']) for e in m], r))} | + |",
-                  f"| Çaba (dikkatli çözümün düşünme token'ı) | {_fmt(spearman([a for a, _ in th], [b for _, b in th]))} | − |",
-                  f"| LLM zorluk etiketi (kolay 0 · orta 1 · zor 2) | {_fmt(spearman([a for a, _ in lab], [b for _, b in lab]))} | − |",
-                  ""]
+        # Birleşik: etiket ve çabanın sıraları toplanır (ikisi de 'zorluk arttıkça büyür'); ölçek gerektirmez
+        both = [(e, x) for e, x in zip(m, got) if e["label"] and e["think"]]
+        rl = _ranks([{"easy": 0, "medium": 1, "hard": 2}[e["label"]] for e, _ in both])
+        rt = _ranks([e["think"] for e, _ in both])
+        combo = [(a + b, x["ratio"]) for a, b, (_, x) in zip(rl, rt, both)]
+
+        def row(name: str, pairs: list[tuple[float, float]], sign: str) -> str:
+            rho, lo, hi = spearman_ci([a for a, _ in pairs], [b for _, b in pairs])
+            return f"| {name} | {_fmt(rho)} | {_fmt(lo)} … {_fmt(hi)} | {sign} |"
+        lines += ["| Sinyal | ρ (öğrenci doğru oranıyla) | %95 aralık | Beklenen işaret |", "|---|---|---|---|",
+                  row("Benzetilmiş öğrenci p (kapalı kitap, düşünmeden, 4 örneklem)", list(zip(p, r)), "+"),
+                  row("Dikkatli çözüm doğru mu (0/1)", [(float(e["careful_ok"]), x["ratio"]) for e, x in zip(m, got)], "+"),
+                  row("Çaba (dikkatli çözümün düşünme token'ı)", th, "−"),
+                  row("LLM zorluk etiketi (kolay 0 · orta 1 · zor 2)", lab, "−"),
+                  row("Birleşik: etiket + çaba (sıra toplamı)", combo, "−"),
+                  "", "Aralık sıfırı kesiyorsa ilişki bu örneklemde kanıtlanmış sayılmaz.", ""]
         lines += [f"Tavan (4 örneklemin 4'ü doğru): {sum(v >= 1 for v in p)}/{len(p)} · dikkatli çözüm doğru: "
                   f"{sum(e['careful_ok'] for e in m)}/{len(m)} · ortalama p: {statistics.mean(p):.2f}", ""]
         # Gerçek düzeye göre ortalamalar
