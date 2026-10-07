@@ -118,23 +118,29 @@ Merdiven ve zorlaştırma soruları yalnızca kod kontrolünden geçer (LLM doğ
 **Soru:** Kaynak metin, modelin cevap doğruluğunu ne kadar değiştiriyor? Aynı soru Gemma 4 26B-A4B'ye (düşünmeden, sıcaklık 0) üç koşulda sorulur: **kaynaksız** (PROMPTS §6), **doğru kaynakla** ve **yanlış kaynakla** (başka bir sorunun kaynağı: arama yanlış sayfa getirirse; §6c).
 
 - Veri: Belebele-TR'den 300 okuduğunu anlama sorusu (insan yazımı, paragraflı) ve havuzun doğrulanmış 122 çoktan seçmeli sorusu (kaynak = sorunun üretildiği not sayfaları; sözel ve hesap ayrı).
-- Ölçüt: doğruluk (%95 Wilson aralığı); "kaynağa muhtaç" (doğru kaynakla doğru, kaynaksız yanlış) ve "yanlış kaynağın zararı" (kaynaksız doğru, yanlış kaynakla yanlış) oranları; havuzda belge ve etkin zorluğa göre.
+- Ölçüt: doğruluk (%95 Wilson aralığı); "kaynağa muhtaç" (doğru kaynakla doğru, kaynaksız yanlış) ve "yanlış kaynağın zararı" (kaynaksız doğru, yanlış kaynakla yanlış) oranları; havuzda belge ve etkin zorluğa göre. Koşullar arası fark [`mcnemar(b, c)`](../eval/kaynak_etkisi.py#L148) ile sınanır: aynı soru iki koşulda cevaplandığı için ölçümler eşli; yalnızca yön değiştiren sorular (kaynakla doğruya dönen `b`, yanlışa dönen `c`) sayılır, kesin binom testi.
 - Gemma 4 31B gece aşırı yüklüyken (basit çağrı 26-40 sn) cevaplayıcı 26B-A4B'ye alındı.
+- **Tek model:** üç koşul aynı modelle karşılaştırıldığı için `simulate._role` (meşgulde 31B'ye geçen öğrenci rolü) kullanılmaz; deney kendi tek modelli rolünü (`ROLE`) kaydeder, model meşgulse [`run`](../eval/kaynak_etkisi.py#L116) 2 dk bekler. [`done()`](../eval/kaynak_etkisi.py#L96) başka modelle ölçülmüş satırı ölçülmemiş sayar → bir sonraki çalıştırmada yeniden ölçülür (ilk çalıştırmada 422 satırın 36'sı kısmen 31B'ydi).
+- Hesap soruları da düşünmeden ve 60 token sınırıyla cevaplanır: model hesabı yazamaz, o satır kaynağın hesapsız cevaba etkisini gösterir.
 - Soru başına 3 Gemma çağrısı; `--parca k/m`, `--rapor`; ölçümler `data/kaynak_etkisi/olcumler.jsonl`.
 
 ### `eval/uc_adim.py` — uzman zorluk adımları ↔ sistemin sinyalleri
 
 **Soru:** MEB 3 Adım Soru Bankası'nda her konunun soruları uzmanlarca 1 → 2 → 3. adımda zorlaşır. TurkishMMLU deneyindeki sinyaller (benzetilmiş öğrenci p, çaba, LLM etiketi, `difficulty.sim_level`) bu uzman sıralamasını izliyor mu?
 
-- Soru çıkarma (kota yok): sayfa başlığından adım ve konu, satır başındaki `N.` ile soru sınırı, `A)…E)` ile şıklar; cevap anahtarı kitabın sonunda konu konu (konu adıyla eşleştirilir, sıra güvenilmez). Görsele dayanan sorular (harita, grafik, tablo, şekil…) atlanır. Tarih 629, Coğrafya 295, Felsefe 155 soru; Biyoloji'nin anahtar biçimi farklı.
-- [`_keys(doc)`](../eval/uc_adim.py#L44), [`_tests(doc)`](../eval/uc_adim.py#L77), [`extract()`](../eval/uc_adim.py#L112): çıkarma; `--cikar` yalnızca sayıları yazar.
+- Soru çıkarma (kota yok): sayfa başlığından adım ve konu, satır başındaki `N.` ile soru sınırı, `A)…E)` ile şıklar; cevap anahtarı kitabın sonunda konu konu. Görsele dayanan sorular (harita, grafik, tablo, şekil, koordinat sistemi, taralı alan…) atlanır. Tarih 618, Coğrafya 368, Felsefe 597 soru; Biyoloji'nin anahtar biçimi farklı (eşleşmiyor).
+- [`_page_keys(page)`](../eval/uc_adim.py#L46): bir anahtar sayfası → konular. **Metin sırasına değil konuma bakar:** her konu bir tablo, adı tablonun üstünde, satır başında "1. ADIM / 2. ADIM / 3. ADIM"; her harf (`7-C`) dikeyde en yakın adım satırına, her tablo üstündeki ada atanır. İlk sürüm metin sırasıyla çalışıyordu: başlıkları ayrı satırda duran tablolar öncekine karışıyor, sayfanın ilk konusunun adı metnin sonunda çıkıyordu → 1. adımın anahtarı çoğu zaman başka konudandı ve ilk ölçüm geçersiz oldu (2026-10-07; dikkatli çözücü 1. adımda 17/30, 2. adımda 30/30 doğru → fark buradan anlaşıldı).
+- [`_keys(doc)`](../eval/uc_adim.py#L79): son 16 sayfadaki anahtar sayfalarını toplar (liste: aynı adlı iki konu olabilir).
+- [`_match_keys(triples, keys)`](../eval/uc_adim.py#L96): test üçlüsü (aynı konunun 1-2-3. adım testleri) → anahtar konusu, üç kuralla: (1) ad aynı ([`_norm`](../eval/uc_adim.py#L90): Türkçe küçük harf, boşluk/noktalama yok); (2) ad kesik ya da yazımı farklı → benzer adlılar arasında soru sayıları en çok tutan, eşitlikte adı test adıyla başlayan; (3) başlık yerine soru cümlesi okunmuşsa → üç adımın soru sayısı boşta kalan tek bir konununkiyle birebir aynıysa. Soru sayısı anahtarla tutmayan adım alınmaz.
+- [`_tests(doc)`](../eval/uc_adim.py#L130), [`extract()`](../eval/uc_adim.py#L165): çıkarma; `--cikar` yalnızca sayıları yazar.
+- Raporda adım başına **dikkatli çözücü doğruluğu** anahtar sağlaması olarak durur: bir adımda belirgin düşükse o adımın anahtarı şüphelidir.
 - Ölçüm `turkishmmlu_zorluk.measure` ile (soru başına 6 Gemma çağrısı); ders × adım başına `--n` (varsayılan 10) soru.
 
 ### `eval/retrieval_queries.json`
 
 Elle yazılmış konu sorguları ve her birinin doğru sayfaları. Sorgu türleri: Türkçe→Türkçe, Türkçe sorgu→İngilizce slayt, İngilizce→İngilizce.
 
-> **Eksik deney (ödev gereksinimi):** "Kaynak metinlerle desteklenen üretimin cevap doğruluğuna etkisi". Yukarıdaki deneylerin hepsi **kaynaklı** koşulda; kaynaksız bir karşılaştırma noktası yok. Plan için ROADMAP "Sıradaki işler" 4. maddeye bak.
+> **Ödev gereksinimi:** "Kaynak metinlerle desteklenen üretimin cevap doğruluğuna etkisi". Cevaplama tarafı (B) `eval/kaynak_etkisi.py` ile ölçüldü; üretim tarafı (A: kaynaksız üretim ↔ RAG ile üretim) kota ister, Vertex sonrası. Plan ve sonuçlar: ROADMAP "Sıradaki işler" 4. madde.
 
 ---
 

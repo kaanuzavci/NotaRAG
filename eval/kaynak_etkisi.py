@@ -25,15 +25,19 @@ import time
 from collections import defaultdict
 
 from src import config
+from src.llm.models import ROLES
 from src.llm.router import AllModelsExhausted, call
 from src.prompts import load_prompt
-from src.simulate import _role
 
 DIR = config.DATA_DIR / "kaynak_etkisi"
 LOG = DIR / "olcumler.jsonl"
 OUT = config.ROOT / "eval" / "sonuclar_kaynak_etkisi.md"
 BELEBELE = config.DATA_DIR / "kaynak_veri" / "hf" / "facebook__belebele" / "tur_Latn" / "test_0000.parquet"
 MODEL = "gemma-4-26b-a4b-it"  # 31B gece aşırı yüklüydü (basit çağrı 26-40 sn); 26B-A4B 0,7 sn
+# Tek model: simulate._role meşgulde 31B'ye geçer (öğrenci sınıfı için doğru), burada üç koşul aynı modelle
+# karşılaştırılır → meşgulse beklenir. Başka modelle ölçülmüş satır ölçülmemiş sayılır (done) ve yeniden ölçülür.
+ROLE = f"_deney_{MODEL}"
+ROLES[ROLE] = [MODEL]
 CONDITIONS = ("kaynaksiz", "dogru", "yanlis")
 TR = {"kaynaksiz": "Kaynaksız", "dogru": "Doğru kaynakla", "yanlis": "Yanlış kaynakla"}
 LETTERS = "ABCD"
@@ -95,14 +99,15 @@ def done() -> dict[str, dict]:
         for line in LOG.read_text(encoding="utf-8").splitlines():
             if line.strip():
                 e = json.loads(line)
-                out[e["id"]] = e
+                if set(e["models"]) == {MODEL}:
+                    out[e["id"]] = e
     return out
 
 
 def measure(it: dict) -> dict:
     res, models = {}, []
     for cond in CONDITIONS:
-        r = call(_role(MODEL), _prompt(it, cond), json_mode=True, max_tokens=60, temperature=0.0, think="minimal")
+        r = call(ROLE, _prompt(it, cond), json_mode=True, max_tokens=60, temperature=0.0, think="minimal")
         res[cond] = _choice(r.text) == it["answer"]
         models.append(r.model)
     return {"id": it["id"], "set": it["set"], "group": it["group"], **res, "models": models, "t": time.time()}
@@ -140,6 +145,12 @@ def wilson(k: int, n: int) -> tuple[float, float]:
     return c - h, c + h
 
 
+def mcnemar(b: int, c: int) -> float:
+    """Eşli geçişler için kesin iki yönlü McNemar p'si (b ve c: iki yöndeki geçiş sayıları; binom, p = 0,5)."""
+    n, k = b + c, min(b, c)
+    return min(1.0, 2 * sum(math.comb(n, i) for i in range(k + 1)) / 2 ** n) if n else 1.0
+
+
 def report(items: list[dict]) -> None:
     meas = done()
     meta = {it["id"]: it for it in items}
@@ -151,9 +162,12 @@ def report(items: list[dict]) -> None:
              "Aynı soru Gemma 4 26B-A4B'ye (düşünmeden, sıcaklık 0) üç koşulda soruldu: **kaynaksız** (PROMPTS §6), **doğru "
              "kaynakla** ve **yanlış kaynakla** (başka bir sorunun kaynağı; §6c). Belebele-TR: insan yazımı okuduğunu anlama "
              "soruları (300). Havuz: sistemin doğrulanmış çoktan seçmeli soruları; kaynak = sorunun üretildiği not sayfaları. "
-             "Doğruluğun yanında %95 Wilson aralığı.", "",
-             "| Veri | n | Kaynaksız | Doğru kaynakla | Yanlış kaynakla | Kaynağa muhtaç¹ | Yanlış kaynağın zararı² |",
-             "|---|---|---|---|---|---|---|"]
+             "Doğruluğun yanında %95 Wilson aralığı. Her ölçümün üç koşulu da aynı modelle (meşgulse beklenir, başka modele "
+             "geçilmez). Hesap soruları da düşünmeden ve 60 token sınırıyla cevaplandı: model hesabı yazamaz, bu satır "
+             "kaynağın hesapsız cevaba etkisini gösterir (notta hazır sonuç yoksa kaynak az yardım eder).", "",
+             "| Veri | n | Kaynaksız | Doğru kaynakla | Yanlış kaynakla | Kaynağa muhtaç¹ | Yanlış kaynağın zararı² "
+             "| Eşli test p³ (doğru / yanlış kaynak) |",
+             "|---|---|---|---|---|---|---|---|"]
     for (s, g), es in sorted(groups.items()):
         n = len(es)
         cells = []
@@ -162,12 +176,18 @@ def report(items: list[dict]) -> None:
             lo, hi = wilson(k, n)
             cells.append(f"%{100 * k / n:.0f} ({100 * lo:.0f}–{100 * hi:.0f})")
         need = sum(e["dogru"] and not e["kaynaksiz"] for e in es)
+        lost = sum(e["kaynaksiz"] and not e["dogru"] for e in es)
         harm = sum(e["kaynaksiz"] and not e["yanlis"] for e in es)
-        lines.append(f"| {s} · {g} | {n} | " + " | ".join(cells) + f" | %{100 * need / n:.0f} | %{100 * harm / n:.0f} |")
+        gain = sum(e["yanlis"] and not e["kaynaksiz"] for e in es)
+        p1, p2 = (f"{mcnemar(a, b):.2g}".replace(".", ",") for a, b in ((need, lost), (harm, gain)))
+        lines.append(f"| {s} · {g} | {n} | " + " | ".join(cells) + f" | %{100 * need / n:.0f} | %{100 * harm / n:.0f} | "
+                     f"{p1} (+{need} −{lost}) / {p2} (−{harm} +{gain}) |")
     lines += ["", "¹ Doğru kaynakla doğru, kaynaksız yanlış cevaplanan soruların oranı: cevabı gerçekten kaynağa bağlı sorular. "
               "Havuzda düşükse sorular genel bilgiyle cevaplanabiliyor (ders notuna özgü değil).",
               "² Kaynaksız doğru cevaplanıp yanlış kaynakla yanlışa dönen soruların oranı: arama yanlış sayfa getirirse doğruluk "
-              "ne kadar düşer.", ""]
+              "ne kadar düşer.",
+              "³ Kesin McNemar testi (aynı sorunun iki koşuldaki cevabı eşli): kaynaksıza göre kaç soru doğruya (+) ve yanlışa (−) "
+              "döndü; p < 0,05 ise fark şansla açıklanamaz.", ""]
     pool_es = [e for e in meas.values() if e["set"] == "Havuz" and e["id"] in meta]
     if pool_es:
         by_doc, by_lvl = defaultdict(list), defaultdict(list)

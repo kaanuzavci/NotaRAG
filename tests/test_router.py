@@ -24,6 +24,8 @@ def test_all() -> None:
     assert _classify(Exception(GEMINI_DAY)) == ("daily", 0)
     assert _classify(Exception("429 rate_limit_exceeded tokens per minute (TPM). Please try again in 3.2s"))[0] == "minute"
     assert _classify(Exception("503 UNAVAILABLE high demand"))[0] == "busy"
+    assert _classify(Exception("504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before "
+                               "operation could complete.', 'status': 'DEADLINE_EXCEEDED'}}"))[0] == "busy"
     # Ağ kesintisi (hotspot): kota sanılmamalı, kısa beklenip tekrar denenmeli (2026-10-03'te bir çalıştırmayı çökertti)
     class ConnectTimeout(Exception):
         pass

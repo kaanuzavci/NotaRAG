@@ -7,7 +7,7 @@
 Hata politikası (internet ve kota israfını önlemek için):
   günlük kota (429 'PerDay' / 'per day')  → model bugün için "dolu" işaretlenir, sıradakine geçilir
   dakikalık sınır (429 'PerMinute' / TPM) → önerilen süre beklenip aynı model 1 kez daha denenir
-  sunucu yoğun / iç hata (500, 503)       → aynı modeli zorlamadan sıradakine geçilir
+  sunucu yoğun / iç hata (500, 502-504)   → aynı modeli zorlamadan sıradakine geçilir
   model yok (404)                         → bugün için kullanılamaz işaretlenir
 Görüntülü çağrıda o gün hiç kullanılmamış modele önce küçük bir metin yoklaması yapılır; böylece
 kotası dolu bir modele görüntü (~150 KB) boşuna yüklenmez.
@@ -212,7 +212,9 @@ def _classify(err: Exception) -> tuple[str, float]:
         if "PerDay" in s or "per day" in s.lower() or "per-day" in s.lower() or "(RPD)" in s or "(TPD)" in s:
             return "daily", (wait if "(TPD)" in s or "(RPD)" in s else 0)
         return "minute", wait or 30
-    if any(x in s for x in ("503", "UNAVAILABLE", "500", "INTERNAL", "502", "overloaded")):
+    # 504 DEADLINE_EXCEEDED: Gemini yükteyken uzun üretim sunucu tarafında zaman aşımına düşüyor → yoğunluk; 'other'
+    # sayılınca yükseltilip zorluk pilotunu çökertti (2026-10-07)
+    if any(x in s for x in ("503", "UNAVAILABLE", "500", "INTERNAL", "502", "504", "DEADLINE_EXCEEDED", "overloaded")):
         return "busy", 0
     if "404" in s or "NOT_FOUND" in s or "model_not_found" in s:
         return "missing", 0

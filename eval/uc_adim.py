@@ -6,8 +6,9 @@ burada uzman sıralamasına karşı ölçülür: benzetilmiş öğrenci p (kapal
 zorluk etiketi ve difficulty.sim_level kuralı. Soru başına 6 Gemma çağrısı (turkishmmlu_zorluk.measure).
 
 Soru çıkarma (kota yok): sayfa başlığından adım ve konu, satır başındaki 'N.' ile soru sınırı, 'A)…E)' ile şıklar,
-kitabın sonundaki konu / adım cevap anahtarı. Görsele dayanan sorular (harita, grafik, tablo, şekil, şerit) metinle
-cevaplanamayacağı için atlanır. Veri: data/kaynak_veri/ogm/3adim (depoda değil).
+kitabın sonundaki konu / adım cevap anahtarı (sayfa düzeninden, konuma göre: _page_keys). Görsele dayanan sorular
+(harita, grafik, tablo, şekil, şerit, koordinat sistemi) metinle cevaplanamayacağı için atlanır. Raporda adım başına
+dikkatli çözücünün doğruluğu anahtar sağlamasıdır. Veri: data/kaynak_veri/ogm/3adim (depoda değil).
 
 Kullanım: python -m eval.uc_adim [--cikar] [--n 10] [--parca k/m] [--rapor]
           --cikar: yalnızca soruları çıkarıp sayıları yazar (kota yok)
@@ -35,43 +36,95 @@ BOOKS = {"TYT_Tarih_074.pdf": "Tarih", "TYT_Cografya_069.pdf": "Coğrafya", "TYT
 _Q = re.compile(r"(?m)^\s*(\d{1,2})\.(?!\s*ADIM)\s")
 _STEP = re.compile(r"([123])\.\s*ADIM")
 _KEY = re.compile(r"(\d{1,2})-([A-E])")
-_VISUAL = re.compile(r"(harita|grafik|tablo|şekil|görsel|şeri[dt]|diyagram|fotoğraf|resim)", re.I)
+_KEY_WORD = re.compile(r"^(\d{1,2})-([A-E])$")
+_STEP_LINE = re.compile(r"^([123])\.\s*ADIM$")
+# "Yukarıdaki koordinat sisteminde taralı bölgeler…" gibi şekle dayanan Coğrafya soruları da metinle cevaplanamaz
+_VISUAL = re.compile(r"(harita|grafik|tablo|şekil|görsel|şeri[dt]|diyagram|fotoğraf|resim|koordinat sistemi|taralı"
+                     r"|işaretli)", re.I)
 
 
-_MARK = re.compile(r"1\.\s*ADIM\s*2\.\s*ADIM\s*3\.\s*ADIM")
+def _page_keys(page) -> list[dict]:
+    """Anahtar sayfası → [{name, steps: {1: [harf…], 2: …, 3: …}}]. Sayfa düzeni: her konu bir tablo; adı tablonun
+    üstünde, satırların solunda '1. ADIM' / '2. ADIM' / '3. ADIM', harfler satırda ('11-A' satırın alt yarısında).
+    Konuma bakılır, metin sırasına değil: metin sırasında ilk konunun adı sayfanın sonunda çıkıyor, başlıkları
+    ayrı satırda duran tablolar da öncekine karışıyordu (2026-10-07 hatası: 1. adımda anahtar başka konudandı)."""
+    lines = []
+    for b in page.get_text("dict")["blocks"]:
+        for ln in b.get("lines", []):
+            t = " ".join(s["text"] for s in ln["spans"]).strip()
+            if t:
+                lines.append((t, *ln["bbox"]))
+    labels = [(int(_STEP_LINE.match(t).group(1)), x0, (y0 + y1) / 2, y0) for t, x0, y0, x1, y1 in lines
+              if _STEP_LINE.match(t)]
+    names = [(t, x0, y1) for t, x0, y0, x1, y1 in lines
+             if not _STEP_LINE.match(t) and not _KEY_WORD.match(t.split()[0]) and not t.isdigit()
+             and "CEVAP ANAHTARI" not in t.upper() and len(t) > 3]
+    rows: dict[int, dict[int, str]] = defaultdict(dict)
+    for w in page.get_text("words"):
+        m = _KEY_WORD.match(w[4])
+        yc = (w[1] + w[3]) / 2
+        near = [(abs(yc - ly), i) for i, (_, lx, ly, _) in enumerate(labels) if lx < w[0] and abs(yc - ly) < 14]
+        if m and near:  # harf, dikeyde en yakın adım satırına (solunda etiketi olan sütunda)
+            rows[min(near)[1]][int(m.group(1))] = m.group(2)
+    topics = []
+    for i, (step, lx, _, top) in enumerate(labels):
+        if step == 1:  # yeni tablo: adı hemen üstündeki, aynı sütundaki satır
+            above = [(ny, t) for t, nx, ny in names if ny <= top + 1 and abs(nx - lx) < 40]
+            topics.append({"name": max(above)[1] if above else None, "steps": {}})
+        if topics:
+            topics[-1]["steps"][step] = [rows[i][k] for k in sorted(rows[i])]
+    return topics
 
 
-def _keys(doc) -> dict[str, list[list[str]]]:
-    """Kitabın sonundaki anahtar: konu adı → [1. adım, 2. adım, 3. adım] harf listeleri. Konu adı, '1. ADIM 2. ADIM
-    3. ADIM' işaretinden önceki anahtar olmayan satırlar; adımlar soru numarası 1'e dönünce ayrılır. (İlk anahtar
-    sayfası bazı kitaplarda görüntü: o konu eşleşmez, atlanır.)"""
-    text = "\n".join(p.get_text() for p in list(doc)[-14:] if _MARK.search(p.get_text()))
-    marks = list(_MARK.finditer(text))
-    out = {}
-    for i, m in enumerate(marks):
-        before = text[marks[i - 1].end() if i else 0:m.start()]
-        name_lines = [ln.strip() for ln in before.split("\n") if ln.strip() and not _KEY.search(ln)]
-        topic = " ".join(name_lines[-2:]) if name_lines else f"konu{i}"
-        body = text[m.end():marks[i + 1].start() if i + 1 < len(marks) else len(text)]
-        steps, cur = [], {}
-        for n, letter in _KEY.findall(body):
-            n = int(n)
-            if n in cur:
-                steps.append([cur[k] for k in sorted(cur)])
-                cur = {}
-            cur[n] = letter
-        if cur:
-            steps.append([cur[k] for k in sorted(cur)])
-        out[re.sub(r"\s+", " ", topic)] = steps
+def _keys(doc) -> list[dict]:
+    """Kitabın sonundaki anahtar sayfaları → konu listesi (adı aynı iki konu olabilir: liste, sözlük değil).
+    İlk anahtar sayfası bazı kitaplarda görüntü: o konular bulunmaz, testleri atlanır."""
+    out = []
+    for page in list(doc)[-16:]:
+        text = page.get_text()
+        if "ADIM" in text and _KEY.search(text):
+            out += _page_keys(page)
     return out
 
 
-def _match_topic(topic: str | None, keys: dict) -> str | None:
-    from rapidfuzz import fuzz, process
-    if not topic or not keys:
-        return None
-    best = process.extractOne(topic, list(keys), scorer=fuzz.partial_ratio)
-    return best[0] if best and best[1] >= 85 else None
+def _norm(s: str | None) -> str:
+    """Konu adı karşılaştırması: Türkçe küçük harf, boşluk ve noktalama yok ('Felsefeyle Düşünme-1' = '… - 1')."""
+    s = (s or "").replace("İ", "i").replace("I", "ı").lower()
+    return re.sub(r"[^\wçğıöşü]", "", s)
+
+
+def _match_keys(triples: list[dict], keys: list[dict]) -> dict[int, dict]:
+    """Test üçlüsü (aynı konunun 1-2-3. adım testleri) → anahtar konusu. Sırayla:
+    1) ad aynı; 2) ad kesik ya da yazım farklı ('Ahlak Felsefenin Konusu ve') → benzer adlılar arasında adım soru
+    sayıları en çok tutan (en az 2 adım); 3) başlık yerine soru cümlesi okunmuşsa: üç adımın soru sayısı, boşta
+    kalan tek bir konununkiyle birebir aynıysa. Her anahtar konusu bir kez kullanılır."""
+    from rapidfuzz import fuzz
+
+    def agree(tr: dict, k: dict) -> int:
+        return sum(len(k["steps"].get(s) or []) == n for s, n in tr["n"].items())
+
+    used, out = set(), {}
+    for rule in (1, 2, 3):
+        for ti, tr in enumerate(triples):
+            if ti in out:
+                continue
+            tn = _norm(tr["topic"])
+            free = [(ki, k) for ki, k in enumerate(keys) if ki not in used and k["name"]]
+            if rule == 1:
+                cand = [(ki, k) for ki, k in free if _norm(k["name"]) == tn and agree(tr, k)]
+            elif rule == 2:
+                cand = [(ki, k) for ki, k in free if len(tn) >= 8 and fuzz.partial_ratio(tn, _norm(k["name"])) >= 90
+                        and agree(tr, k) >= 2]
+                best = max((agree(tr, k) for _, k in cand), default=0)
+                cand = [(ki, k) for ki, k in cand if agree(tr, k) == best]
+                # eşitlikte adı test adıyla başlayan: 'Devletleşme Sürecinde' → '…Savaşçılar', '(Yerleşme ve) …' değil
+                cand = [(ki, k) for ki, k in cand if _norm(k["name"]).startswith(tn)] or cand
+            else:
+                cand = [(ki, k) for ki, k in free if len(tr["n"]) == 3 and agree(tr, k) == 3]
+            if len(cand) == 1:
+                out[ti] = cand[0][1]
+                used.add(cand[0][0])
+    return out
 
 
 def _tests(doc) -> list[dict]:
@@ -115,12 +168,18 @@ def extract() -> tuple[list[dict], dict]:
     for fname, subject in BOOKS.items():
         doc = pymupdf.open(SRC / fname)
         keys, tests = _keys(doc), _tests(doc)
+        triples, of_test = [], {}  # aynı konunun ardışık 1-2-3. adım testleri
+        for t_i, test in enumerate(tests):
+            if test["step"] == 1 or not triples or test["step"] in triples[-1]["n"]:
+                triples.append({"topic": test["topic"], "n": {}})
+            triples[-1]["n"][test["step"]] = len(test["questions"])
+            of_test[t_i] = len(triples) - 1
+        matched = _match_keys(triples, keys)
         ok = skipped_visual = bad = unmatched = 0
         for t_i, test in enumerate(tests):
-            name = _match_topic(test["topic"], keys)
-            steps = keys.get(name) or []
-            key = steps[test["step"] - 1] if len(steps) >= test["step"] else None
-            if not key or len(key) != len(test["questions"]):
+            k = matched.get(of_test[t_i])
+            key = k["steps"].get(test["step"]) if k else None
+            if not key or len(key) != len(test["questions"]):  # soru sayısı tutmayan adım alınmaz
                 unmatched += len(test["questions"])
                 continue
             for (no, body), letter in zip(test["questions"], key):
@@ -133,10 +192,10 @@ def extract() -> tuple[list[dict], dict]:
                     skipped_visual += 1
                     continue
                 items.append({"id": f"ua_{subject[:3].lower()}_{t_i:02d}_{no:02d}", "subject": subject, "step": test["step"],
-                              "topic": test["topic"], "question": stem, "choices": options, "answer": "ABCDE".index(letter),
+                              "topic": k["name"], "question": stem, "choices": options, "answer": "ABCDE".index(letter),
                               "metadata": {"grade": "lise (TYT)"}})
                 ok += 1
-        stats[subject] = {"test": len(tests), "anahtardaki konu": len(keys), "soru": ok,
+        stats[subject] = {"test": len(tests), "anahtardaki konu": len(keys), "eşleşen konu": len(matched), "soru": ok,
                           "görselli (atlandı)": skipped_visual, "ayrıştırılamadı": bad,
                           "anahtarla eşleşmedi": unmatched}
     return items, stats
@@ -208,8 +267,9 @@ def report(picked: list[dict], stats: dict) -> None:
                   row("Benzetilmiş öğrenci p", [e["p"] for e in m], step, "−"),
                   row("Çaba (düşünme token'ı)", [a for a, _ in th], [b for _, b in th], "+"),
                   row("LLM zorluk etiketi", [a for a, _ in lb], [b for _, b in lb], "+"), "",
-                  "| Adım | n | ort. p | ort. çaba | LLM etiketi kolay / orta / zor | sim_level: bilgi yok / orta / zor |",
-                  "|---|---|---|---|---|---|"]
+                  "| Adım | n | ort. p | ort. çaba | LLM etiketi kolay / orta / zor | sim_level: bilgi yok / orta / zor "
+                  "| dikkatli çözücü doğru¹ |",
+                  "|---|---|---|---|---|---|---|"]
         for s in (1, 2, 3):
             g = [e for e, x in zip(m, got) if x["step"] == s]
             if not g:
@@ -219,11 +279,14 @@ def report(picked: list[dict], stats: dict) -> None:
             lines.append(f"| {s}. adım | {len(g)} | {statistics.mean(e['p'] for e in g):.2f} | "
                          f"{statistics.median(e['think'] or 0 for e in g):.0f} (medyan) | "
                          + " / ".join(str(labs.count(v)) for v in ("easy", "medium", "hard")) + " | "
-                         + " / ".join(str(sims.count(v)) for v in ("tavan", "medium", "hard")) + " |")
+                         + " / ".join(str(sims.count(v)) for v in ("tavan", "medium", "hard")) + " | "
+                         + f"{sum(bool(e['careful_ok']) for e in g)}/{len(g)} |")
         by = defaultdict(list)
         for e, x in zip(m, got):
             by[x["subject"]].append((e, x["step"]))
-        lines += ["", "Ders bazında ρ (adımla): " + ", ".join(
+        lines += ["", "¹ Anahtar sağlaması: dikkatli çözücü (Gemma, uzun düşünme) bir adımda belirgin biçimde düşükse o adımın "
+                  "anahtarı şüphelidir (ilk çalıştırmada 1. adımın anahtarı başka konudandı: 1. adımda 17/30, 2. adımda 30/30).",
+                  "", "Ders bazında ρ (adımla): " + ", ".join(
             f"{s} çaba {_fmt(spearman_ci([e['think'] or 0 for e, _ in v], [float(t) for _, t in v], n_boot=200)[0])} · "
             f"etiket {_fmt(spearman_ci([lab.get(e['label'], 1) for e, _ in v], [float(t) for _, t in v], n_boot=200)[0])}"
             for s, v in sorted(by.items())), ""]
