@@ -92,20 +92,21 @@ Bu iki ifadeyi PROMPTS.md'de değiştirirsen kural ekleme sessizce çalışmaz y
 **Bağlantılar**
 - → `ui/style.py` (`inject`), `ui/auth.py` (`current`, `page`, `sidebar`; bölüm 11).
 - → 7 sayfa dosyası (Streamlit onları ayrı betik olarak çalıştırır).
-- 💾 Okur: `src/ui/logo.svg`, `.streamlit/config.toml` (Streamlit kendisi okur: renkler, yazı tipleri).
+- 💾 Okur: `src/ui/logo.svg`, `src/ui/logo_ink.svg`, `.streamlit/config.toml` (Streamlit kendisi okur: renkler, yazı tipleri).
 
 **İçindekiler (yukarıdan aşağı)**
-- [Satır 11](../src/app.py#L11) `sys.path.insert(0, ...)`: Streamlit `src/app.py`'yi paket olarak değil, düz betik olarak çalıştırır. Bu durumda `from src.ui import style` çalışmaz, çünkü Python `src` paketini bilmez. Proje kökü arama yoluna eklenerek sorun çözülür.
-- [Satır 17](../src/app.py#L17) `st.set_page_config(...)`: sekme başlığı "NotaRAG", geniş düzen, kenar çubuğu açık.
-- [Satır 19](../src/app.py#L19) `style.inject()`: bütün sayfalarda geçerli CSS (bkz. bölüm 8).
+- [Satır 12](../src/app.py#L12) `sys.path.insert(0, ...)`: Streamlit `src/app.py`'yi paket olarak değil, düz betik olarak çalıştırır. Bu durumda `from src.ui import style` çalışmaz, çünkü Python `src` paketini bilmez. Proje kökü arama yoluna eklenerek sorun çözülür.
+- [Satır 18](../src/app.py#L18) `st.set_page_config(...)`: sekme başlığı "NotaRAG", geniş düzen, kenar çubuğu açık.
+- [Satır 20](../src/app.py#L20) `style.inject()`: bütün sayfalarda geçerli CSS (bkz. bölüm 8).
 - [`user`](../src/app.py#L22) `= auth.current()`: giriş yapmış kişi (ya da "beni hatırla" çerezinden geri gelen oturum). Yoksa menü yerine yalnızca giriş ekranı kurulur ve `st.stop()` betiği orada bitirir: giriş yapılmadan hiçbir sayfa çalışmaz. Rol yok; giriş yapan herkes aynı menüyü görür.
-- [`pages`](../src/app.py#L29): menü (2026-10-08'den beri):
+- [`pages`](../src/app.py#L31): menü (2026-10-08'den beri):
   - **Ana sayfa** (varsayılan, grup başlıksız; bölüm 12)
   - **Çalış:** Sınav Hazırla, Bilgi Kartları
   - **İçerik:** Belgeler, Soru Bankası
   - **Kalite:** İnceleme, Rapor, Modeller ve Kota
   - **Hesap:** Profil ve beyin analizi (bölüm 12)
-- [`nav`](../src/app.py#L46) `= st.navigation(...)`: menüyü kurar. Kenar çubuğuna marka yazısı ve `auth.sidebar(user)` (kim giriş yaptı, "Çıkış yap") eklenir; `nav.run()` seçilen sayfanın dosyasını çalıştırır.
+- [Satır 28](../src/app.py#L28) `st.logo(...)`: kenar çubuğunda açık renkli logo (`logo.svg`, koyu zemin için); kenar çubuğu kapalıyken üst şeritte mürekkep renkli olanı (`icon_image=logo_ink.svg`; açık renkli logo kâğıt zeminde okunmuyordu, 2026-10-08).
+- [`nav`](../src/app.py#L48) `= st.navigation(...)`: menüyü kurar. `auth.sidebar(user)` kenar çubuğunun **en altına** kim giriş yaptı ve "Çıkış" kutusunu koyar (bölüm 13); `nav.run()` seçilen sayfanın dosyasını çalıştırır.
 
 **Streamlit'in çalışma biçimi:** Her sayfa dosyası (ör. [`ui/pages/exam.py`](../src/ui/pages/exam.py)) en altta `render()` çağırır. Streamlit sayfayı her açtığında ve her tıklamada o dosyayı **baştan sona** yeniden çalıştırır. Ayrıntısı bölüm 8'de.
 

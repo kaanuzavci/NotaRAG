@@ -5,10 +5,17 @@ ekran görüntüsünü alır, ana sayfadaki kartlara gerçek fare tıklamasıyla
                                                                   # yarım kart oturumu, yarım sınav, herkese açık bir not
     .venv\\Scripts\\python scripts\\tasarim.py baslat             # uygulama 8503'te (geçici veritabanıyla; yeniden başlatır)
     .venv\\Scripts\\python scripts\\tasarim.py ekran ":ana" "profile:profil" ":ana_hover:.stack:nth-child(3)"
+    .venv\\Scripts\\python scripts\\tasarim.py ekran ":kapali:!$COLLAPSE" "documents:pencere:!.stack:nth-child(2) > ~2"
     .venv\\Scripts\\python scripts\\tasarim.py tikla ".stack.new|yeni" ".stack[data-id='tyt-matematik'] [data-act=exam]|sinav"
     .venv\\Scripts\\python scripts\\tasarim.py durdur
 
-ekran: "yol:ad[:üzerine_gelinecek_seçici]" (yol '' = ana sayfa; seçici sayfada ya da bileşenlerin Shadow DOM'unda aranır).
+ekran: "yol:ad[:adımlar]" (yol '' = ana sayfa). Adımlar " > " ile ayrılır, sırayla yapılır, sonra ekran alınır:
+  seçici      üzerine gel (seçici sayfada ya da bileşenlerin Shadow DOM'unda aranır)
+  !seçici     gerçek fare tıklaması          ~2      2 sn bekle
+  ^ArrowRight tuşa bas (ArrowLeft, Escape, Enter, f, i…)       #ifade  JS çalıştır
+  @ad         ara ekran görüntüsü (akışın ortasında; sonda yine "ad" adıyla alınır)
+  $COLLAPSE / $EXPAND: kenar çubuğunu kapatan / açan düğme. Her açılışta kenar çubuğu açık başlar.
+  Dikkat: " > " adım ayırıcı; seçicilerde çocuk birleştiricisi (a > b) yerine boşluk (a b) kullan.
 tikla: "seçici|ad" — her tıklamadan önce ana sayfaya dönülür; sonra adres, başlık ve seçili düğmeler yazılır.
 Çıktılar data/tasarim/ekran/*.png (Read ile bakılır). Giriş: deneme / parola123. Görünmez Edge + CDP (scripts/ekran.py gibi).
 
@@ -38,7 +45,7 @@ PORT = 8503
 URL = f"http://localhost:{PORT}"
 EDGE = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 USER, PASSWORD = "deneme", "parola123"
-W, H = 1440, 1000
+W, H = map(int, os.environ.get("NR_EKRAN", "1440x1000").split("x"))  # ör. $env:NR_EKRAN="1280x720" (dizüstü, %150)
 
 
 # ---------------------------------------------------------------- hazırlık ve sunucu
@@ -165,6 +172,47 @@ class Tab:
         await asyncio.sleep(0.5)
         return box
 
+    async def click(self, sel: str) -> bool:
+        box = await self.hover(sel)
+        if not box:
+            return False
+        for t in ("mousePressed", "mouseReleased"):
+            await self.cmd("Input.dispatchMouseEvent", {"type": t, "x": box[0], "y": box[1], "button": "left",
+                                                       "clickCount": 1})
+        return True
+
+    async def key(self, key: str) -> None:
+        code = KEYS.get(key, ord(key.upper()) if len(key) == 1 else 0)
+        for t in ("keyDown", "keyUp"):
+            await self.cmd("Input.dispatchKeyEvent", {"type": t, "key": key, "code": key if len(key) > 1 else
+                                                      f"Key{key.upper()}", "windowsVirtualKeyCode": code})
+
+    async def steps(self, spec: str, name: str) -> None:
+        """ekran komutunun adımları (bkz. modül açıklaması)."""
+        for s in (x.strip() for x in spec.split(" > ") if x.strip()):
+            for alias, sel in ALIAS.items():
+                s = s.replace(alias, sel)
+            if s[0] == "~":
+                await asyncio.sleep(float(s[1:]))
+            elif s[0] == "@":
+                await self.shot(s[1:])
+                print("ekran:", OUT / f"{s[1:]}.png")
+            elif s[0] == "#":
+                print(f"{name}: {s[1:40]}… → {await self.js(s[1:])}")
+            elif s[0] == "^":
+                await self.key(s[1:])
+                await asyncio.sleep(1.2)
+            elif s[0] == "!":
+                if not await self.click(s[1:]):
+                    print(f"{name}: tıklanacak seçici bulunamadı ({s[1:]})")
+                await asyncio.sleep(4)
+            elif not await self.hover(s.lstrip("?")):
+                print(f"{name}: seçici bulunamadı ({s})")
+
+
+KEYS = {"ArrowRight": 39, "ArrowLeft": 37, "Escape": 27, "Enter": 13, "Home": 36, "End": 35, " ": 32}
+ALIAS = {"$COLLAPSE": "[data-testid=stSidebarCollapseButton] button", "$EXPAND": "[data-testid=stExpandSidebarButton]"}
+
 
 async def _open() -> Tab:
     import websockets
@@ -182,6 +230,8 @@ async def _open() -> Tab:
             await tab.cmd("Input.insertText", {"text": text})
         await tab.js("document.querySelector('[data-testid=stFormSubmitButton] button').click()")
         await asyncio.sleep(8)
+    # Streamlit kenar çubuğunun açık/kapalı durumunu tarayıcıda saklıyor: her deneme açık başlasın (kullanıcının varsayılanı)
+    await tab.js("localStorage.setItem('stSidebarCollapsed-', 'false')")
     return tab
 
 
@@ -191,8 +241,8 @@ async def ekran(specs: list[str]) -> None:
         path, name, *rest = spec.split(":", 2)
         await tab.cmd("Page.navigate", {"url": f"{URL}/{path}"})
         await asyncio.sleep(9)
-        if rest and not await tab.hover(rest[0]):
-            print(f"{name}: seçici bulunamadı ({rest[0]})")
+        if rest:
+            await tab.steps(rest[0], name)
         await tab.shot(name)
         print("ekran:", OUT / f"{name}.png")
 
@@ -203,13 +253,9 @@ async def tikla(specs: list[str]) -> None:
         sel, name = spec.split("|")
         await tab.cmd("Page.navigate", {"url": URL})
         await asyncio.sleep(9)
-        box = await tab.hover(sel)
-        if not box:
+        if not await tab.click(sel):
             print(f"{name}: bulunamadı")
             continue
-        for t in ("mousePressed", "mouseReleased"):
-            await tab.cmd("Input.dispatchMouseEvent", {"type": t, "x": box[0], "y": box[1], "button": "left",
-                                                       "clickCount": 1})
         await asyncio.sleep(8)
         where = await tab.js("location.pathname + location.search")
         what = await tab.js("document.querySelector('[role=dialog]') ? 'PENCERE: ' + document.querySelector('[role=dialog]')"

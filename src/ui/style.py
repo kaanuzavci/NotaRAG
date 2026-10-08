@@ -51,25 +51,78 @@ _CSS = """
   font-family: 'Fraunces', serif; font-weight: 600; letter-spacing: .02em;
   box-shadow: 0 0 0 3px #FFFDF8, 0 0 0 4px #E2DAC8; }
 
-/* Ana sayfa: selam satırı ve bölüm başlıkları (src/ui/pages/home.py) */
-.nr-hello { display: flex; align-items: center; gap: 18px; }
-.nr-hello .nr-title { margin: 0; }
-.nr-hello-sub { color: #5B5F6B; font-size: .95rem; margin-top: .35rem; }
-.nr-hello-sub b { color: #1E2433; font-weight: 600; }
+/* Ana sayfa ve Belgeler: kısa selam satırı, istatistik hapları, bölüm başlıkları (src/ui/pages/home.py).
+   Üst kısım az yer tutsun, sahne kartların (kullanıcı isteği 2026-10-08). */
+.nr-hello { display: flex; align-items: center; gap: 14px; }
+h1.nr-hello-t { font-family: 'Fraunces', serif !important; font-weight: 650 !important; font-size: 1.55rem !important;
+  line-height: 1.15 !important; color: #1E2433; margin: 0 !important; padding: 0 !important; }
+.nr-hello-stats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: .4rem; }
+.nr-hello-stats span { font-size: .8rem; color: #5B5F6B; background: #FFFDF8; border: 1px solid #E8E0CE; border-radius: 999px;
+  padding: .12rem .6rem; white-space: nowrap; }
+.nr-hello-stats b { color: #1E2433; font-weight: 600; }
+.nr-hello-stats span.due { background: #EEF2F8; border-color: #CBD7E8; }
+.nr-shelf-h { display: flex; align-items: baseline; gap: .35rem .9rem; flex-wrap: wrap; margin: 1.5rem 0 0; }
+h2.nr-shelf-t { font-family: 'Fraunces', serif !important; font-weight: 600 !important; font-size: 1.3rem !important;
+  color: #1E2433; margin: 0 !important; padding: 0 !important; line-height: 1.2 !important; }
+.nr-shelf-t small { font: 500 .78rem 'Instrument Sans', sans-serif; color: #7A6F57; background: #EFE8D8; border-radius: 999px;
+  padding: .1rem .5rem; margin-left: .45rem; vertical-align: .18rem; }
+.nr-shelf-h p { color: #6B6F7B; font-size: .86rem; margin: 0; }
+/* Bölüm başlığı (profil: üst etiket + serif başlık) */
 .nr-sec { margin: 1.6rem 0 .1rem; }
 .nr-sec .k { font-family: 'JetBrains Mono', monospace; font-size: .68rem; letter-spacing: .14em; text-transform: uppercase;
   color: #8A7E63; }
 .nr-sec h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.45rem; color: #1E2433; margin: .1rem 0 0;
   padding: 0; }
 .nr-sec p { color: #6B6F7B; font-size: .9rem; margin: .25rem 0 0; }
+.nr-head { display: flex; align-items: baseline; gap: .3rem 1.1rem; flex-wrap: wrap; margin: .3rem 0 .6rem; }
+.nr-head p { color: #5B5F6B; font-size: .92rem; margin: 0; }
 
-/* Kenar çubuğunda (koyu zemin) giriş yapan kişi (src/ui/auth.py) */
-.nr-who { display: flex; align-items: center; gap: 11px; font-size: .92rem; margin-bottom: -.5rem; }
-.nr-who > div { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
-.nr-who span { font-family: 'JetBrains Mono', monospace; font-size: .66rem; letter-spacing: .14em;
-  text-transform: uppercase; color: #8F876F; }
-.nr-who b { color: #F1ECE0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Kenar çubuğu: menü üstte, hesap kutusu en altta sabit (src/ui/auth.py). İçerik dikey esnek kutu; hesap kutusunun
+   sarmalayıcısı üstten 'auto' boşlukla dibe itilir. Menü uzunsa (alçak ekran) kutu menünün ardından gelir, çubuk kayar. */
+section[data-testid="stSidebar"] [data-testid="stSidebarContent"] { display: flex; flex-direction: column; height: 100%; }
+section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] { flex: 1 0 auto; display: flex; flex-direction: column;
+  padding-top: .5rem; padding-bottom: 1.1rem; }
+section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] > div { flex: 1 0 auto; display: flex;
+  flex-direction: column; }
+section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] > div > [data-testid="stVerticalBlock"] { flex: 1 0 auto; }
+section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] [data-testid="stLayoutWrapper"]:has(> .st-key-nr_account),
+section[data-testid="stSidebar"] .st-key-nr_account { margin-top: auto; }
+section[data-testid="stSidebar"] .st-key-nr_account { padding: .85rem .2rem 0; border-top: 1px solid #343D52; flex-wrap: nowrap; }
+[data-testid="stSidebarNavSeparator"] { display: none; }
+.st-key-nr_account [data-testid="stElementContainer"]:has(.nr-who) { flex: 1 1 auto; min-width: 0; }
+.st-key-nr_account button { color: #AFA690; padding: .3rem .4rem; }
+.st-key-nr_account button:hover { color: #F2D64B; }
+.nr-who { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.nr-who > div { display: flex; flex-direction: column; gap: .05rem; min-width: 0; }
+.nr-who b { color: #F1ECE0; font-weight: 600; font-size: .92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nr-who span { font-family: 'JetBrains Mono', monospace; font-size: .7rem; color: #8F876F; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
 .nr-who .nr-avatar { box-shadow: 0 0 0 2px #2B3550; }
+
+/* Kenar çubuğu açılıp kapanırken sayfa yerinden oynamasın (kullanıcı isteği 2026-10-08): Streamlit çubuğu kapatınca
+   genişliğini sıfırlıyor, ana alan genişliyor → kartlar büyüyor, her şey aşağı kayıyordu. Geniş ekranda çubuk sabit
+   konumda içeriğin üstünde durur, ana alan hep çubuğun genişliği kadar soldan başlar: kapatınca yalnızca çubuk kayarak
+   gider. Üst şerit saydam ve tıklamayı geçirir; kapalıyken logo ve "»" çubuğun boşalttığı alanda görünür. Dar ekranda
+   (telefon) Streamlit'in kendi davranışı (çubuk içeriğin üstüne açılır) kalır. */
+@media (min-width: 769px) {
+  section[data-testid="stSidebar"] { position: fixed !important; top: 0; bottom: 0; left: 0; z-index: 1000001;
+    width: 300px !important; min-width: 300px !important; max-width: 300px !important; }
+  [data-testid="stMain"] { margin-left: 300px; width: calc(100% - 300px) !important; }
+}
+header[data-testid="stHeader"] { position: fixed !important; left: 0 !important; right: 0 !important; width: auto !important;
+  background: transparent !important; pointer-events: none !important; }
+header[data-testid="stHeader"] button, header[data-testid="stHeader"] a, header[data-testid="stHeader"] img {
+  pointer-events: auto; }
+
+/* Pencereler (st.dialog): arka plandaki sayfa hafifçe bulanıklaşır ve kararır; pencere kâğıt beyazı. Bulanıklık hafif
+   tutuldu ve pencere ekrandan taşmıyor (içerik pencerenin içinde kayar): örtü kaydıkça bulanıklık her karede yeniden
+   hesaplanıyor, kaydırma takılıyordu. */
+div[data-testid="stDialog"] { background: rgba(30, 36, 51, .26) !important; backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px); }
+div[data-testid="stDialog"] > div { background: #FBF8F1 !important; border: 1px solid #E4DCC9; border-radius: 22px !important;
+  box-shadow: 0 24px 60px -34px rgba(30, 36, 51, .55); }
+div[data-testid="stDialog"] [role="dialog"] h2 p { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.45rem;
+  color: #1E2433; }
 
 /* Fosforlu kalem: sistemin imzası (kanıt vurgusu) */
 .nr-hl { background: linear-gradient(104deg, rgba(242,214,75,0) .9%, rgba(242,214,75,.85) 2.4%,
@@ -283,10 +336,6 @@ _CSS = """
 .nr-pager .s { font-size: .8rem; color: #7A7468; }
 @media (max-width: 1000px) { .nr-pair { grid-template-columns: minmax(0, 1fr); } }
 
-/* Kenar çubuğu marka alanı */
-.nr-brand { font-family: 'Fraunces', serif; font-size: 1.5rem; font-weight: 650; color: #EDE6D6; line-height: 1; }
-.nr-brand span { background-image: linear-gradient(transparent 60%, rgba(242,214,75,.55) 60%); }
-.nr-brand-sub { font-size: .8rem; color: #AFA690; margin-top: .3rem; }
 section[data-testid="stSidebar"] .nr-foot { font-size: .74rem; color: #8F876F; }
 
 /* ==== Çalışma ekranları (bilgi kartı + sınav), v3: kâğıt zemin üstünde sakin kartlar; hareket yalnızca anlam taşıyınca
@@ -440,6 +489,16 @@ PALETTE = [("#EDE9FE", "#DDD6FE", "#2E1065", "#7C3AED"),   # lavanta
            ("#E0F2FE", "#BAE6FD", "#0C4A6E", "#0284C7"),   # gök
            ("#FCE7F3", "#FBCFE8", "#831843", "#DB2777"),   # gül
            ("#FEF9C3", "#FDE68A", "#713F12", "#CA8A04")]   # tereyağı
+
+
+# Konu ustalığı (src/mastery.py): durum → (renk, simge, açıklama). Profildeki beyin analizi ve not penceresinin konu
+# listesi ortak kullanır; renk tek başına anlam taşımaz (simge + yazı)
+MASTERY = {
+    "öğrenildi": ("#2E8B57", "✓", "Öğrenildi"),
+    "çalışılıyor": ("#D99A1E", "◐", "Çalışılıyor"),
+    "zayıf": ("#C4452B", "!", "Zayıf"),
+    "başlanmadı": ("#B9B2A3", "○", "Başlanmadı"),
+}
 
 
 def color(i: int) -> tuple[str, str, str, str]:

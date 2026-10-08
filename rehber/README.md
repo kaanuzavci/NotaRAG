@@ -10,7 +10,7 @@ Bu klasör projedeki **bütün kod dosyalarını tek tek** anlatır. Her dosya i
 
 Fonksiyon adları bağlantıdır; tıklayınca VS Code o satırı açar. Rehberi önizlemede okumak için dosya açıkken `Ctrl+Shift+V` (yan yana: `Ctrl+K V`).
 
-> Rehber **2026-10-05**'teki koda göre yazıldı; 2026-10-06'da bilgi kartları ve zorluk ölçümü, 2026-10-07'de kullanıcı girişi ve belge kütüphanesi (bölüm 11), 2026-10-08'de ana sayfa, profil ve beyin analizi (bölüm 12) eklendi. Kod değiştikçe satır numaraları kayabilir. Bağlantıları koda göre yeniden hizalamak için `python scripts\rehber_satirlari.py --yaz` çalıştır (fonksiyon adına bakarak düzeltir; internetsiz). Bağlantı yanlış satıra gidiyorsa dosyada `Ctrl+Shift+O` ile ada göre atla.
+> Rehber **2026-10-05**'teki koda göre yazıldı; 2026-10-06'da bilgi kartları ve zorluk ölçümü, 2026-10-07'de kullanıcı girişi ve belge kütüphanesi (bölüm 11), 2026-10-08'de ana sayfa, profil ve beyin analizi (bölüm 12), aynı akşam not penceresi, tam ekran okuyucu ve kart görünümlü Belgeler (bölüm 13) eklendi. Kod değiştikçe satır numaraları kayabilir. Bağlantıları koda göre yeniden hizalamak için `python scripts\rehber_satirlari.py --yaz` çalıştır (fonksiyon adına bakarak düzeltir; internetsiz). Bağlantı yanlış satıra gidiyorsa dosyada `Ctrl+Shift+O` ile ada göre atla.
 
 ## Bölümler (verinin aktığı sırayla)
 
@@ -28,6 +28,7 @@ Fonksiyon adları bağlantıdır; tıklayınca VS Code o satırı açar. Rehberi
 | 10 | [Zorluk: iddia değil ölçüm](10-zorluk.md) | `difficulty.py`, `simulate.py` |
 | 11 | [Hesaplar ve belge kütüphanesi](11-hesaplar-ve-belgeler.md) | `appdb.py`, `accounts.py`, `library.py`, `jsonl.py`, `ui/auth.py` |
 | 12 | [Ana sayfa, profil ve beyin analizi](12-ana-sayfa-ve-profil.md) | `ui/pages/home.py`, `ui/shelf.py`, `ui/upload.py`, `ui/pages/profile.py`, `mastery.py`, `resume.py` |
+| 13 | [Not penceresi, tam ekran okuyucu ve Belgeler](13-not-penceresi-ve-okuyucu.md) | `ui/docview.py`, `ui/reader.py`, `ui/pages/documents.py` |
 
 Acele edenler için okuma sırası: bu sayfa → 1 (özellikle `pipeline.py`) → 7'deki `request.py` → 5 → 6. Bu beşi sistemin omurgasıdır; gerisi bu omurgaya hizmet eder.
 
@@ -259,7 +260,7 @@ Bunlar hata değil; projenin nasıl büyüdüğünü gösteren izler. İleride t
 1. **Ölü kod** (kimse kullanmıyor):
    - [`ui/parts/system.py`](../src/ui/parts/system.py): dosyanın tamamı; yerini `ui/pages/models.py` aldı.
    - [`ui/parts/evaluation.render`](../src/ui/parts/evaluation.py#L194): Rapor sayfası alt fonksiyonları doğrudan çağırıyor.
-   - [`schema.Batch`](../src/generation/schema.py#L71), [`review_store.agreement`](../src/review_store.py#L226), `review_store.LABEL_TR`, [`style.card`](../src/ui/style.py#L498), `style.INK / PAPER / HIGHLIGHT`. (`ui/data.DOC_SHORT` 2026-10-07'de silindi.)
+   - [`schema.Batch`](../src/generation/schema.py#L71), [`review_store.agreement`](../src/review_store.py#L226), `review_store.LABEL_TR`, [`style.card`](../src/ui/style.py#L557), `style.INK / PAPER / HIGHLIGHT`. (`ui/data.DOC_SHORT` 2026-10-07'de silindi.)
 2. **Tanımlı ama hiç çağrılmayan rol:** `models.py`'deki `"judge"` (kısa cevap hakemi). Hakem istemi (§4d) aslında doğrulayıcı rolüyle çağrılıyor ([`verify_short`](../src/verification/verify.py#L174)). Arayüz bu rolü listeliyor, kod kullanmıyor.
 3. **Tekrarlanan kod:**
    - `chunks.jsonl` okuyan fonksiyonun yaklaşık 9 kopyası var (`index.load_chunks`, `generate._load`, `review_store.load_chunks`, `topics._chunks`, `pipeline.run` içinde, `verification/__main__`, `sensitivity`, `requote`, `eval/batch_compare`).

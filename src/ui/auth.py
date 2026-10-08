@@ -63,15 +63,17 @@ def _logout() -> None:
 
 
 def sidebar(u: dict) -> None:
-    """Kenar çubuğunun altı: kim giriş yapmış, çıkış."""
+    """Kenar çubuğunun en altı: kim giriş yapmış, çıkış. Kutu, menü ne kadar uzun olursa olsun çubuğun dibinde durur
+    (style.py: kenar çubuğu içeriği dikey esnek kutu, .st-key-nr_account üstten 'auto' boşlukla aşağı itilir)."""
+    from src.ui import data
     with st.sidebar:
         if st.session_state.get("_set_cookie") and st.session_state.get("_token"):
             _cookie(st.session_state._token, accounts.SESSION_DAYS * 86400)
-        st.space("small")
-        from src.ui import data
-        style.html(f'<div class="nr-who">{style.avatar(u, data.avatar_b64(u["id"]), 38)}'
-                   f'<div><span>Hesap</span><b>{style.esc(u["name"])}</b></div></div>')
-        st.button("Çıkış yap", key="nr_logout", icon=":material/logout:", type="tertiary", on_click=_logout)
+        with st.container(key="nr_account", horizontal=True, vertical_alignment="center", gap="small"):
+            style.html(f'<div class="nr-who">{style.avatar(u, data.avatar_b64(u["id"]), 38)}'
+                       f'<div><b>{style.esc(u["name"])}</b><span>@{style.esc(u["username"])}</span></div></div>')
+            st.button("Çıkış", key="nr_logout", icon=":material/logout:", type="tertiary", on_click=_logout,
+                      help="Çıkış yap")
 
 
 # ---------------------------------------------------------------- giriş ekranı

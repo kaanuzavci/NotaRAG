@@ -13,8 +13,10 @@ src/app.py                 menü ve giriş (bölüm 1)
 src/ui/auth.py             giriş ekranı, "beni hatırla" çerezi, çıkış (bölüm 11)
 src/ui/pages/home.py       Ana sayfa (varsayılan): not desteleri, herkese açık notlar, kaldığın yer (bölüm 12)
 src/ui/pages/profile.py    Profil ve beyin analizi (bölüm 12)
-src/ui/shelf.py            ana sayfanın kart desteleri: Streamlit özel bileşeni, CCv2 (bölüm 12)
-src/ui/upload.py           not yükleme akışı (Belgeler + ana sayfa penceresi; bölüm 12)
+src/ui/shelf.py            kart desteleri (ana sayfa + Belgeler): Streamlit özel bileşeni, CCv2 (bölüm 12)
+src/ui/docview.py          not penceresi (konular, sayfalar, hazır sorular, ad, görünürlük) ve not kartı (bölüm 13)
+src/ui/reader.py           tam ekran PDF okuyucu: CCv2 (bölüm 13)
+src/ui/upload.py           not yükleme akışı (ana sayfadaki "+ Yeni not ekle" penceresi; bölüm 12)
 src/ui/style.py            görsel dil: CSS + küçük HTML yardımcıları
 src/ui/data.py             arayüzün veri katmanı (dosya okuma, önbellek, arka plan işleri)
 src/ui/components.py       ortak soru kartı, kaynak sayfa kartı, bitiş özeti
@@ -22,7 +24,7 @@ src/ui/quiz.py             sınav çözme deneyimi (başlangıç → odak modu �
 src/cards.py               bilgi kartı mantığı: deste, aralıklı tekrar (Streamlit'siz)
 src/ui/pages/exam.py       Sınav Hazırla
 src/ui/pages/cards.py      Bilgi Kartları
-src/ui/pages/documents.py  Belgeler (PDF yükleme dahil)
+src/ui/pages/documents.py  Belgeler: bütün notlar kart kart, süzgeç / arama / sıralama (bölüm 13)
 src/ui/pages/bank.py       Soru Bankası
 src/ui/pages/review.py     İnceleme (kalite kontrol; rol yok, her hesap görür)
 src/ui/pages/report.py     Rapor (nasıl çalışır + ölçümler)
@@ -78,18 +80,18 @@ Streamlit'i ilk okuyanı en çok şaşırtan şey şu: **her etkileşimde sayfa 
     - sınav kartının üstündeki soru başına renkli şerit (`.nr-focus::before`);
     - hareket azaltma tercihi (`prefers-reduced-motion`) açıksa animasyonlar kapanır.
 - `PALETTE`: altı pastel kart rengi `(açık, koyu pastel, yazı, vurgu)`. Yazı rengi her pastelde en az 7:1 karşıtlıkta.
-- [`color(i)`](../src/ui/style.py#L445): i. kartın rengi (palet döner).
-- [`color_vars(i)`](../src/ui/style.py#L449): o rengi CSS değişkenleri olarak verir (`--c1`, `--ink`, `--a`…); kart HTML'inin `style=` özniteliğine yazılır.
-- [`inject()`](../src/ui/style.py#L454): CSS'i sayfaya basar (`app.py` çağırır).
-- [`html(markup)`](../src/ui/style.py#L460): HTML'i `st.markdown(..., unsafe_allow_html=True)` ile basar.
+- [`color(i)`](../src/ui/style.py#L504): i. kartın rengi (palet döner).
+- [`color_vars(i)`](../src/ui/style.py#L508): o rengi CSS değişkenleri olarak verir (`--c1`, `--ink`, `--a`…); kart HTML'inin `style=` özniteliğine yazılır.
+- [`inject()`](../src/ui/style.py#L513): CSS'i sayfaya basar (`app.py` çağırır).
+- [`html(markup)`](../src/ui/style.py#L519): HTML'i `st.markdown(..., unsafe_allow_html=True)` ile basar.
   - Neden `st.html` değil? `st.html` içeriği ana sayfanın stillerinden yalıtıyor; sınıflar uygulanmıyordu.
   - Boş satırlar silinir: Markdown boş satırda HTML bloğunu keser.
   - `<div lang="tr">` sarmalayıcısı CSS büyük harf dönüşümünü Türkçe yapar: "ipucu" → "İPUCU" (İngilizce kuralla "IPUCU" olurdu).
-- [`esc(s)`](../src/ui/style.py#L468): HTML kaçışı (`<` → `&lt;`). Metinde `<` geçerse sayfa bozulmasın, betik enjeksiyonu olmasın.
-- [`header(kicker, title, lead, hero_word)`](../src/ui/style.py#L472): sayfa başlığı.
-- [`pill(label)`](../src/ui/style.py#L493): "Doğrulandı / İncelenmeli / Reddedildi" rozeti.
-- [`card(...)`](../src/ui/style.py#L498): kullanılmıyor.
-- [`flow(steps)`](../src/ui/style.py#L503): akış şeması (Rapor → Nasıl çalışır).
+- [`esc(s)`](../src/ui/style.py#L527): HTML kaçışı (`<` → `&lt;`). Metinde `<` geçerse sayfa bozulmasın, betik enjeksiyonu olmasın.
+- [`header(kicker, title, lead, hero_word)`](../src/ui/style.py#L531): sayfa başlığı.
+- [`pill(label)`](../src/ui/style.py#L552): "Doğrulandı / İncelenmeli / Reddedildi" rozeti.
+- [`card(...)`](../src/ui/style.py#L557): kullanılmıyor.
+- [`flow(steps)`](../src/ui/style.py#L562): akış şeması (Rapor → Nasıl çalışır).
 
 ---
 
@@ -110,22 +112,23 @@ Streamlit'i ilk okuyanı en çok şaşırtan şey şu: **her etkileşimde sayfa 
   - [`visible()`](../src/ui/data.py#L67): giriş yapan kişi için `_visible`. Belge gösteren her sayfa bununla süzer.
   - [`doc_meta()`](../src/ui/data.py#L74): belge kaydı `{doc: {name, owner, public, …}}` (Belgeler sayfasındaki rozet ve düğmeler).
   - [`my_documents()`](../src/ui/data.py#L80): `documents()`'ın görünür olanları.
-- **Ana sayfa ve profil (bölüm 12):** [`mine()`](../src/ui/data.py#L91) (kişinin kendi listesi), [`items()`](../src/ui/data.py#L97) (bütün sorular, 30 sn önbellek), [`mastery()`](../src/ui/data.py#L109) (beyin analizi), [`home_stats()`](../src/ui/data.py#L129) ve [`due_cards()`](../src/ui/data.py#L134) (selam satırı, bugünün tekrarı), [`avatar_b64(user_id)`](../src/ui/data.py#L140) (profil resmi; değişince `.clear()`).
-- [`topics(doc)`](../src/ui/data.py#L150): konu haritası, `build_missing=False` ile. Arayüz konu haritası için LLM'e gitmez.
-- [`has_math(doc)`](../src/ui/data.py#L157): belgede formüllü birim var mı? Varsa Sınav Hazırla'da "Hesap sorusu" tipi gösterilir.
-- [`item_stats()`](../src/ui/data.py#L167), [`reports()`](../src/ui/data.py#L173): `request` modülündekilerin önbellekli hali.
-- [`set_label(name, kind)`](../src/ui/data.py#L178): dosya adından okunur set adı (`'qwen_..._english_tr'` → `'Genetic Algorithms → TR · qwen3.8-27b (pilot)'`).
-- [`doc_of(item)`](../src/ui/data.py#L194): sorunun belgesi (ilk parça kimliğinden).
-- [`question_sets()`](../src/ui/data.py#L200): bütün soru setleri `[{key, name, kind ('belge'|'pilot'), items}]`. Her soruya `doc`, `set`, `set_kind` eklenir.
-- [`all_questions(include_pilot)`](../src/ui/data.py#L214): setlerdeki soruların kimliğe göre tekilleştirilmiş listesi.
-- [`decisions()`](../src/ui/data.py#L226): inceleme kararları (önbelleksiz; karar verilince hemen görünsün).
-- [`documents()`](../src/ui/data.py#L231): her PDF için özet. Sayfa sayısı, görselden okunan ve bekleyen sayfa, tablo sayfası, parça / bölüm / soru / doğrulanmış soru sayısı. **Bütün** belgeler; sayfalar `my_documents()` kullanır (Rapor ve Modeller ve Kota'daki sistem toplamları hariç: içerik göstermezler).
-- [`eval_json(name)`](../src/ui/data.py#L256): `eval/<ad>.json` ölçüm sonucu.
-- [`quota()`](../src/ui/data.py#L261): `ledger.report()`.
+- **Ana sayfa ve profil (bölüm 12):** [`mine()`](../src/ui/data.py#L91) (kişinin kendi listesi), [`items()`](../src/ui/data.py#L97) (bütün sorular, 30 sn önbellek), [`mastery()`](../src/ui/data.py#L120) (beyin analizi), [`home_stats()`](../src/ui/data.py#L137) ve [`due_cards()`](../src/ui/data.py#L142) (selam satırındaki sayı hapları, bugünün tekrarı), [`avatar_b64(user_id)`](../src/ui/data.py#L148) (profil resmi; değişince `.clear()`).
+- **Hazır soru sayısı (bölüm 13):** [`ready()`](../src/ui/data.py#L104): not → doğrulanmış, reddedilmemiş, hatalı bildirilmemiş soru sayısı (sınavlar ve kartlar bunlardan kurulur). Kişiye gösterilen sayı bu; `documents()`'teki `verified` deney (pilot) setlerini de sayar.
+- [`topics(doc)`](../src/ui/data.py#L158): konu haritası, `build_missing=False` ile. Arayüz konu haritası için LLM'e gitmez.
+- [`has_math(doc)`](../src/ui/data.py#L165): belgede formüllü birim var mı? Varsa Sınav Hazırla'da "Hesap sorusu" tipi gösterilir.
+- [`item_stats()`](../src/ui/data.py#L175), [`reports()`](../src/ui/data.py#L181): `request` modülündekilerin önbellekli hali.
+- [`set_label(name, kind)`](../src/ui/data.py#L186): dosya adından okunur set adı (`'qwen_..._english_tr'` → `'Genetic Algorithms → TR · qwen3.8-27b (pilot)'`).
+- [`doc_of(item)`](../src/ui/data.py#L202): sorunun belgesi (ilk parça kimliğinden).
+- [`question_sets()`](../src/ui/data.py#L208): bütün soru setleri `[{key, name, kind ('belge'|'pilot'), items}]`. Her soruya `doc`, `set`, `set_kind` eklenir.
+- [`all_questions(include_pilot)`](../src/ui/data.py#L222): setlerdeki soruların kimliğe göre tekilleştirilmiş listesi.
+- [`decisions()`](../src/ui/data.py#L234): inceleme kararları (önbelleksiz; karar verilince hemen görünsün).
+- [`documents()`](../src/ui/data.py#L239): her PDF için özet. Sayfa sayısı, görselden okunan ve bekleyen sayfa, tablo sayfası, parça / bölüm / soru / doğrulanmış soru sayısı. **Bütün** belgeler; sayfalar `my_documents()` kullanır (Rapor ve Modeller ve Kota'daki sistem toplamları hariç: içerik göstermezler).
+- [`eval_json(name)`](../src/ui/data.py#L264): `eval/<ad>.json` ölçüm sonucu.
+- [`quota()`](../src/ui/data.py#L269): `ledger.report()`.
 - **Arka plan işleri:**
-  - [`start_job(pdf_name, language)`](../src/ui/data.py#L271): `python -m src.pipeline "<pdf>"`'i bağımsız süreçte başlatır. Çıktı `data/jobs/<belge>.log`'a, başlangıç zamanı `.json`'a yazılır.
-  - [`job_status(stem)`](../src/ui/data.py#L287): log dosyasını okuyup durumu çıkarır. `STEP_RE` `"3/6 bölümleme"` satırlarını yakalar; "Bitti" görünce iş bitti, "Traceback" görünce hata, "⏳" görünce kota beklemesi sayılır.
-  - [`jobs()`](../src/ui/data.py#L304): bütün işler, en yeni önce.
+  - [`start_job(pdf_name, language)`](../src/ui/data.py#L279): `python -m src.pipeline "<pdf>"`'i bağımsız süreçte başlatır. Çıktı `data/jobs/<belge>.log`'a, başlangıç zamanı `.json`'a yazılır.
+  - [`job_status(stem)`](../src/ui/data.py#L295): log dosyasını okuyup durumu çıkarır. `STEP_RE` `"3/6 bölümleme"` satırlarını yakalar; "Bitti" görünce iş bitti, "Traceback" görünce hata, "⏳" görünce kota beklemesi sayılır.
+  - [`jobs()`](../src/ui/data.py#L312): bütün işler, en yeni önce.
 
   Ayrı süreç ile arayüz arasındaki "iletişim" bu log dosyasıdır.
 
@@ -351,25 +354,13 @@ Klavye: Boşluk çevir · ← bilemedim · ↓ atla · → bildim.
 
 ---
 
-## `src/ui/pages/documents.py` — Belgeler (152 satır)
+## `src/ui/pages/documents.py` — Belgeler (~100 satır)
 
-**Ne işe yarar?** Yeni PDF yüklenir ve işlenir. Çalışan işler izlenir. Her belgenin konuları, sayfaları (görüntü + çıkarılan metin) ve okuma kalitesi gösterilir. Belge kütüphanesinin (bölüm 11) arayüzü de burada: yüklenen not yalnızca yükleyene görünür, istenirse herkese açılır; sistemde zaten olan not yeniden işlenmez.
+**2026-10-08 akşamı baştan yazıldı; ayrıntısı bölüm 13'te.** Kişinin görebildiği bütün notlar, ana sayfadaki desteler gibi kart kart (süzgeç: Tümü / Notlarım / Herkese açık; arama: not adı ya da konu; sıralama; iki görünüm: **Sayfalı** — sayfa kaymaz, 2×4 kart, kalanlar okla yana kayar — ve **Kaydırmalı** — satırlar sayfa kaydıkça gelir). Bir nota tıklayınca ayrıntısı sayfanın üstünde, arkası hafifçe bulanık bir pencerede açılır ([`ui/docview.py`](../src/ui/docview.py)): ad ve görünürlük (gizli / herkese aç, geri alınamaz), konular, sayfalar (tam ekran okuyucu: [`ui/reader.py`](../src/ui/reader.py)), okuma kalitesi. Belge kütüphanesinin (bölüm 11) arayüzü de bu pencerede.
 
-**Bağlantılar:** → `library` (`register`, `publish`, `rename`, `has_access`), `data` (`start_job`, `jobs`, `my_documents`, `visible`, `doc_meta`, `topics`, `parsed`), `request` (`all_items`, `usable`), `config`, `pymupdf`.
+Eski hâlinden farkı: yükleme kutusu ve "çalışan işler" kutusu kalktı (not ekleme ana sayfadaki "+ Yeni not ekle" kartından; işlenen notun kartı canlı ilerleme gösterir, ayrıntısı pencerede), üstteki belge seçici yerine kart ızgarası, konu tablosu yerine tıklanabilir konu listesi (ustalık durumuyla), "Herkese aç" onayı ayrı pencere yerine açılır kutuda (Streamlit pencere içinde pencere açamaz).
 
-**İçindekiler**
-- [`_add()`](../src/ui/pages/documents.py#L25): "Yeni ders notu ekle" açılır paneli. İçindeki akış (dosya seçici, soru dili, `library.register`, sonuç, işleme başlatma) 2026-10-08'de [`ui/upload.py`](../src/ui/upload.py)'ye taşındı; ana sayfadaki "+ Yeni not ekle" penceresi de aynısını kullanır (bölüm 12).
-- [`_start(file, lang)`](../src/ui/pages/documents.py#L32): `upload.start` + sayfayı yenile ("Notu işle" düğmesi).
-- Seçili not: ana sayfada bir karta tıklanınca `session_state.doc_open` ile gelir ve belge seçici (`doc_sel`) o nota ayarlanır.
-- [`_publish(d)`](../src/ui/pages/documents.py#L38) (`@st.dialog`): "Notu herkese aç" onay penceresi. Neyin açılacağını (sayfalar, metin, sorular, kanıtlar) ve **geri alınamayacağını** söyler.
-- [`_actions(d)`](../src/ui/pages/documents.py#L51): seçili belgenin rozeti (Gizli / Herkese açık), "Herkese aç" düğmesi (erişimin varsa), "Adını değiştir" (yalnızca sahibi). Not henüz işlenmediyse "Notu işle" düğmesi.
-- [`_jobs()`](../src/ui/pages/documents.py#L82) (`fragment`, 4 sn): çalışan işlerin adım adı, ilerleme çubuğu ve son satırı (yalnızca görebildiğin belgelerin işleri). Kota bekleniyorsa "iş duraklamadı" notu.
-- [`_detail(tail)`](../src/ui/pages/documents.py#L96): log'un son satırını kullanıcıya uygun metne çevirir ("Gemini'nin kotası dolu, qwen ile tek tek üretiliyor").
-- [`_page_png(file, page)`](../src/ui/pages/documents.py#L109): sayfa görüntüsü (85 dpi, önbellekli).
-- [`_topics_tab(d)`](../src/ui/pages/documents.py#L114): konu tablosu. Konu, sayfalar ve **hazır soru** sayısı (o sayfalara bağlı doğrulanmış sorular).
-- [`_pages_tab(d)`](../src/ui/pages/documents.py#L132): sayfa kaydırıcısı. Solda PDF görüntüsü, sağda sistemin çıkardığı metin ve rozetler (metin katmanı / görselden okundu / bekliyor / bayraklar).
-- [`_quality_tab(d)`](../src/ui/pages/documents.py#L156): görselden okunan sayfa, tablosu çıkarılan sayfa, silinen üst/alt bilgi satırı, üretimden çıkarılan sayfalar.
-- [`render()`](../src/ui/pages/documents.py#L170): yükleme → işler → belge seçici (görebildiğin belgeler) → rozet ve düğmeler → üç sekme.
+**Bağlantılar:** → `docview` (kart, tıklama, pencere, okuyucu), `shelf`, `data` (`my_documents`, `documents`, `doc_meta`, `mine`, `jobs`, `mastery`, `topics`, `ready`, `short`), `style`.
 
 ---
 

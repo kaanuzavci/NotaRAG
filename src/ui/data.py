@@ -100,6 +100,17 @@ def items() -> dict[str, dict]:
     return all_items()
 
 
+@st.cache_data(ttl=30)
+def ready() -> dict[str, int]:
+    """Not → hazır soru sayısı: doğrulanmış, insanın reddetmediği, hatalı bildirilmemiş sorular (sınavlar ve kartlar
+    bunlardan kurulur). documents()'teki 'verified' deney (pilot) setlerini de sayar; kişiye gösterilen sayı bu."""
+    from collections import Counter
+
+    from src import request as R
+    blocked = R.blocked_ids()
+    return dict(Counter(it["doc"] for it in items().values() if R.usable(it) and it["id"] not in blocked))
+
+
 @st.cache_data(ttl=20)
 def _mastery(user_id: str, docs: tuple[str, ...]) -> dict:
     from src.mastery import for_user
@@ -116,19 +127,16 @@ def _home(user_id: str, docs: tuple[str, ...]) -> dict:
     import time as _t
 
     from src import cards as K
-    from src import request as R
     pool = K.pool(list(docs))
     hist = K.history(user=user_id)
     due = [it["id"] for it in pool if it["id"] in hist and K.is_due(hist[it["id"]], _t.time())]
-    verified = sum(1 for it in R.all_items().values() if it["doc"] in docs and R.usable(it))
-    parts = [f"<b>{len(docs)}</b> not", f"<b>{verified}</b> hazır soru", f"<b>{len(pool)}</b> kart"]
-    parts.append(f"bugün tekrar zamanı gelen <b>{len(due)}</b> kart" if due else "bugün tekrar zamanı gelen kart yok")
-    return {"line": " · ".join(parts), "due": due}
+    n_ready = sum(ready().get(d, 0) for d in docs)
+    return {"parts": [(len(docs), "not"), (n_ready, "hazır soru"), (len(pool), "kart")], "due": due}
 
 
-def home_stats() -> str:
-    """Ana sayfa başlığının altındaki özet satırı (HTML; sayılar kalın)."""
-    return _home(uid(), tuple(sorted(mine())))["line"] if uid() else ""
+def home_stats() -> list[tuple[int, str]]:
+    """Ana sayfadaki selamın altındaki sayılar: [(sayı, ad), …] (not, hazır soru, kart)."""
+    return _home(uid(), tuple(sorted(mine())))["parts"] if uid() else []
 
 
 def due_cards() -> list[str]:

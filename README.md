@@ -187,8 +187,9 @@ NotaRAG/
 │   ├── generation/           # üretim (generate.py), şema, hesap (compute.py), pilot
 │   ├── verification/         # kod kontrolleri, kör doğrulama, duyarlılık testi
 │   ├── llm/                  # router (tek kapı), models (kalite kapısı), ledger (kota + önbellek), capacity
-│   └── ui/                   # auth.py (giriş), shelf.py (ana sayfa desteleri, CCv2), upload.py, quiz.py (sınav deneyimi),
-│                             # style.py, components.py, data.py, pages/ (home, profile, exam, cards, …), parts/
+│   └── ui/                   # auth.py (giriş), shelf.py (not desteleri, CCv2), docview.py (not penceresi),
+│                             # reader.py (tam ekran PDF okuyucu, CCv2), upload.py, quiz.py (sınav deneyimi),
+│                             # style.py, components.py, data.py, pages/ (home, profile, documents, exam, cards, …), parts/
 ├── data/                     # sample_docs/ (PDF'ler), parsed/, chunks/, chroma/, topics/, questions/, requests/,
 │                             # jobs/ (arka plan iş günlükleri), review/ (attempts, cards, reports: kişi kimliğiyle),
 │                             # llm.sqlite (kota + önbellek), app.sqlite (hesaplar, oturumlar, belge kaydı)

@@ -172,9 +172,9 @@ Eşleşen belge yükleyene açılır: hazır sorular, konu haritası ve dizin ol
   - Bu yüzden görünmez bir çerçeve (`st.iframe`) içindeki küçük bir betik `window.parent.document.cookie`'ye yazar. Sınav ekranındaki klavye kısayolları da aynı yolla ana sayfaya erişiyor (bölüm 8).
 - [`_sign_in(u, remember)`](../src/ui/auth.py#L48): kişiyi oturuma koyar. "Beni hatırla" seçiliyse yeni bir oturum belirteci alır ve çerez yazılmak üzere işaretlenir.
 - [`_logout()`](../src/ui/auth.py#L56): oturumu veritabanından siler ve `session_state`'i tamamen temizler; açık sınav ve kart oturumu sıradaki kişiye kalmasın. Çerezi silmek için işaret bırakır.
-- [`sidebar(u)`](../src/ui/auth.py#L65): kenar çubuğunun altı. Çerezi bu oturumda yazılacaksa burada yazar; ad ve "Çıkış yap".
-- [`_login_form()`](../src/ui/auth.py#L79), [`_create_form(first)`](../src/ui/auth.py#L93): iki form. Hiç hesap yoksa "Hesap oluştur" açık gelir ve ilk hesabın eski kayıtların sahibi olacağı söylenir.
-- [`page()`](../src/ui/auth.py#L119): giriş ekranının kendisi. Kenar çubuğu gizli, dar ve ortalı.
+- [`sidebar(u)`](../src/ui/auth.py#L65): kenar çubuğunun en altı (CSS ile dibe sabit; bölüm 13). Çerezi bu oturumda yazılacaksa burada yazar; profil resmi, ad, @kullanıcı adı ve "Çıkış".
+- [`_login_form()`](../src/ui/auth.py#L81), [`_create_form(first)`](../src/ui/auth.py#L95): iki form. Hiç hesap yoksa "Hesap oluştur" açık gelir ve ilk hesabın eski kayıtların sahibi olacağı söylenir.
+- [`page()`](../src/ui/auth.py#L121): giriş ekranının kendisi. Kenar çubuğu gizli, dar ve ortalı.
 
 **Akış (tarayıcıda denendi):** giriş → çerez yazılır → sayfa yenilenince `current()` çerezden oturumu geri getirir → çıkış → oturum silinir, çerez temizlenir → yenileyince giriş ekranı.
 

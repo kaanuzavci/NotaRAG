@@ -17,12 +17,7 @@ from src import accounts
 from src import request as R
 from src.ui import data, style
 
-STATUS = {  # durum → (renk, simge, açıklama)
-    "öğrenildi": ("#2E8B57", "✓", "Öğrenildi"),
-    "çalışılıyor": ("#D99A1E", "◐", "Çalışılıyor"),
-    "zayıf": ("#C4452B", "!", "Zayıf"),
-    "başlanmadı": ("#B9B2A3", "○", "Başlanmadı"),
-}
+STATUS = style.MASTERY  # durum → (renk, simge, açıklama); not penceresinin konu listesiyle ortak
 MEMORY = [("kısa", "Kısa süreli", "#C7D3E6", "yeni ya da yakında yeniden gelecek"),
           ("pekişiyor", "Pekişiyor", "#7C98C2", "birkaç kez bildin"),
           ("uzun", "Uzun süreli", "#1F3A5F", "haftalar arayla bile hatırlıyorsun")]

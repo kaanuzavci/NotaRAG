@@ -1,200 +1,114 @@
-"""Belgeler: ders notu ekle (arka planda okunur, konu haritası çıkarılır, soru havuzu hazırlanır) ve her notun
-konularını, sayfalarını, okuma kalitesini gör.
+"""Belgeler: bütün notların deste kartları olarak (kendi notların ve herkese açık olanlar). Bir nota tıklayınca
+ayrıntısı sayfanın üstünde açılır, arkadaki sayfa hafifçe bulanıklaşır (src/ui/docview.py): ad ve görünürlük,
+konular, sayfalar (tam ekran okuyucu: src/ui/reader.py), okuma kalitesi. Üstte süzgeç (Tümü / Notlarım / Herkese
+açık), arama (not adı ya da konu başlığı), sıralama ve görünüm düğmesi:
+  Sayfalı     ekranda 2 satır × 4 not; sayfa aşağı kaymaz, kalanlar sağdaki okla (ya da ← →) yana kayarak gelir
+  Kaydırmalı  bütün notlar alt alta; satırlar sayfa aşağı kaydıkça birer birer belirir
+(kullanıcı isteği 2026-10-08; kartlar src/ui/shelf.py: layout="pages" / lazy=True).
 
+Not ekleme ana sayfadaki "+ Yeni not ekle" kartından (src/ui/upload.py); ana sayfadaki "Tümünü gör" buraya getirir.
 Belge kütüphanesi (src/library.py): yüklenen not yalnızca yükleyene görünür; istenirse herkese açılır (geri
 alınamaz). Sistemde zaten olan bir not (aynı dosya ya da aynı içerik, adı farklı olsa da) yeniden işlenmez,
 yükleyenin listesine eklenir."""
 
-import time
-
-import pymupdf
 import streamlit as st
 
-from src import library
-from src import request as R
-from src.ui import data, style, upload
+from src.ui import data, docview, style
+from src.ui.shelf import shelf
 
-STEPS = ["PDF okuma", "Görsel okuma", "Bölümleme", "Dizin", "Soru havuzu", "Doğrulama"]
-SOURCE_TR = {"text": "Metin katmanı", "vision": "Görselden okundu"}
-FLAG_TR = {"title_page": "Kapak", "toc_like": "İçindekiler", "image_heavy": "Görsel ağırlıklı",
-           "noisy_text": "Bozuk metin", "tables_extracted": "Tablo çıkarıldı"}
+FILTERS = ["Tümü", "Notlarım", "Herkese açık"]
+SORTS = ["En yeni", "Ada göre", "En çok soru"]
+VIEWS = {"Sayfalı": ":material/view_carousel:", "Kaydırmalı": ":material/view_agenda:"}
+_FOLD = str.maketrans("ÇĞİIÖŞÜçğıöşü", "cgiiosucgiosu")
 
-
-# ---------------------------------------------------------------- ekleme ve işler
-
-def _add() -> None:
-    """Yükleme akışı src/ui/upload.py'de (ana sayfadaki "+ Yeni not ekle" penceresi de onu kullanır)."""
-    with st.expander("Yeni ders notu ekle", icon=":material/upload_file:", expanded=not data.my_documents()):
-        if upload.uploader("docs_up"):
-            st.rerun()
-
-
-def _start(file: str, lang: str | None) -> None:
-    upload.start(file, lang)
-    st.rerun()
+# Sayfaya özgü: kartlara yer açmak için biraz daha geniş içerik alanı (ana sayfa da aynısını kullanır)
+_CSS = """<style>
+.block-container { max-width: 1320px; padding-left: 3rem; padding-right: 3rem; }
+.st-key-docs_bar { margin: .2rem 0 .1rem; }
+.st-key-docs_bar [data-testid="stTextInputRootElement"], .st-key-docs_bar [data-testid="stSelectbox"] [role="group"] {
+  background: #FFFDF8 !important; border-color: #DCD3C1 !important; }
+</style>"""
+# Sayfalı görünüm: sayfa aşağı kaymaz (kartlar ekrana sığacak boyda, kalanlar yana kayar)
+_NO_SCROLL = """<style>
+[data-testid="stMain"] { overflow: hidden !important; }
+.block-container { padding-bottom: 0 !important; }
+</style>"""
 
 
-@st.dialog("Notu herkese aç")
-def _publish(d: dict) -> None:
-    st.markdown(f"**{data.short(d['stem'])}** bütün hesaplara açılacak: sayfaları, sistemin çıkardığı metin, "
-                "soruları ve kanıt alıntıları herkes görebilecek, bu nottan sınav hazırlayıp kart çalışabilecek.")
-    st.warning("Bu işlem geri alınamaz: herkese açılan not yeniden gizlenemez.", icon=":material/warning:")
-    c = st.columns(2)
-    if c[0].button("Herkese aç", type="primary", width="stretch", key="pub_yes"):
-        library.publish(d["stem"], data.uid())
-        st.cache_data.clear()
-        st.rerun()
-    if c[1].button("Vazgeç", width="stretch", key="pub_no"):
-        st.rerun()
+def _fold(s: str) -> str:
+    """Aramada büyük/küçük harf ve Türkçe harf farkı gözetilmez ('ogrenme' → 'Öğrenme')."""
+    return s.translate(_FOLD).lower()
 
 
-def _actions(d: dict) -> None:
-    """Görünürlük, ad ve (işlenmemişse) işle düğmesi."""
-    meta = data.doc_meta().get(d["stem"], {})
-    mine = meta.get("owner") == data.uid()
-    row = st.container(horizontal=True, vertical_alignment="center", gap="small")
-    if meta.get("public"):
-        row.badge("Herkese açık", icon=":material/public:", color="green")
+def _match(d: dict, words: list[str]) -> bool:
+    """Not adı, PDF'in kendi başlığı ya da konu başlıklarından biri bütün kelimeleri içeriyor mu."""
+    topics = [t["title"] for t in data.topics(d["stem"])] if d["chunks"] else []
+    hay = _fold(" ".join([data.short(d["stem"]), d["title"], *topics]))
+    return all(w in hay for w in words)
+
+
+def _grid(stems: list[str], empty: str, view: str, live: bool = False) -> None:
+    """Kartlar. live: işlenen not var, ızgara 5 sn'de bir kendiliğinden yenilenen bir parçanın (fragment) içinde."""
+    docs = {d["stem"]: d for d in data.documents()}
+    meta, jobs, mine = data.doc_meta(), dict(data.jobs()), data.mine()
+    prog = {p["doc"]: p for p in data.mastery()["docs"]}
+    cards = [docview.card(docs[s], meta.get(s, {}), jobs, prog, public_view=s not in mine) for s in stems if s in docs]
+    if view == "Sayfalı":
+        hit = shelf(cards, key="shelf_docs_pages", layout="pages", empty=empty)
     else:
-        row.badge("Gizli", icon=":material/lock:", color="gray",
-                  help="Yalnızca bu notu yükleyenler görüyor.")
-        if library.has_access(d["stem"], data.uid()) and row.button("Herkese aç", key=f"pub_{d['stem']}",
-                                                                     icon=":material/public:", type="tertiary"):
-            _publish(d)
-    if mine:
-        with row.popover("Adını değiştir", icon=":material/edit:", type="tertiary"):
-            new = st.text_input("Görünen ad", value=data.short(d["stem"]), key=f"ren_{d['stem']}", max_chars=80)
-            if st.button("Kaydet", key=f"renb_{d['stem']}", type="primary"):
-                try:
-                    library.rename(d["stem"], data.uid(), new)
-                    st.cache_data.clear()
-                    st.rerun()
-                except library.LibraryError as e:
-                    st.error(str(e))
-    job = data.job_status(d["stem"])
-    if not d["parsed"] and not (job and not job["done"] and not job["failed"]):
-        st.info("Bu not henüz işlenmedi.", icon=":material/hourglass_empty:")
-        if st.button("Notu işle", type="primary", icon=":material/play_arrow:", key=f"run_{d['stem']}"):
-            _start(d["file"], None)
-
-
-@st.fragment(run_every=4)
-def _jobs() -> None:
-    mine = data.visible()
-    running = [(s, j) for s, j in data.jobs() if not j["done"] and not j["failed"] and s in mine
-               and time.time() - j["started"] < 6 * 3600]
-    for stem, j in running[:3]:
-        with st.container(border=True):
-            st.markdown(f"**{data.short(stem)}** işleniyor — {STEPS[max(0, j['step'] - 1)] if j['step'] else 'başlıyor'}")
-            st.progress(j["step"] / 6)
-            if j["waiting"]:
-                st.caption(f"Kota bekleniyor; iş duraklamadı, kaldığı yerden devam edecek. {j['waiting'].lstrip('⏳ ')}")
-            elif detail := _detail(j["tail"]):
-                st.caption(detail)
-
-
-def _detail(tail: list[str]) -> str | None:
-    """Adımın içindeki son ilerleme satırı (ör. 'üretim 9/15', 'doğrulama 10/30'); adım başlığı ise gösterme."""
-    last = tail[-1] if tail else ""
-    if not last.startswith("   "):
-        return None
-    if "yapılamadı" in last and "qwen" in last:
-        return "Gemini'nin günlük kotası dolu; sorular yedek modelle (qwen) tek tek üretiliyor, bu yüzden biraz daha yavaş."
-    return last.strip()
-
-
-# ---------------------------------------------------------------- belge ayrıntısı
-
-@st.cache_data(max_entries=48)
-def _page_png(file: str, page: int) -> bytes:
-    with pymupdf.open(data.DOCS_DIR / file) as doc:
-        return doc[page - 1].get_pixmap(dpi=85).tobytes("png")
-
-
-def _topics_tab(d: dict) -> None:
-    ts = data.topics(d["stem"])
-    if not ts:
-        st.info("Bu belge için konu bulunamadı.")
-        return
-    if ts[0].get("source") == "sections":
-        st.caption("Konu haritası henüz çıkarılmadı; şimdilik PDF'teki bölüm başlıkları gösteriliyor.")
-    pool = [it for it in R.all_items().values() if it["doc"] == d["stem"] and R.usable(it)]
-    rows = []
-    for t in ts:
-        pages = set(t["pages"])
-        rows.append({"Konu": t["title"], "Sayfalar": ", ".join(map(str, t["pages"])),
-                     "Hazır soru": sum(it["check"].get("evidence_page") in pages for it in pool)})
-    st.dataframe(rows, hide_index=True, width="stretch",
-                 column_config={"Hazır soru": st.column_config.NumberColumn(
-                     help="Bu konunun sayfalarına bağlı, doğrulanmış soru sayısı (sınavlarda anında kullanılır)")})
-
-
-def _pages_tab(d: dict) -> None:
-    p = data.parsed(d["stem"])
-    if not p:
-        st.info("Bu belge henüz okunmadı.")
-        return
-    pages = p["pages"]
-    n = st.select_slider("Sayfa", options=[x["page"] for x in pages], key=f"s_{d['stem']}")
-    pg = pages[n - 1]
-    img, txt = st.columns([1, 1], gap="large")
-    with img:
-        st.image(_page_png(d["file"], n), width="stretch")
-    with txt:
-        b = st.container(horizontal=True)
-        b.badge(SOURCE_TR.get(pg.get("source", "text"), "?"), color="violet" if pg.get("source") == "vision" else "gray")
-        if pg.get("quality") == "needs_vision":
-            b.badge("Görsel okuma bekliyor", color="orange")
-        for f in pg.get("flags", []):
-            b.badge(FLAG_TR.get(f, f), color="blue")
-        style.html(f"<div class='nr-card' style='white-space:pre-wrap;font-size:.92rem;max-height:520px;overflow:auto'>"
-                   f"{style.esc(pg['text']) or '(metin yok)'}</div>")
-        st.caption("Sistemin bu sayfadan çıkardığı metin" + (f" · görsel okuma: `{pg['vision_model']}`"
-                                                             if pg.get("vision_model") else ""))
-
-
-def _quality_tab(d: dict) -> None:
-    p = data.parsed(d["stem"]) or {}
-    c = st.columns(3, gap="medium")
-    c[0].metric("Görselden okunan sayfa", d["vision_pages"], border=True)
-    c[1].metric("Tablosu çıkarılan sayfa", d["table_pages"], border=True)
-    c[2].metric("Silinen üst/alt bilgi satırı", sum(x.get("removed_lines", 0) for x in p.get("pages", [])), border=True)
-    skipped = [x for x in p.get("pages", []) if {"title_page", "toc_like"} & set(x.get("flags", []))]
-    if skipped:
-        st.caption("Soru üretiminden çıkarılan sayfalar: "
-                   + ", ".join(f"s.{x['page']} ({', '.join(FLAG_TR.get(f, f) for f in x['flags'])})" for x in skipped))
-    if d["pending_vision"]:
-        st.caption(f"{d['pending_vision']} sayfa görsel okuma bekliyor (kota açılınca okunur).")
+        hit = shelf(cards, key="shelf_docs_rows", lazy=True, empty=empty)
+    if hit:
+        docview.act(*hit, in_fragment=live)
 
 
 def render() -> None:
-    style.header("İçerik", "Belgeler", "Ders notlarını ekle ve sistemin her notu nasıl okuduğunu, hangi konulara "
-                 "ayırdığını gör.")
-    _add()
-    _jobs()
-    docs = data.my_documents()
-    if not docs:
+    if docview.reading():  # tam ekran okuyucu açık: sayfanın kendisi çizilmez
+        docview.reader_view()
         return
-    st.space("small")
-    names = [d["stem"] for d in docs]
-    if (want := st.session_state.pop("doc_open", None)) in names:  # ana sayfada karta tıklandı
-        st.session_state.doc_sel = want
-    if st.session_state.get("doc_sel") not in names:
-        st.session_state.doc_sel = names[0]
-    stem = st.segmented_control("Belge", names, format_func=data.short, key="doc_sel",
-                                label_visibility="collapsed") or names[0]
-    d = next(x for x in docs if x["stem"] == stem)
-    pool = sum(it["doc"] == stem and R.usable(it) for it in R.all_items().values())
-    st.caption(f"{d['title']} · {d['pages']} sayfa · dil {d['language'].upper()} · "
-               f"{len(data.topics(stem))} konu · havuzda {pool} doğrulanmış soru")
-    _actions(d)
-    t1, t2, t3 = st.tabs(["Konular", "Sayfalar", "Okuma kalitesi"])
-    with t1:
-        _topics_tab(d)
-    with t2:
-        _pages_tab(d)
-    with t3:
-        _quality_tab(d)
+    st.session_state.setdefault("docs_view", "Sayfalı")
+    style.html(_CSS + (_NO_SCROLL if st.session_state.docs_view == "Sayfalı" else ""))
+    style.html('<div class="nr-head"><h1 class="nr-hello-t">Belgeler</h1><p>Bütün notların. Birine tıkla: konuları ve '
+               'sayfaları açılsın; sayfalarına tam ekranda çalışabilirsin.</p></div>')
+    docs, meta, mine = data.my_documents(), data.doc_meta(), data.mine()
+    if not docs:
+        st.info("Henüz notun yok. Ana sayfadaki “Yeni not ekle” kartından bir PDF yükleyebilirsin.",
+                icon=":material/library_books:")
+        st.page_link("ui/pages/home.py", label="Ana sayfaya git", icon=":material/home:")
+        return
+    public = {s for s, m in meta.items() if m.get("public")}
+    counts = {"Tümü": len(docs), "Notlarım": sum(d["stem"] in mine for d in docs),
+              "Herkese açık": sum(d["stem"] in public for d in docs)}
+    if want := st.session_state.pop("docs_filter", None):  # ana sayfadaki "Tümünü gör"
+        st.session_state.docs_f = want
+    st.session_state.setdefault("docs_f", "Tümü")
+    bar = st.container(key="docs_bar", horizontal=True, vertical_alignment="center", gap="small")
+    pick = bar.segmented_control("Süzgeç", FILTERS, required=True, key="docs_f", label_visibility="collapsed",
+                                 format_func=lambda x: f"{x} · {counts[x]}")
+    q = bar.text_input("Ara", placeholder="Not ya da konu ara", key="docs_q", icon=":material/search:",
+                       label_visibility="collapsed")
+    order = bar.selectbox("Sırala", SORTS, key="docs_sort", label_visibility="collapsed", width=160)
+    view = bar.segmented_control("Görünüm", list(VIEWS), required=True, key="docs_view", label_visibility="collapsed",
+                                 format_func=lambda v: f"{VIEWS[v]} {v}",
+                                 help="Sayfalı: ekranda 8 not, kalanlar yana kayar. Kaydırmalı: bütün notlar alt alta.")
+
+    shown = [d for d in docs if pick == "Tümü" or (d["stem"] in mine if pick == "Notlarım" else d["stem"] in public)]
+    if words := _fold(q or "").split():
+        shown = [d for d in shown if _match(d, words)]
+    if order == "Ada göre":
+        shown.sort(key=lambda d: _fold(data.short(d["stem"])))
+    elif order == "En çok soru":
+        shown.sort(key=lambda d: -data.ready().get(d["stem"], 0))
+    else:
+        shown.sort(key=lambda d: -(meta.get(d["stem"], {}).get("created") or 0))
+    empty = (f"“{q}” aramasına uyan not yok." if words else
+             "Henüz herkese açık not yok." if pick == "Herkese açık" else "Bu süzgece uyan not yok.")
+
+    stems, jobs = [d["stem"] for d in shown], dict(data.jobs())
+    if any(docview.running(s, jobs) for s in stems):
+        st.fragment(run_every=5)(_grid)(stems, empty, view, True)  # işlenen notun ilerlemesi kendiliğinden güncellensin
+    else:
+        _grid(stems, empty, view)
+    docview.show()
 
 
 render()

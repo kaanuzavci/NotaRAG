@@ -207,10 +207,15 @@ Tasarım değişikliği kullanıcıya gösterilmeden önce ekran görüntüsüyl
 - [`run_page(rel)`](../scripts/onizleme.py#L42): sayfa dosyasını (`src/ui/pages/cards.py`) burada çalıştırır.
 
 **`tasarim.py` (2026-10-08):** önizlemenin göremediğini gösterir (yazı tipleri, giriş, menü, sayfa geçişleri). Gerçek uygulamayı **geçici bir hesap veritabanıyla** (`data/tasarim/app.sqlite`, `NOTARAG_APP_DB`) 8503'te açar; gerçek hesaplara dokunmaz.
-- [`hazirla()`](../scripts/tasarim.py#L46): iki hesap (deneme / arkadas, parola `parola123`), yarım kart oturumu, yarım sınav, "arkadaşın" paylaştığı herkese açık bir not.
-- [`baslat()`](../scripts/tasarim.py#L91), [`durdur()`](../scripts/tasarim.py#L83): uygulamayı ayrı süreçte açar / kapatır (her `baslat` önce durdurur: src/ui/pages dışı modül değişince yeniden başlatmak gerekir).
-- [`ekran(specs)`](../scripts/tasarim.py#L188): giriş yapar, `"yol:ad[:seçici]"` sayfalarının ekran görüntüsünü `data/tasarim/ekran/`'a alır; seçici verilirse önce fareyle üzerine gelir (sayfada ya da bileşenlerin Shadow DOM'unda arar).
-- [`tikla(specs)`](../scripts/tasarim.py#L200): ana sayfada `"seçici|ad"` öğesine gerçek fare tıklaması; gidilen adres, başlık ve seçili düğmeleri yazar. Kart üzerine gelince kalktığı için konum yeniden ölçülür ([`Tab.hover`](../scripts/tasarim.py#L156)).
+- [`hazirla()`](../scripts/tasarim.py#L53): iki hesap (deneme / arkadas, parola `parola123`), yarım kart oturumu, yarım sınav, "arkadaşın" paylaştığı herkese açık bir not.
+- [`baslat()`](../scripts/tasarim.py#L98), [`durdur()`](../scripts/tasarim.py#L90): uygulamayı ayrı süreçte açar / kapatır (her `baslat` önce durdurur: src/ui/pages dışı modül değişince yeniden başlatmak gerekir).
+- [`ekran(specs)`](../scripts/tasarim.py#L238): giriş yapar, `"yol:ad[:adımlar]"` sayfalarının ekran görüntüsünü `data/tasarim/ekran/`'a alır. Adımlar `" > "` ile ayrılır ve sırayla yapılır ([`Tab.steps`](../scripts/tasarim.py#L190), 2026-10-08 akşamı):
+  - `seçici`: fareyle üzerine gel (sayfada ya da bileşenlerin Shadow DOM'unda arar); `!seçici`: gerçek fare tıklaması;
+  - `~2`: bekle; `^ArrowRight`: tuşa bas; `#ifade`: JS çalıştır, sonucu yaz; `@ad`: akışın ortasında ekran görüntüsü;
+  - `$COLLAPSE` / `$EXPAND`: kenar çubuğunu kapatan / açan düğme. Streamlit çubuğun durumunu tarayıcıda sakladığı için her açılış çubuk açık başlar.
+  - Örnek: `"documents:okuyucu:!.stack:nth-child(2) > ~2 > ![role=tab]:nth-child(2) > @sayfalar > !.st-key-dv_full button > ^ArrowRight"` (kart → pencere → Sayfalar → tam ekran → sonraki sayfa).
+  - Ekran boyutu: `$env:NR_EKRAN="1280x720"` (varsayılan 1440x1000).
+- [`tikla(specs)`](../scripts/tasarim.py#L250): ana sayfada `"seçici|ad"` öğesine gerçek fare tıklaması; gidilen adres, başlık ve seçili düğmeleri yazar. Kart üzerine gelince kalktığı için konum yeniden ölçülür ([`Tab.hover`](../scripts/tasarim.py#L163)).
 - Dikkat: o kurulumda da sınav bitirmek ya da kart değerlendirmek gerçek `attempts.jsonl` / `cards.jsonl`'e yazar; betik bu düğmelere basmaz.
 
 **`ekran.py` (65 satır):** tarayıcı kurulumu olmadan ekran görüntüsü. Windows'taki Edge görünmez modda açılır ve CDP (Chrome DevTools Protocol) ile sürülür; Streamlit çizimini bitirsin diye beklenir. Edge'in tek seferlik `--screenshot` seçeneği yalnızca yükleme iskeletini yakalıyordu.

@@ -24,7 +24,9 @@ if user is None:
     st.navigation([st.Page(auth.page, title="Giriş", icon=":material/login:", default=True)], position="hidden").run()
     st.stop()
 
-st.logo(str(Path(__file__).parent / "ui" / "logo.svg"), size="large")
+# Kenar çubuğunda açık renkli logo (koyu zemin); kenar çubuğu kapalıyken üst şeritte mürekkep renkli olanı (kâğıt zemin)
+st.logo(str(Path(__file__).parent / "ui" / "logo.svg"), icon_image=str(Path(__file__).parent / "ui" / "logo_ink.svg"),
+        size="large")
 
 pages = {
     "": [st.Page("ui/pages/home.py", title="Ana sayfa", icon=":material/home:", default=True)],
@@ -44,9 +46,6 @@ pages = {
     "Hesap": [st.Page("ui/pages/profile.py", title="Profil ve beyin analizi", icon=":material/psychology:")],
 }
 nav = st.navigation(pages, position="sidebar")
-
-with st.sidebar:
-    style.html('<div class="nr-brand-sub">Ders notlarından kanıta dayalı sorular</div>')
-auth.sidebar(user)
+auth.sidebar(user)  # kenar çubuğunun en altında sabit: kim giriş yaptı, çıkış
 
 nav.run()
