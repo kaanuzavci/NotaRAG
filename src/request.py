@@ -22,7 +22,7 @@ import uuid
 from functools import lru_cache
 from pathlib import Path
 
-from src import config
+from src import config, jsonl
 from src import review_store as rs
 
 REQ_DIR = config.DATA_DIR / "requests"
@@ -111,8 +111,9 @@ def _split(n: int, k: int) -> list[int]:
 
 
 def prepare(docs: list[str], topics: list[str], difficulty: str | None, kinds: list[str], n: int,
-            language: str = "tr") -> dict:
-    """Aramayı ve havuz eşleştirmesini yapar (anında); eksik kalan soru sayısını hesaplar. İstek dosyasını yazar."""
+            language: str = "tr", user: str | None = None) -> dict:
+    """Aramayı ve havuz eşleştirmesini yapar (anında); eksik kalan soru sayısını hesaplar. İstek dosyasını yazar.
+    user: sınavı hazırlayan (kayıt için; sınavı bağlantıyla açan herkes kendi hesabıyla çözer)."""
     from src.topics import topic_map
 
     if not topics:  # konu seçilmediyse: seçili belgelerin bütün konuları
@@ -138,7 +139,7 @@ def prepare(docs: list[str], topics: list[str], difficulty: str | None, kinds: l
            "sources": {t: [{"doc": c["doc"], "page": c["page"], "chunk": c["id"], "distance": c["distance"]}
                            for c in s] for t, s in sources.items()},
            "pool_ids": chosen, "missing": missing, "new_ids": [], "status": "ready" if not missing else "partial",
-           "progress": ""}
+           "progress": "", "user": user}
     save(req)
     return req
 
@@ -339,27 +340,33 @@ def _settle(req: dict, new: list[dict], chunks: dict[str, dict]) -> tuple[list[d
 # ---------------------------------------------------------------- öğrenci denemeleri ve bildirimler
 
 def record_attempt(req_id: str, results: dict[str, bool], retry: bool = False, answers: dict | None = None,
-                   hints: dict | None = None) -> None:
+                   hints: dict | None = None, user: str | None = None) -> None:
     """retry=True: yanlışların ikinci denemesi — madde istatistiğine girmez (güçlük ilk denemeden ölçülür).
     answers: öğrencinin verdiği cevap da saklanır → puanlama düzelirse eski denemeler yeniden puanlanabilir
     (2026-10-05'te puanlama hatası yalnızca doğru/yanlış saklandığı için ekran görüntüsünden düzeltilebildi) ve
-    hangi çeldiricinin seçildiği görülür (hiç seçilmeyen çeldirici = işe yaramayan çeldirici)."""
-    ATTEMPTS.parent.mkdir(parents=True, exist_ok=True)
-    with ATTEMPTS.open("a", encoding="utf-8") as f:
-        for qid, correct in results.items():
-            rec = {"id": qid, "correct": bool(correct), "request": req_id, "retry": retry,
-                   "time": time.strftime("%Y-%m-%d %H:%M:%S")}
-            if answers is not None and answers.get(qid) is not None:
-                rec["answer"] = answers[qid]
-            if hints and hints.get(qid):
-                rec["hints"] = hints[qid]  # kullanılan ipucu sayısı (ipucuyla doğru ≠ ipucusuz doğru)
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    hangi çeldiricinin seçildiği görülür (hiç seçilmeyen çeldirici = işe yaramayan çeldirici).
+    user: çözen kişi. Aynı kişinin aynı soruyu yeniden çözmesi de yazılır; ölçüme yalnızca ilk görüşü girer
+    (difficulty.fresh_attempts)."""
+    now, rows = time.time(), []
+    for qid, correct in results.items():
+        rec = {"id": qid, "correct": bool(correct), "request": req_id, "retry": retry,
+               "time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now)), "t": now}
+        if user:
+            rec["user"] = user
+        if answers is not None and answers.get(qid) is not None:
+            rec["answer"] = answers[qid]
+        if hints and hints.get(qid):
+            rec["hints"] = hints[qid]  # kullanılan ipucu sayısı (ipucuyla doğru ≠ ipucusuz doğru)
+        rows.append(rec)
+    jsonl.append(ATTEMPTS, rows)
 
 
 def item_stats() -> dict[str, dict]:
-    """Soru başına öğrenci istatistiği (madde analizi): çözülme sayısı ve doğru oranı (yalnızca ilk denemeler)."""
+    """Soru başına öğrenci istatistiği (madde analizi): kaç kişi çözdü ve doğru oranı. Her kişinin yalnızca soruyu
+    ilk görüşü sayılır (tekrarlar ve kartta görülmüş sorular değil): difficulty.real_attempts."""
+    from src.difficulty import real_attempts
     out: dict[str, dict] = {}
-    for a in (x for x in _jsonl(ATTEMPTS) if not x.get("retry")):
+    for a in real_attempts():
         s = out.setdefault(a["id"], {"n": 0, "correct": 0})
         s["n"] += 1
         s["correct"] += int(a["correct"])
@@ -368,11 +375,11 @@ def item_stats() -> dict[str, dict]:
     return out
 
 
-def report(qid: str, note: str, req_id: str | None = None) -> None:
-    REPORTS.parent.mkdir(parents=True, exist_ok=True)
-    with REPORTS.open("a", encoding="utf-8") as f:
-        f.write(json.dumps({"id": qid, "note": note.strip(), "request": req_id,
-                            "time": time.strftime("%Y-%m-%d %H:%M:%S")}, ensure_ascii=False) + "\n")
+def report(qid: str, note: str, req_id: str | None = None, user: str | None = None) -> None:
+    rec = {"id": qid, "note": note.strip(), "request": req_id, "time": time.strftime("%Y-%m-%d %H:%M:%S")}
+    if user:
+        rec["user"] = user
+    jsonl.append(REPORTS, [rec])
 
 
 if __name__ == "__main__":

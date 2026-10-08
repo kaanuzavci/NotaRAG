@@ -122,7 +122,7 @@ Gemini'nin sınırı istek sayısıdır (günde 20), token değil. Bu yüzden bi
 ### Sınav isteği üretimi
 
 - [`_spec_blocks(spec, noun)`](../src/generation/generate.py#L275): sınav isteğinin özel sayı ve tip planlarıyla birim blokları.
-- [`generate_request(spec, language, difficulty, role, worked)`](../src/generation/generate.py#L281): [`request.run`](../src/request.py#L211) çağırır.
+- [`generate_request(spec, language, difficulty, role, worked)`](../src/generation/generate.py#L281): [`request.run`](../src/request.py#L212) çağırır.
   - `spec` listesinin her elemanı `(birim, kaç soru, tipler)` üçlüsüdür; birim = bir konunun **aramayla bulunan** parçaları.
   - `worked=False`: §2 kuralları + §2b. `worked=True`: §2c.
   - Zorluk istemde hedef olarak verilir ve `requested_difficulty` alanına yazılır; düzey ölçülür (bölüm 10).

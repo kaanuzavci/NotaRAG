@@ -1,6 +1,8 @@
 """NotaRAG arayüzü. Çalıştırma: .venv\\Scripts\\streamlit run src/app.py  →  http://localhost:8501
 
-Sayfalar (src/ui/pages): Sınav Hazırla · Bilgi Kartları · Belgeler · Soru Bankası · İnceleme · Rapor · Modeller ve Kota
+Önce giriş (src/ui/auth.py); giriş yapılmadan hiçbir sayfa görünmez. Rol yok: herkes aynı sayfaları görür.
+Sayfalar (src/ui/pages): Ana sayfa · Sınav Hazırla · Bilgi Kartları · Belgeler · Soru Bankası · İnceleme · Rapor ·
+Modeller ve Kota · Profil ve beyin analizi
 Görsel dil: .streamlit/config.toml (tema) + src/ui/style.py (ayrıntılar); ortak soru kartı src/ui/components.py.
 """
 
@@ -11,17 +13,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # 'streamlit ru
 
 import streamlit as st
 
-from src.ui import style
+from src.ui import auth, style
 
 st.set_page_config(page_title="NotaRAG", page_icon=":material/menu_book:", layout="wide",
                    initial_sidebar_state="expanded")
 style.inject()
 
+user = auth.current()
+if user is None:
+    st.navigation([st.Page(auth.page, title="Giriş", icon=":material/login:", default=True)], position="hidden").run()
+    st.stop()
+
 st.logo(str(Path(__file__).parent / "ui" / "logo.svg"), size="large")
 
 pages = {
+    "": [st.Page("ui/pages/home.py", title="Ana sayfa", icon=":material/home:", default=True)],
     "Çalış": [
-        st.Page("ui/pages/exam.py", title="Sınav Hazırla", icon=":material/quiz:", default=True),
+        st.Page("ui/pages/exam.py", title="Sınav Hazırla", icon=":material/quiz:"),
         st.Page("ui/pages/cards.py", title="Bilgi Kartları", icon=":material/style:"),
     ],
     "İçerik": [
@@ -33,10 +41,12 @@ pages = {
         st.Page("ui/pages/report.py", title="Rapor", icon=":material/insights:"),
         st.Page("ui/pages/models.py", title="Modeller ve Kota", icon=":material/speed:"),
     ],
+    "Hesap": [st.Page("ui/pages/profile.py", title="Profil ve beyin analizi", icon=":material/psychology:")],
 }
 nav = st.navigation(pages, position="sidebar")
 
 with st.sidebar:
     style.html('<div class="nr-brand-sub">Ders notlarından kanıta dayalı sorular</div>')
+auth.sidebar(user)
 
 nav.run()

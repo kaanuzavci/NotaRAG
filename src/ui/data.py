@@ -39,11 +39,111 @@ def parsed(stem: str) -> dict | None:
     return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
 
 
-DOC_SHORT = config.DOC_NAMES
-
-
 def short(doc: str) -> str:
-    return config.doc_name(doc)
+    """Belgenin görünen adı (kütüphane kaydından; src/library.py)."""
+    from src.library import display_name
+    return display_name(doc)
+
+
+# --- Kişi ve görünürlük (src/accounts.py, src/library.py) ------------------------------------------------------
+
+def user() -> dict | None:
+    """Giriş yapmış kişi {id, name, username} (src/ui/auth.py koyar)."""
+    return st.session_state.get("user")
+
+
+def uid() -> str | None:
+    u = user()
+    return u["id"] if u else None
+
+
+@st.cache_data(ttl=10)
+def _visible(user_id: str) -> set[str]:
+    from src import library
+    library.sync()  # elle konan PDF'ler ve girişten önceki belgeler kayda girsin
+    return library.visible(user_id)
+
+
+def visible() -> set[str]:
+    """Kişinin görebildiği belgeler (kendi yükledikleri + herkese açık olanlar). Belge ya da içeriği gösteren her
+    sayfa bununla süzer."""
+    return _visible(uid()) if uid() else set()
+
+
+@st.cache_data(ttl=10)
+def doc_meta() -> dict[str, dict]:
+    """Belge kaydı: {doc: {name, owner, public, ...}}."""
+    from src import library
+    return library.all_docs()
+
+
+def my_documents() -> list[dict]:
+    seen = visible()
+    return [d for d in documents() if d["stem"] in seen]
+
+
+@st.cache_data(ttl=10)
+def _mine(user_id: str) -> set[str]:
+    from src import library
+    return library.mine(user_id)
+
+
+def mine() -> set[str]:
+    """Kişinin kendi listesindeki notlar (yükledikleri + eklediği herkese açık notlar); ana sayfadaki raf."""
+    return _mine(uid()) if uid() else set()
+
+
+@st.cache_data(ttl=30)
+def items() -> dict[str, dict]:
+    """Bütün sorular (request.all_items; etkin zorluk bindirilmiş), 30 sn önbellek."""
+    from src.request import all_items
+    return all_items()
+
+
+@st.cache_data(ttl=20)
+def _mastery(user_id: str, docs: tuple[str, ...]) -> dict:
+    from src.mastery import for_user
+    return for_user(user_id, set(docs))
+
+
+def mastery() -> dict:
+    """Beyin analizi (src/mastery.py): görebildiğin notlarda konu konu ne kadar hâkimsin."""
+    return _mastery(uid(), tuple(sorted(visible()))) if uid() else {"docs": [], "weak": []}
+
+
+@st.cache_data(ttl=20)
+def _home(user_id: str, docs: tuple[str, ...]) -> dict:
+    import time as _t
+
+    from src import cards as K
+    from src import request as R
+    pool = K.pool(list(docs))
+    hist = K.history(user=user_id)
+    due = [it["id"] for it in pool if it["id"] in hist and K.is_due(hist[it["id"]], _t.time())]
+    verified = sum(1 for it in R.all_items().values() if it["doc"] in docs and R.usable(it))
+    parts = [f"<b>{len(docs)}</b> not", f"<b>{verified}</b> hazır soru", f"<b>{len(pool)}</b> kart"]
+    parts.append(f"bugün tekrar zamanı gelen <b>{len(due)}</b> kart" if due else "bugün tekrar zamanı gelen kart yok")
+    return {"line": " · ".join(parts), "due": due}
+
+
+def home_stats() -> str:
+    """Ana sayfa başlığının altındaki özet satırı (HTML; sayılar kalın)."""
+    return _home(uid(), tuple(sorted(mine())))["line"] if uid() else ""
+
+
+def due_cards() -> list[str]:
+    """Kişinin notlarında bugün tekrar zamanı gelen kartlar (daha önce görülmüş, kutusunun aralığı dolmuş)."""
+    return _home(uid(), tuple(sorted(mine())))["due"] if uid() else []
+
+
+@st.cache_data(ttl=300)
+def avatar_b64(user_id: str) -> str | None:
+    """Profil resmi (base64 JPEG) ya da None. Resim değişince avatar_b64.clear()."""
+    import base64
+
+    from src import accounts
+    raw = accounts.avatar(user_id)
+    return base64.b64encode(raw).decode("ascii") if raw else None
 
 
 @st.cache_data(ttl=60)

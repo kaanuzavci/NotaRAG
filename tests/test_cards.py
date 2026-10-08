@@ -3,7 +3,7 @@
 import tempfile
 from pathlib import Path
 
-from src.cards import card_ok, history, is_due, next_gap, pick, record, step, summary
+from src.cards import card_ok, first_seen, history, is_due, next_gap, pick, record, step, summary
 
 DAY = 86400
 
@@ -45,6 +45,26 @@ def test_all() -> None:
         assert h["q1"]["box"] == 2 and h["q1"]["seen"] == 4 and h["q1"]["good"] == 3
 
 
+def test_per_user() -> None:
+    """Kutular kişiye özel: aynı kural, herkesin kendi değerlendirmeleri. Kişi alanı olmayan eski satırlar ilk hesabın."""
+    from src import accounts, appdb
+    with tempfile.TemporaryDirectory() as d:
+        appdb.PATH = Path(d) / "app.sqlite"
+        p = Path(d) / "cards.jsonl"
+        record("q1", "good", p)  # girişten önceki dönem (kişi alanı yok)
+        kaan = accounts.create("kaan", "parola123")["id"]  # ilk hesap: eski satırların sahibi
+        demo = accounts.create("demo", "parola123")["id"]
+        record("q1", "good", p, user=kaan)
+        record("q1", "bad", p, user=demo)
+        record("q2", "skip", p, user=demo)
+        assert history(p, user=kaan)["q1"]["box"] == 3  # eski + yeni: iki kez bildi
+        assert history(p, user=demo)["q1"]["box"] == 1 and "q1" not in history(p, user="baskasi")
+        assert history(p)["q1"]["seen"] == 3  # kişi verilmezse bütün satırlar
+        seen = first_seen(p)
+        assert set(seen) == {(kaan, "q1"), (demo, "q1")}  # atla sayılmaz: cevap görülmemiş olabilir
+
+
 if __name__ == "__main__":
     test_all()
+    test_per_user()
     print("cards: tüm testler geçti")

@@ -40,8 +40,8 @@ def _topic(it: dict) -> str:
 
 
 def _doc_name(it: dict) -> str:
-    from src.config import doc_name
-    return doc_name(_doc(it))
+    from src.library import display_name  # kütüphanedeki görünen ad (değiştirilebilir); kayıtta yoksa dosya adından
+    return display_name(_doc(it))
 
 
 def _source(it: dict) -> str:

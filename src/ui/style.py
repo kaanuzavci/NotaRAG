@@ -35,6 +35,42 @@ _CSS = """
 .nr-lead { color: #4A5163; font-size: 1rem; max-width: 44rem; margin: .45rem 0 0 0; }
 .nr-rule { border: 0; border-top: 3px double #CFC5AF; margin: 1rem 0 1.3rem 0; }
 
+/* Seçim düğmeleri (st.pills, st.segmented_control): seçili olan net görünsün (eskiden açık gri, seçilmemişe çok yakındı) */
+.stButtonGroup button[data-selected="true"] { background: #1F3A5F !important; border-color: #1F3A5F !important;
+  color: #FFFDF8 !important; }
+.stButtonGroup button[data-selected="true"] * { color: inherit !important; }
+.stButtonGroup button:not([data-selected="true"]):hover { border-color: #1F3A5F !important; color: #1F3A5F !important; }
+.stButtonGroup button { transition: background .15s, border-color .15s, color .15s; }
+
+/* Kart görünümlü form kutusu (ör. Sınav Hazırla): st.container(key="nr_card_…") */
+[class*="st-key-nr_card_"] { background: #FFFDF8; border: 1px solid #E4DCC9; border-radius: 18px; padding: 1.3rem 1.4rem;
+  box-shadow: 0 1px 0 rgba(30, 36, 51, .04), 0 18px 34px -30px rgba(30, 36, 51, .55); }
+
+/* Profil resmi (src/ui/style.avatar) */
+.nr-avatar { display: inline-grid; place-items: center; flex: none; border-radius: 50%; object-fit: cover;
+  font-family: 'Fraunces', serif; font-weight: 600; letter-spacing: .02em;
+  box-shadow: 0 0 0 3px #FFFDF8, 0 0 0 4px #E2DAC8; }
+
+/* Ana sayfa: selam satırı ve bölüm başlıkları (src/ui/pages/home.py) */
+.nr-hello { display: flex; align-items: center; gap: 18px; }
+.nr-hello .nr-title { margin: 0; }
+.nr-hello-sub { color: #5B5F6B; font-size: .95rem; margin-top: .35rem; }
+.nr-hello-sub b { color: #1E2433; font-weight: 600; }
+.nr-sec { margin: 1.6rem 0 .1rem; }
+.nr-sec .k { font-family: 'JetBrains Mono', monospace; font-size: .68rem; letter-spacing: .14em; text-transform: uppercase;
+  color: #8A7E63; }
+.nr-sec h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.45rem; color: #1E2433; margin: .1rem 0 0;
+  padding: 0; }
+.nr-sec p { color: #6B6F7B; font-size: .9rem; margin: .25rem 0 0; }
+
+/* Kenar çubuğunda (koyu zemin) giriş yapan kişi (src/ui/auth.py) */
+.nr-who { display: flex; align-items: center; gap: 11px; font-size: .92rem; margin-bottom: -.5rem; }
+.nr-who > div { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
+.nr-who span { font-family: 'JetBrains Mono', monospace; font-size: .66rem; letter-spacing: .14em;
+  text-transform: uppercase; color: #8F876F; }
+.nr-who b { color: #F1ECE0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nr-who .nr-avatar { box-shadow: 0 0 0 2px #2B3550; }
+
 /* Fosforlu kalem: sistemin imzası (kanıt vurgusu) */
 .nr-hl { background: linear-gradient(104deg, rgba(242,214,75,0) .9%, rgba(242,214,75,.85) 2.4%,
   rgba(242,214,75,.55) 5.8%, rgba(242,214,75,.35) 93%, rgba(242,214,75,.75) 96%, rgba(242,214,75,0) 98%),
@@ -440,6 +476,18 @@ def header(kicker: str, title: str, lead: str = "", hero_word: str | None = None
         t = t.replace(esc(hero_word), f'<span class="nr-hero-hl">{esc(hero_word)}</span>', 1)
     lead_html = f'<p class="nr-lead">{esc(lead)}</p>' if lead else ""
     html(f'<div class="nr-kicker">{esc(kicker)}</div><h1 class="nr-title">{t}</h1>{lead_html}<hr class="nr-rule">')
+
+
+def avatar(user: dict, b64: str | None, size: int = 40) -> str:
+    """Yuvarlak profil resmi; resim yoksa adın baş harfleri kişiye özgü pastel zeminde (renk kimlikten)."""
+    if b64:
+        return (f'<img class="nr-avatar" src="data:image/jpeg;base64,{b64}" alt="" '
+                f'style="width:{size}px;height:{size}px">')
+    words = (user.get("name") or user.get("username") or "?").split()
+    initials = "".join(w[0] for w in words[:2]).upper()
+    c1, c2, ink, a = color(sum(map(ord, user.get("id") or "x")))
+    return (f'<span class="nr-avatar" style="width:{size}px;height:{size}px;background:{c2};color:{ink};'
+            f'font-size:{size * .38:.0f}px">{esc(initials)}</span>')
 
 
 def pill(label: str) -> str:

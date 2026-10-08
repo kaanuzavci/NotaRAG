@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pymupdf
 
-from src import config
+from src import config, jsonl
 from src.textnorm import normalize_for_match as norm
 
 REVIEWS = config.DATA_DIR / "reviews.jsonl"
@@ -71,15 +71,17 @@ REJECT_REASONS = ["Yanlış cevap", "Birden çok doğru şık", "Metinde yok / u
                   "Belirsiz soru", "Anlatım / dil hatası", "Önemsiz ayrıntı"]
 
 
-def save_decision(item: dict, decision: str, note: str, source: str, reasons: list[str] | None = None) -> None:
+def save_decision(item: dict, decision: str, note: str, source: str, reasons: list[str] | None = None,
+                  user: str | None = None) -> None:
+    """user: kararı veren. Karar ortak havuzu etkiler (herkes için); kimin verdiği kayıtta kalır."""
     rec = {"id": item["id"], "decision": decision, "note": note.strip(), "reasons": reasons or [],
            "time": time.strftime("%Y-%m-%d %H:%M:%S"),
            "set": source, "model": item.get("model"), "question": item["q"].get("question"),
            "system_label": item.get("verification", {}).get("label"),
            "flags": item.get("check", {}).get("flags", [])}
-    REVIEWS.parent.mkdir(parents=True, exist_ok=True)
-    with REVIEWS.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    if user:
+        rec["user"] = user
+    jsonl.append(REVIEWS, [rec])
 
 
 def _pdf_for(doc_stem: str) -> Path | None:

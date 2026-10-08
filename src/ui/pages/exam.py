@@ -7,7 +7,7 @@ Sonra: çöz (puan, zayıf konular, yanlışlarda çözüm ve kaynak, hatalı so
 
 import streamlit as st
 
-from src import export
+from src import export, resume
 from src import request as R
 from src.ui import data, style
 from src.ui import quiz as Q
@@ -18,15 +18,19 @@ DIFF = {"Karışık": None, "Kolay": "easy", "Orta": "medium", "Zor": "hard"}
 # ---------------------------------------------------------------- 1. seçim
 
 def _builder() -> None:
-    docs = [d for d in data.documents() if d["chunks"]]
+    docs = [d for d in data.my_documents() if d["chunks"]]
     if not docs:
         st.info("Önce **Belgeler** sayfasından bir ders notu ekle.", icon=":material/upload_file:")
         return
-    default = max(docs, key=lambda d: d["verified"])["stem"]
-    with st.container(border=True):
+    names = [d["stem"] for d in docs]
+    if (want := st.session_state.pop("exam_doc", None)) in names:  # ana sayfada destedeki "Sınav" düğmesi
+        st.session_state.exam_docs = [want]
+    if not st.session_state.get("exam_docs") or not set(st.session_state.exam_docs) <= set(names):
+        st.session_state.exam_docs = [max(docs, key=lambda d: d["verified"])["stem"]]
+    with st.container(key="nr_card_exam"):
         st.markdown("##### 1 · Hangi notlardan?")
-        chosen = st.pills("Belgeler", [d["stem"] for d in docs], selection_mode="multi", default=[default],
-                          format_func=data.short, label_visibility="collapsed")
+        chosen = st.pills("Belgeler", names, selection_mode="multi", format_func=data.short, key="exam_docs",
+                          label_visibility="collapsed")
         if not chosen:
             st.caption("En az bir belge seç.")
             return
@@ -49,7 +53,8 @@ def _builder() -> None:
         go = st.button("Sınavı hazırla", type="primary", icon=":material/auto_awesome:", disabled=not kinds)
     if go:
         with st.spinner("Notlarında bu konuları anlatan sayfalar aranıyor…"):
-            req = R.prepare(chosen, list(dict.fromkeys(t for _, t in picked)), DIFF[diff or "Karışık"], kinds, n)
+            req = R.prepare(chosen, list(dict.fromkeys(t for _, t in picked)), DIFF[diff or "Karışık"], kinds, n,
+                            user=data.uid())
         _open(req["id"])
         st.rerun()
 
@@ -150,10 +155,29 @@ def _export(req: dict, items: list[dict]) -> None:
 
 # ---------------------------------------------------------------- sayfa
 
+def _remember(ex: dict | None) -> None:
+    """Kaldığın yerden devam et (src/resume.py): başlamış ama bitmemiş sınav kişiye kaydedilir (her tıklamada;
+    geri çağırmalar betikten önce çalıştığı için burada en son hâli var), bitince silinir."""
+    if not ex:
+        return
+    if ex.get("submitted"):
+        resume.clear(data.uid(), "exam")
+    elif ex.get("started"):
+        resume.save(data.uid(), "exam", ex)
+
+
 def render() -> None:
-    if "exam" not in st.session_state and st.query_params.get("sinav") and R.load(st.query_params["sinav"]):
-        _open(st.query_params["sinav"])
+    link = st.query_params.get("sinav")
+    if "exam" not in st.session_state and link and (shared := R.load(link)):
+        # Sınav bağlantısı: açan kişi kendi hesabıyla çözer; ancak sınavın belgelerini görebiliyorsa
+        if set(shared["params"]["docs"]) <= data.visible():
+            _open(link)
+        else:
+            st.query_params.clear()
+            st.warning("Bu sınav senin göremediğin bir nottan hazırlanmış. Not herkese açılırsa bağlantı çalışır.",
+                       icon=":material/lock:")
     ex = st.session_state.get("exam")
+    _remember(ex)
     req = R.load(ex["id"]) if ex else None
     items = R.items_of(req) if req else []
     phase = (ex or {}).get("phase") or ("results" if (ex or {}).get("submitted") else "start")

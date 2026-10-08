@@ -1,16 +1,20 @@
 """Belgeler: ders notu ekle (arka planda okunur, konu haritası çıkarılır, soru havuzu hazırlanır) ve her notun
-konularını, sayfalarını, okuma kalitesini gör."""
+konularını, sayfalarını, okuma kalitesini gör.
+
+Belge kütüphanesi (src/library.py): yüklenen not yalnızca yükleyene görünür; istenirse herkese açılır (geri
+alınamaz). Sistemde zaten olan bir not (aynı dosya ya da aynı içerik, adı farklı olsa da) yeniden işlenmez,
+yükleyenin listesine eklenir."""
 
 import time
 
 import pymupdf
 import streamlit as st
 
+from src import library
 from src import request as R
-from src.ui import data, style
+from src.ui import data, style, upload
 
 STEPS = ["PDF okuma", "Görsel okuma", "Bölümleme", "Dizin", "Soru havuzu", "Doğrulama"]
-LANGS = {"Belgenin dili": None, "Türkçe": "tr", "İngilizce": "en"}
 SOURCE_TR = {"text": "Metin katmanı", "vision": "Görselden okundu"}
 FLAG_TR = {"title_page": "Kapak", "toc_like": "İçindekiler", "image_heavy": "Görsel ağırlıklı",
            "noisy_text": "Bozuk metin", "tables_extracted": "Tablo çıkarıldı"}
@@ -19,27 +23,65 @@ FLAG_TR = {"title_page": "Kapak", "toc_like": "İçindekiler", "image_heavy": "G
 # ---------------------------------------------------------------- ekleme ve işler
 
 def _add() -> None:
-    with st.expander("Yeni ders notu ekle", icon=":material/upload_file:", expanded=not data.documents()):
-        up = st.file_uploader("PDF dosyası", type=["pdf"], label_visibility="collapsed")
-        lang = st.segmented_control("Soruların dili", list(LANGS), default="Belgenin dili",
-                                    help="İngilizce bir slayttan Türkçe soru üretilebilir; kanıt alıntısı kaynak dilde kalır.")
-        if up is not None:
-            dest = data.DOCS_DIR / up.name
-            if not dest.exists() or dest.stat().st_size != up.size:
-                dest.write_bytes(up.getvalue())
-                st.cache_data.clear()
-            if st.button(f"“{up.name}” notunu işle", type="primary", icon=":material/play_arrow:"):
-                data.start_job(up.name, LANGS[lang or "Belgenin dili"])
-                st.toast("İşleme başladı; ilerleme aşağıda.", icon=":material/rocket_launch:")
-                time.sleep(1)
-                st.rerun()
-        st.caption("Not okunur (gerekirse görsel okuma), konu haritası çıkarılır ve her konudan doğrulanmış sorularla "
-                   "bir başlangıç havuzu hazırlanır. Arka planda yürür; sayfayı kapatsan da devam eder.")
+    """Yükleme akışı src/ui/upload.py'de (ana sayfadaki "+ Yeni not ekle" penceresi de onu kullanır)."""
+    with st.expander("Yeni ders notu ekle", icon=":material/upload_file:", expanded=not data.my_documents()):
+        if upload.uploader("docs_up"):
+            st.rerun()
+
+
+def _start(file: str, lang: str | None) -> None:
+    upload.start(file, lang)
+    st.rerun()
+
+
+@st.dialog("Notu herkese aç")
+def _publish(d: dict) -> None:
+    st.markdown(f"**{data.short(d['stem'])}** bütün hesaplara açılacak: sayfaları, sistemin çıkardığı metin, "
+                "soruları ve kanıt alıntıları herkes görebilecek, bu nottan sınav hazırlayıp kart çalışabilecek.")
+    st.warning("Bu işlem geri alınamaz: herkese açılan not yeniden gizlenemez.", icon=":material/warning:")
+    c = st.columns(2)
+    if c[0].button("Herkese aç", type="primary", width="stretch", key="pub_yes"):
+        library.publish(d["stem"], data.uid())
+        st.cache_data.clear()
+        st.rerun()
+    if c[1].button("Vazgeç", width="stretch", key="pub_no"):
+        st.rerun()
+
+
+def _actions(d: dict) -> None:
+    """Görünürlük, ad ve (işlenmemişse) işle düğmesi."""
+    meta = data.doc_meta().get(d["stem"], {})
+    mine = meta.get("owner") == data.uid()
+    row = st.container(horizontal=True, vertical_alignment="center", gap="small")
+    if meta.get("public"):
+        row.badge("Herkese açık", icon=":material/public:", color="green")
+    else:
+        row.badge("Gizli", icon=":material/lock:", color="gray",
+                  help="Yalnızca bu notu yükleyenler görüyor.")
+        if library.has_access(d["stem"], data.uid()) and row.button("Herkese aç", key=f"pub_{d['stem']}",
+                                                                     icon=":material/public:", type="tertiary"):
+            _publish(d)
+    if mine:
+        with row.popover("Adını değiştir", icon=":material/edit:", type="tertiary"):
+            new = st.text_input("Görünen ad", value=data.short(d["stem"]), key=f"ren_{d['stem']}", max_chars=80)
+            if st.button("Kaydet", key=f"renb_{d['stem']}", type="primary"):
+                try:
+                    library.rename(d["stem"], data.uid(), new)
+                    st.cache_data.clear()
+                    st.rerun()
+                except library.LibraryError as e:
+                    st.error(str(e))
+    job = data.job_status(d["stem"])
+    if not d["parsed"] and not (job and not job["done"] and not job["failed"]):
+        st.info("Bu not henüz işlenmedi.", icon=":material/hourglass_empty:")
+        if st.button("Notu işle", type="primary", icon=":material/play_arrow:", key=f"run_{d['stem']}"):
+            _start(d["file"], None)
 
 
 @st.fragment(run_every=4)
 def _jobs() -> None:
-    running = [(s, j) for s, j in data.jobs() if not j["done"] and not j["failed"]
+    mine = data.visible()
+    running = [(s, j) for s, j in data.jobs() if not j["done"] and not j["failed"] and s in mine
                and time.time() - j["started"] < 6 * 3600]
     for stem, j in running[:3]:
         with st.container(border=True):
@@ -130,16 +172,22 @@ def render() -> None:
                  "ayırdığını gör.")
     _add()
     _jobs()
-    docs = data.documents()
+    docs = data.my_documents()
     if not docs:
         return
     st.space("small")
-    stem = st.segmented_control("Belge", [d["stem"] for d in docs], format_func=data.short,
-                                default=docs[0]["stem"], label_visibility="collapsed") or docs[0]["stem"]
+    names = [d["stem"] for d in docs]
+    if (want := st.session_state.pop("doc_open", None)) in names:  # ana sayfada karta tıklandı
+        st.session_state.doc_sel = want
+    if st.session_state.get("doc_sel") not in names:
+        st.session_state.doc_sel = names[0]
+    stem = st.segmented_control("Belge", names, format_func=data.short, key="doc_sel",
+                                label_visibility="collapsed") or names[0]
     d = next(x for x in docs if x["stem"] == stem)
     pool = sum(it["doc"] == stem and R.usable(it) for it in R.all_items().values())
     st.caption(f"{d['title']} · {d['pages']} sayfa · dil {d['language'].upper()} · "
                f"{len(data.topics(stem))} konu · havuzda {pool} doğrulanmış soru")
+    _actions(d)
     t1, t2, t3 = st.tabs(["Konular", "Sayfalar", "Okuma kalitesi"])
     with t1:
         _topics_tab(d)

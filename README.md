@@ -143,11 +143,14 @@ Tasarım ilkesi: **kota dolduğunda sistem yavaşlar ama kaliteden ödün vermez
 | Füzyon | Reciprocal Rank Fusion (yalnızca karşılaştırma) | TR sorgu → EN slaytta zarar verdi (isabet@5 %58'e %100); varsayılan değil |
 | LLM (üretim) | Gemini 3.8 / 3.5 Flash, toplu (bir istekte bir grubun tüm birimleri); yedek: Groq `qwen3.8-27b` birim başına | Aynı 12 birimde toplu Gemini %92-100, qwen %92 doğrulandı; Gemini daha çeşitli ve zor soru üretiyor. Hesap soruları (§2c) yalnızca Gemini'de (yedek yok) |
 | Doğrulama | gpt-oss-120b / 20b (Groq), Nemotron 3 Ultra (OpenRouter ücretsiz), qwen — üreticiden farklı aile | Kendi hatasını görememe riskini azaltır; duyarlılık testleri: 120b 17/17, 20b 20/20, Nemotron 10/10 + hesap 12/12, qwen 19/19 |
+| LLM düzenleme | Kendi yönlendiricimiz (`src/llm/router.py` + `ledger.py`); LangChain kullanılmıyor | Ödevin teknoloji listesinde var, ama asıl zorluk ücretsiz kota ve kalite kuralları: günlük istek/token kotası süreçler arasında ortak defterde izlenir (LangChain'in hız sınırlayıcısı süreç içi ve saniyelik), kota dolunca zayıf modele geçilmez (LangChain `with_fallbacks` sıradaki modele geçer), doğrulayıcı üreticiden farklı aileden. PDF için PyMuPDF zaten doğrudan gerekiyordu (sayfa kalitesi, kanıt vurgulama), Chroma doğrudan kullanılıyor → LangChain yeni yetenek eklemiyor (karar 2026-10-07) |
 | Hesap kontrolü | SymPy (AST beyaz listesi, ayrı süreçte 10 sn sınırı) | Model kendi hesabını ifade olarak yazar; kod yeniden hesaplar (`src/generation/compute.py`) |
 | Öğrenci cevabı puanlama | SymPy değer karşılaştırması + sıkı metin eşleşmesi (`src/grading.py`) | '30240' = '9!/(3!·2!)'; '2' ≠ '(n choose 2)·2'; güvenilmez girdi için büyüklük sınırları |
 | Bulanık eşleşme | rapidfuzz | Kanıt alıntısı için "neredeyse birebir" eşleşme |
 | Değerlendirme | Kendi betikleri (`eval/`); RAGAS planlı | Retrieval ablasyonu, doğrulayıcı duyarlılığı, hesap kontrolü, toplu üretim, Bloom deneyi |
-| Arayüz | Streamlit 1.59 | Hızlı prototipleme; 6 sayfa (`src/app.py`) |
+| Arayüz | Streamlit 1.59 | Hızlı prototipleme; giriş + 9 sayfa (`src/app.py`). Ana sayfanın kart desteleri Streamlit özel bileşeni (CCv2, iframe'siz Shadow DOM): düz HTML tıklamayı Python'a iletemiyor, bağlantı ise sayfayı yeniden yükleyip oturumu düşürüyordu |
+| Beyin analizi | Kendi kayıtlarından kural tabanlı (`src/mastery.py`) | Soru → konu bağı konu haritasının sayfalarından (kalıcı); konunun durumu son sınav cevabı ve kart kutusundan; açıklanabilir eşikler, LLM ve kota yok |
+| Hesaplar ve belge kaydı | SQLite (`data/app.sqlite`), parola özeti scrypt (Python `hashlib`) | Kurulum ve ek paket gerektirmez, tek dosya; şema adım adım sürümlü (yeni alan var olan veriyi bozmadan eklenir); hesap kimliği giriş yönteminden bağımsız → ileride Google ya da telefonla giriş aynı hesaba bağlanır. Rol yok: herkes aynı sayfaları kullanır, verisi kendisinindir; belge varsayılan gizli, istenirse herkese açılır (geri alınamaz). Sona eklenen geçmiş (çözümler, kartlar) JSONL'de kişi kimliğiyle (`rehber/11`) |
 
 > **Ölçülen ücretsiz kotalar (2026-10-03/05):** Groq'ta bağlayıcı sınır istek sayısı değil, **model başına günde 200.000 token** (kayan 24 saat; ör. qwen için hata mesajı: "tokens per day (TPD): Limit 200000") ve dakikada 8.000 token. Gemini modelleri günde 20 istek/model (Google bazen bizim sayacımız 17'deyken "dolu" diyor), embedding dakikada 100 metin. OpenRouter ücretsiz modelleri günde 50 istek (bir kez 10 $ kredi → 1.000). Kota defteri (`src/llm/ledger.py`) kayan 24 saatlik token kullanımını izler; sınıra takılan model yalnızca sağlayıcının söylediği süre kadar bekletilir.
 >
@@ -161,7 +164,7 @@ NotaRAG/
 ├── requirements.txt, constraints.txt   # sürümler sabitlenmiş (pip önbelleğiyle uyumlu)
 ├── .env                      # API anahtarları (repoya girmez; şablon .env.example)
 ├── src/
-│   ├── app.py                # Streamlit girişi (6 sayfa)
+│   ├── app.py                # Streamlit girişi: önce giriş (ui/auth.py), sonra 9 sayfa (Ana sayfa varsayılan)
 │   ├── pipeline.py           # uçtan uca akış: PDF → … → doğrulanmış sorular (ekleyerek)
 │   ├── request.py            # sınav isteği: arama, havuz, hedefli üretim, çözüm kayıtları
 │   ├── topics.py             # konu haritası (PROMPTS §7)
@@ -172,15 +175,23 @@ NotaRAG/
 │   ├── qualify.py            # aday model yeterlilik testi
 │   ├── requote.py            # kanıt alıntılarını güncel metinden yeniden alma
 │   ├── prompts.py            # PROMPTS.md'den istem okuma
+│   ├── accounts.py           # hesaplar, parola (scrypt), "beni hatırla" oturumları; rol yok
+│   ├── library.py            # belge kütüphanesi: kimlik, gizli/herkese açık, aynı belgeyi içerikten tanıma
+│   ├── appdb.py              # data/app.sqlite (hesaplar + belge kaydı) ve şema adımları
+│   ├── jsonl.py              # kayıt dosyalarına kilitli ekleme
+│   ├── mastery.py            # beyin analizi: konu konu ne kadar hâkimsin (kendi kayıtlarından; LLM yok)
+│   ├── resume.py             # kaldığın yerden devam et: yarım kart oturumu ve sınav
 │   ├── ingestion/            # PDF okuma, görsel okuma, dil tespiti
 │   ├── chunking/             # başlık duyarlı bölme + metadata
 │   ├── retrieval/            # embedding, Chroma, BM25-F5, RRF
 │   ├── generation/           # üretim (generate.py), şema, hesap (compute.py), pilot
 │   ├── verification/         # kod kontrolleri, kör doğrulama, duyarlılık testi
 │   ├── llm/                  # router (tek kapı), models (kalite kapısı), ledger (kota + önbellek), capacity
-│   └── ui/                   # quiz.py (sınav deneyimi), style.py, components.py, data.py, pages/, parts/
+│   └── ui/                   # auth.py (giriş), shelf.py (ana sayfa desteleri, CCv2), upload.py, quiz.py (sınav deneyimi),
+│                             # style.py, components.py, data.py, pages/ (home, profile, exam, cards, …), parts/
 ├── data/                     # sample_docs/ (PDF'ler), parsed/, chunks/, chroma/, topics/, questions/, requests/,
-│                             # jobs/ (arka plan iş günlükleri), review/ (attempts.jsonl, reports.jsonl), llm.sqlite
+│                             # jobs/ (arka plan iş günlükleri), review/ (attempts, cards, reports: kişi kimliğiyle),
+│                             # llm.sqlite (kota + önbellek), app.sqlite (hesaplar, oturumlar, belge kaydı)
 ├── eval/                     # değerlendirme betikleri + sonuclar_*.md, yeterlilik/
 ├── tests/                    # python -m tests.<ad>
 ├── rehber/                   # dosya dosya kod rehberi (her fonksiyon, bağlantılar, nedenleri)
@@ -207,7 +218,7 @@ Durum, ölçüm sonuçları ve sıradaki işler: **ROADMAP.md** (en üstteki "Ş
 Windows, Python 3.11 sanal ortamı (`.venv`). Anahtarlar `.env` dosyasında (şablon: `.env.example`).
 
 ```powershell
-.venv\Scripts\streamlit run src/app.py                 # arayüz → http://localhost:8501
+.venv\Scripts\streamlit run src/app.py                 # arayüz → http://localhost:8501 (önce giriş; ilk hesap eski kayıtların sahibi)
 .venv\Scripts\python -m src.pipeline "<pdf kökü>" [tr|en]   # data/sample_docs içindeki PDF'i uçtan uca işle (arayüzden yüklemek de bunu başlatır)
 .venv\Scripts\python -m src.topics <belge ...>          # konu haritası (yoksa / kota yüzünden bölüm başlıklarına düştüyse)
 .venv\Scripts\python -m src.llm.capacity [belge]        # kalan kota, belge maliyeti
@@ -219,7 +230,11 @@ Windows, Python 3.11 sanal ortamı (`.venv`). Anahtarlar `.env` dosyasında (şa
 .venv\Scripts\python -m eval.uc_adim                   # uzman zorluk adımları ↔ sistem (MEB 3 Adım, Gemma) → eval/sonuclar_uc_adim.md
 # eval betikleri kaldığı yerden devam eder; uzun ölçümde --parca k/4 ile 4 ayrı süreç (ROADMAP "Yeni oturumda ilk işler")
 .venv\Scripts\python scripts\bekci.py [sn]              # iş ve kota izleyici (olayda çıkar)
+.venv\Scripts\python -m src.accounts [sifirla <ad>]     # hesapları listele / unutulan parolayı sıfırla
+.venv\Scripts\python -m src.library [gizle <belge>]     # belge kaydı / acil durumda herkese açık belgeyi gizle
+.venv\Scripts\python scripts\tasarim.py baslat|ekran|tikla|durdur   # tasarım denemesi: geçici hesap veritabanıyla 8503
 ```
 
 Testler (internetsiz, API çağrısı yok): `.venv\Scripts\python -m tests.<ad>` — `test_pipeline`, `test_checks`, `test_compute`,
-`test_grading`, `test_textnorm`, `test_router`, `test_parser`, `test_cards`, `test_difficulty`.
+`test_grading`, `test_textnorm`, `test_router`, `test_parser`, `test_cards`, `test_difficulty`, `test_accounts`,
+`test_mastery`.

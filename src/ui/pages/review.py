@@ -25,8 +25,17 @@ def _evidence_png(qid: str, key: str) -> tuple:
     return rs.render_evidence(item, data.chunks(), dpi=144)
 
 
+def _mine(s: dict) -> dict:
+    """Setin yalnızca görebildiğin notlara ait soruları (istek setinde birden çok notun sorusu olabilir)."""
+    seen = data.visible()
+    return {**s, "items": [i for i in s["items"] if i["doc"] in seen]}
+
+
 def _filters() -> tuple[dict, list[dict]]:
     sets = [s for s in data.question_sets() if s["kind"] == "belge"] or data.question_sets()
+    sets = [s for s in map(_mine, sets) if s["items"]]
+    if not sets:
+        return {}, []
     sets = sorted(sets, key=lambda s: (s["name"].startswith("istek_"), -len(s["items"])))  # en büyük belge seti önce
     labels = {s["key"]: data.set_label(s["name"], s["kind"]) for s in sets}
     with st.container(border=True):
@@ -70,10 +79,10 @@ def _decide(item: dict, source: str, n_view: int) -> None:
         note = st.text_input("Not (isteğe bağlı)", key=f"n_{item['id']}", placeholder="ör. ikinci şık da savunulabilir")
         b1, b2, b3 = st.columns([2, 2, 1])
         if b1.button("Onayla", type="primary", icon=":material/check:", width="stretch"):
-            rs.save_decision(item, "approve", note, source)
+            rs.save_decision(item, "approve", note, source, user=data.uid())
             _advance(n_view)
         if b2.button("Reddet", icon=":material/close:", width="stretch"):
-            rs.save_decision(item, "reject", note, source, reasons)
+            rs.save_decision(item, "reject", note, source, reasons, user=data.uid())
             _advance(n_view)
         if b3.button("Atla", width="stretch"):
             _advance(n_view)
@@ -117,6 +126,10 @@ def render() -> None:
     style.header("Kalite", "İnceleme", "Her soruyu cevabın geçtiği sayfayla yan yana değerlendir. Reddettiğin ya da "
                  "öğrencinin hatalı bildirdiği soru sınavlara konmaz.")
     s, view = _filters()
+    if not s:
+        st.info("Görebildiğin notlarda henüz soru yok. **Belgeler** sayfasından bir not ekle.",
+                icon=":material/upload_file:")
+        return
     decs = data.decisions()
     done = sum(i["id"] in decs for i in s["items"])
     if not view:

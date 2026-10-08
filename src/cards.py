@@ -5,7 +5,9 @@ yalnızca şıksız da anlaşılan sorular kart olur (card_ok) — kısa cevap v
 (cevabı doğru şıkkın metni). Doğru/yanlış ifadeleri ve "aşağıdakilerden hangisi", olumsuz kök gibi şıklara dayanan
 sorular sınavda kalır. Kartın sonucu öğrencinin kendi
 değerlendirmesidir (Bildim / Bilemedim / Atla); sınavın madde istatistiğine (attempts.jsonl) karışmaz, ayrı kaydedilir:
-data/review/cards.jsonl (soru kimliğine bağlı, yalnızca eklenir — kutular kayıt baştan oynatılarak bulunur).
+data/review/cards.jsonl (soru ve kişi kimliğine bağlı, yalnızca eklenir — kutular kayıt baştan oynatılarak bulunur).
+Kutular kişiye özeldir: herkes aynı kuralla, kendi değerlendirmeleriyle ilerler. Kişi alanı olmayan eski satırlar
+ilk hesabındır (accounts.legacy_owner).
 
 Leitner: her kart bir kutudadır (1-5). Bildim → bir üst kutu, Bilemedim → 1. kutu, Atla → değişmez.
 Kutu yükseldikçe kart seyrekleşir: 1. kutu her oturumda, sonra 1, 3, 7, 14 gün.
@@ -13,13 +15,12 @@ Kutu yükseldikçe kart seyrekleşir: 1. kutu her oturumda, sonra 1, 3, 7, 14 g�
 
 from __future__ import annotations
 
-import json
 import random
 import re
 import time
 from pathlib import Path
 
-from src import config
+from src import config, jsonl
 
 LOG = config.DATA_DIR / "review" / "cards.jsonl"
 INTERVAL_DAYS = {1: 0, 2: 1, 3: 3, 4: 7, 5: 14}
@@ -53,24 +54,40 @@ def step(state: dict | None, result: str, t: float) -> dict:
     return s
 
 
-def history(path: Path | None = None) -> dict[str, dict]:
-    """Kart kimliği → {box, last, seen, good, bad}."""
+def _mine(rows: list[dict], user: str | None) -> list[dict]:
+    """user verilirse yalnızca o kişinin satırları (kişi alanı olmayan eski satırlar ilk hesabın)."""
+    if user is None:
+        return rows
+    from src.accounts import legacy_owner
+    legacy = legacy_owner()
+    return [e for e in rows if (e.get("user") or legacy) == user]
+
+
+def history(path: Path | None = None, user: str | None = None) -> dict[str, dict]:
+    """Kart kimliği → {box, last, seen, good, bad}. user: kişinin kendi kutuları (None: bütün satırlar)."""
     out: dict[str, dict] = {}
-    path = path or LOG
-    if path.exists():
-        for line in path.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                e = json.loads(line)
-                out[e["id"]] = step(out.get(e["id"]), e["result"], e["t"])
+    for e in _mine(jsonl.read(path or LOG), user):
+        out[e["id"]] = step(out.get(e["id"]), e["result"], e["t"])
     return out
 
 
-def record(qid: str, result: str, path: Path | None = None) -> None:
+def first_seen(path: Path | None = None) -> dict[tuple[str | None, str], float]:
+    """(kişi, soru) → kartta ilk değerlendirildiği an. Kartta cevabı görülmüş soru, sonra sınavda çıkarsa o deneme
+    taze değildir (zorluk ölçümüne girmez: difficulty.fresh_attempts). Atla sayılmaz (cevap görülmemiş olabilir)."""
+    from src.accounts import legacy_owner
+    legacy, out = legacy_owner(), {}
+    for e in jsonl.read(path or LOG):
+        if e["result"] != "skip":
+            out.setdefault((e.get("user") or legacy, e["id"]), e["t"])
+    return out
+
+
+def record(qid: str, result: str, path: Path | None = None, user: str | None = None) -> None:
     assert result in RESULTS
-    path = path or LOG  # çağrı anında okunur (testler geçici dosyaya yönlendirebilsin)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps({"id": qid, "result": result, "t": time.time()}) + "\n")
+    rec = {"id": qid, "result": result, "t": time.time()}
+    if user:
+        rec["user"] = user
+    jsonl.append(path or LOG, [rec])  # yol çağrı anında okunur (testler geçici dosyaya yönlendirebilsin)
 
 
 def is_due(state: dict | None, now: float) -> bool:

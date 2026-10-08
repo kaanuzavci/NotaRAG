@@ -1,7 +1,8 @@
 """Zorluk: üretecin iddiası değil, ölçüm (LITERATURE §8, ROADMAP 8).
 
 Etiketi eldeki en güvenilir katman verir, kaynağı yanında saklanır (arayüz "ölçüldü / tahmin" diye gösterebilir):
-  1. Gerçek öğrenci — çözüm kayıtlarından (attempts.jsonl, ilk denemeler) Elo; yeterli kayıt varsa (MIN_REAL).
+  1. Gerçek öğrenci — çözüm kayıtlarından (attempts.jsonl; her kişinin soruyu ilk görüşü, fresh_attempts) Elo;
+     yeterli kayıt varsa (MIN_REAL: soru başına 5 farklı kişi).
   2. Benzetilmiş öğrenci — src/simulate.py: bir model sınıfının hızlı-cevap doğru oranı (p). Yalnızca sınıf
      yanıldığında söz sahibi (alt sınır); hepsi doğruysa (tavan) bilgi vermez. Dikkatli çözümün düşünme token'ı
      (çaba) yalnızca çoktan seçmelide ve TurkishMMLU'da ayarlanmış eşiklerle alt sınır olur (sim_level).
@@ -34,7 +35,7 @@ LOG = config.DATA_DIR / "review" / "difficulty.jsonl"
 ATTEMPTS = config.DATA_DIR / "review" / "attempts.jsonl"
 LEVELS = ("easy", "medium", "hard")
 RANK = {lvl: i for i, lvl in enumerate(LEVELS)}
-MIN_REAL = 5            # gerçek öğrenci etiketi için en az ilk-deneme sayısı
+MIN_REAL = 5            # gerçek öğrenci etiketi için en az taze ilk deneme (= farklı kişi) sayısı
 # Doğru oranı eşikleri: gerçek öğrencide p ≥ 0,75 kolay, < 0,40 zor; benzetimde p < 0,40 zor (sim_level).
 P_EASY, P_HARD = 0.75, 0.40
 # Çaba eşikleri, YALNIZCA çoktan seçmeli: TurkishMMLU'da (180 lise sorusu, gerçek öğrenci doğru oranı,
@@ -178,30 +179,69 @@ def claims_from_cache(db: Path | None = None) -> dict[str, str]:
 
 def elo(attempts: list[dict], prior: dict[str, float] | None = None) -> dict[str, dict]:
     """Gerçek öğrenci ilk denemelerinden Elo (Pelánek 2016): madde zorluğu d ve öğrenci yeteneği θ birlikte güncellenir;
-    adım küçülür (K = 1 / (1 + 0.05·n)). prior: benzetimden başlangıç zorluğu (logit). Kayıtlarda öğrenci kimliği
-    yok → tek öğrenci varsayılır (çok kullanıcılı kurulumda öğrenci başına θ)."""
+    adım küçülür (K = 1 / (1 + 0.05·n)). prior: benzetimden başlangıç zorluğu (logit). Sorunun zorluğu herkesin
+    denemelerinden ortak, yetenek θ kişi başına ("user" alanı; yoksa tek öğrenci)."""
     prior = prior or {}
     d: dict[str, float] = {}
     n: dict[str, int] = {}
-    theta, n_student = 0.0, 0
+    theta: dict[str | None, float] = {}
+    n_student: dict[str | None, int] = {}
     for a in attempts:
         if a.get("retry"):
             continue
-        qid = a["id"]
+        qid, u = a["id"], a.get("user")
         d.setdefault(qid, prior.get(qid, 0.0))
-        p = 1 / (1 + math.exp(-(theta - d[qid])))
+        th = theta.get(u, 0.0)
+        p = 1 / (1 + math.exp(-(th - d[qid])))
         y = 1.0 if a.get("correct") else 0.0
         d[qid] -= (y - p) / (1 + 0.05 * n.get(qid, 0))
-        theta += (y - p) / (1 + 0.05 * n_student)
+        theta[u] = th + (y - p) / (1 + 0.05 * n_student.get(u, 0))
         n[qid] = n.get(qid, 0) + 1
-        n_student += 1
+        n_student[u] = n_student.get(u, 0) + 1
     return {q: {"d": round(d[q], 3), "n": n[q], "p": round(1 / (1 + math.exp(d[q])), 2)} for q in d}
 
 
+def _epoch(a: dict) -> float:
+    if a.get("t"):
+        return a["t"]
+    try:
+        return time.mktime(time.strptime(a["time"], "%Y-%m-%d %H:%M:%S"))
+    except (KeyError, ValueError):
+        return 0.0
+
+
+def fresh_attempts(rows: list[dict], legacy: str | None = None,
+                   card_seen: dict[tuple[str | None, str], float] | None = None) -> list[dict]:
+    """Ölçüme giren denemeler: kişinin soruyu İLK görüşü. Sayılmayanlar: ikinci denemeler (yalnızca yanlışlar,
+    retry), aynı kişinin aynı soruyu yeniden çözmesi ("Baştan çöz", soru başka sınavda yine çıktı) ve önce kartta
+    cevabı görülmüş soru. Aksi halde aynı kişinin tekrarları doğru oranını şişirirdi.
+    legacy: kişi alanı olmayan eski satırların sahibi; card_seen: cards.first_seen()."""
+    seen, out = set(), []
+    for a in rows:
+        if a.get("retry"):
+            continue
+        key = (a.get("user") or legacy, a["id"])
+        if key in seen:
+            continue
+        seen.add(key)
+        t_card = (card_seen or {}).get(key)
+        if t_card is not None and t_card < _epoch(a):
+            continue
+        out.append({**a, "user": key[0]})
+    return out
+
+
+def real_attempts() -> list[dict]:
+    """attempts.jsonl'den taze ilk denemeler (madde analizi ve Elo bunları kullanır)."""
+    from src import cards, jsonl
+    from src.accounts import legacy_owner
+    return fresh_attempts(jsonl.read(ATTEMPTS), legacy_owner(), cards.first_seen())
+
+
 def _real() -> dict[str, dict]:
-    if not ATTEMPTS.exists():
+    rows = real_attempts()
+    if not rows:
         return {}
-    rows = [json.loads(x) for x in ATTEMPTS.read_text(encoding="utf-8").splitlines() if x.strip()]
     out = elo(rows)
     for r in out.values():
         r["level"] = "easy" if r["p"] >= P_EASY else ("medium" if r["p"] >= P_HARD else "hard")

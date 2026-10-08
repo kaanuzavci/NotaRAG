@@ -97,6 +97,24 @@ def test_claims_and_elo() -> None:
     r = D.elo(att)
     assert r["zor"]["d"] > 0 > r["kolay"]["d"] and r["zor"]["n"] == 6
     assert D.elo([{"id": "q", "correct": False, "retry": True}]) == {}  # ikinci denemeler sayılmaz
+    # Yetenek kişi başına: güçlü bir öğrencinin doğruları zayıf öğrencinin zorluk tahminini kaydırmaz
+    many = [{"id": f"k{i}", "correct": True, "user": "guclu"} for i in range(20)] + [{"id": "q", "correct": False, "user": "yeni"}]
+    assert D.elo(many)["q"]["d"] < D.elo([{"id": f"k{i}", "correct": True} for i in range(20)]
+                                         + [{"id": "q", "correct": False}])["q"]["d"]
+
+
+def test_fresh_attempts() -> None:
+    """Ölçüme yalnızca kişinin soruyu ilk görüşü girer: tekrar çözme ("Baştan çöz"), ikinci deneme ve kartta
+    cevabı görülmüş soru sayılmaz. Kişi alanı olmayan eski satırlar ilk hesabın (legacy)."""
+    rows = [{"id": "q1", "correct": False, "time": "2026-10-05 10:00:00"},           # eski satır → kaan
+            {"id": "q1", "correct": True, "user": "kaan", "t": 2e9},                # kaan yeniden çözdü
+            {"id": "q1", "correct": True, "user": "demo", "t": 2e9},
+            {"id": "q2", "correct": False, "user": "demo", "retry": True, "t": 2e9},  # ikinci deneme
+            {"id": "q3", "correct": True, "user": "demo", "t": 2e9 + 50},           # önce kartta gördü
+            {"id": "q4", "correct": True, "user": "demo", "t": 2e9 + 50}]           # kartı sınavdan sonra
+    fresh = D.fresh_attempts(rows, legacy="kaan", card_seen={("demo", "q3"): 2e9, ("demo", "q4"): 2e9 + 99})
+    assert [(a["user"], a["id"], a["correct"]) for a in fresh] == [("kaan", "q1", False), ("demo", "q1", True),
+                                                                   ("demo", "q4", True)]
 
 
 def test_simulated_answer_check() -> None:
@@ -142,6 +160,7 @@ if __name__ == "__main__":
     test_fact_count()
     test_levels()
     test_claims_and_elo()
+    test_fresh_attempts()
     test_simulated_answer_check()
     test_evolve_offline()
     print("difficulty: tüm testler geçti")

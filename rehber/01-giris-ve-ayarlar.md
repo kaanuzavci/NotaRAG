@@ -28,8 +28,9 @@ Bu bölüm dört dosyayı ve bir istem dosyasını anlatıyor:
   - `os.getenv("X", "")` değişken yoksa boş metin döndürür; program çökmez.
   - Anahtarı olmayan sağlayıcının modelleri [`router.has_key`](../src/llm/router.py#L88) tarafından atlanır.
 - [Satır 19-22](../src/config.py#L19): `DATA_DIR` (`data/`), `PARSED_DIR` (`data/parsed/`), `VISION_CACHE_DIR` (`data/vision_cache/`), `VISION_DPI = 150` (görsel okuma için sayfa görüntüsünün çözünürlüğü).
-- [Satır 25 `DOC_NAMES`](../src/config.py#L26): dosya adı → ekranda görünen kısa ad (ör. `"english"` → `"Genetic Algorithms"`).
-- [Satır 31 `doc_name(stem)`](../src/config.py#L32): kısa adı döndürür. Listede olmayan (arayüzden yeni yüklenmiş) belgede alt çizgileri boşluğa çevirir.
+- [`APP_DB`](../src/config.py#L26): hesapların ve belge kaydının veritabanı (`data/app.sqlite`; bölüm 11). `NOTARAG_APP_DB` ortam değişkeniyle başka bir dosyaya yönlendirilebilir: deneme amaçlı ikinci bir Streamlit, gerçek hesaplara dokunmadan geçici bir veritabanıyla açılabilsin.
+- [Satır 25 `DOC_NAMES`](../src/config.py#L29): dosya adı → ekranda görünen kısa ad (ör. `"english"` → `"Genetic Algorithms"`).
+- [Satır 31 `doc_name(stem)`](../src/config.py#L35): kısa adı döndürür. Listede olmayan (arayüzden yeni yüklenmiş) belgede alt çizgileri boşluğa çevirir. Artık yalnızca **ilk ad** için kullanılıyor: belge kaydına girerken görünen ad buradan alınır; sonra ad kayıttan okunur ve sahibi değiştirebilir ([`library.display_name`](../src/library.py#L233)).
 
 **Neden böyle?** Anahtarlar koda yazılmaz, `.env`'de durur; `.env` de `.gitignore` sayesinde repoya girmez. Şablonu [`.env.example`](../.env.example).
 
@@ -84,24 +85,27 @@ Bu iki ifadeyi PROMPTS.md'de değiştirirsen kural ekleme sessizce çalışmaz y
 
 ---
 
-## `src/app.py` — arayüzün giriş noktası (41 satır)
+## `src/app.py` — arayüzün giriş noktası (49 satır)
 
-**Ne işe yarar?** `streamlit run src/app.py` komutu bu dosyayı çalıştırır. Sayfa ayarlarını yapar, ortak stili basar, kenar çubuğundaki menüyü kurar ve seçilen sayfayı çalıştırır.
+**Ne işe yarar?** `streamlit run src/app.py` komutu bu dosyayı çalıştırır. Sayfa ayarlarını yapar, ortak stili basar, **önce giriş ister**, sonra kenar çubuğundaki menüyü kurar ve seçilen sayfayı çalıştırır.
 
 **Bağlantılar**
-- → `ui/style.py` (`inject`).
-- → 6 sayfa dosyası (Streamlit onları ayrı betik olarak çalıştırır).
+- → `ui/style.py` (`inject`), `ui/auth.py` (`current`, `page`, `sidebar`; bölüm 11).
+- → 7 sayfa dosyası (Streamlit onları ayrı betik olarak çalıştırır).
 - 💾 Okur: `src/ui/logo.svg`, `.streamlit/config.toml` (Streamlit kendisi okur: renkler, yazı tipleri).
 
 **İçindekiler (yukarıdan aşağı)**
-- [Satır 10](../src/app.py#L10) `sys.path.insert(0, ...)`: Streamlit `src/app.py`'yi paket olarak değil, düz betik olarak çalıştırır. Bu durumda `from src.ui import style` çalışmaz, çünkü Python `src` paketini bilmez. Proje kökü arama yoluna eklenerek sorun çözülür.
-- [Satır 16](../src/app.py#L16) `st.set_page_config(...)`: sekme başlığı "NotaRAG", geniş düzen, kenar çubuğu açık.
-- [Satır 18](../src/app.py#L18) `style.inject()`: bütün sayfalarda geçerli CSS (bkz. bölüm 8).
-- [Satır 22-36](../src/app.py#L22) `pages`: menü üç gruptan oluşur:
-  - **Çalış:** Sınav Hazırla (varsayılan sayfa), Bilgi Kartları
+- [Satır 11](../src/app.py#L11) `sys.path.insert(0, ...)`: Streamlit `src/app.py`'yi paket olarak değil, düz betik olarak çalıştırır. Bu durumda `from src.ui import style` çalışmaz, çünkü Python `src` paketini bilmez. Proje kökü arama yoluna eklenerek sorun çözülür.
+- [Satır 17](../src/app.py#L17) `st.set_page_config(...)`: sekme başlığı "NotaRAG", geniş düzen, kenar çubuğu açık.
+- [Satır 19](../src/app.py#L19) `style.inject()`: bütün sayfalarda geçerli CSS (bkz. bölüm 8).
+- [`user`](../src/app.py#L22) `= auth.current()`: giriş yapmış kişi (ya da "beni hatırla" çerezinden geri gelen oturum). Yoksa menü yerine yalnızca giriş ekranı kurulur ve `st.stop()` betiği orada bitirir: giriş yapılmadan hiçbir sayfa çalışmaz. Rol yok; giriş yapan herkes aynı menüyü görür.
+- [`pages`](../src/app.py#L29): menü (2026-10-08'den beri):
+  - **Ana sayfa** (varsayılan, grup başlıksız; bölüm 12)
+  - **Çalış:** Sınav Hazırla, Bilgi Kartları
   - **İçerik:** Belgeler, Soru Bankası
   - **Kalite:** İnceleme, Rapor, Modeller ve Kota
-- [Satır 37-42](../src/app.py#L37): `st.navigation(...)` menüyü kurar, `nav.run()` seçilen sayfanın dosyasını çalıştırır.
+  - **Hesap:** Profil ve beyin analizi (bölüm 12)
+- [`nav`](../src/app.py#L46) `= st.navigation(...)`: menüyü kurar. Kenar çubuğuna marka yazısı ve `auth.sidebar(user)` (kim giriş yaptı, "Çıkış yap") eklenir; `nav.run()` seçilen sayfanın dosyasını çalıştırır.
 
 **Streamlit'in çalışma biçimi:** Her sayfa dosyası (ör. [`ui/pages/exam.py`](../src/ui/pages/exam.py)) en altta `render()` çağırır. Streamlit sayfayı her açtığında ve her tıklamada o dosyayı **baştan sona** yeniden çalıştırır. Ayrıntısı bölüm 8'de.
 
@@ -115,7 +119,7 @@ Bu iki ifadeyi PROMPTS.md'de değiştirirsen kural ekleme sessizce çalışmaz y
 - ← `ui/data.start_job` bunu ayrı süreçte başlatır (`python -m src.pipeline "<pdf>"`).
 - ← `request.py` yalnızca `patient` fonksiyonunu kullanır.
 - ← `tests/test_pipeline.py` `merge_existing`'i sınar.
-- → `ingestion` (pdf_parser, vision), `chunking`, `retrieval.index`, `topics`, `generation.generate`, `verification` (checks, verify), `review_store`, `llm` (ledger, router, capacity).
+- → `ingestion` (pdf_parser, vision), `chunking`, `retrieval.index`, `topics`, `generation.generate`, `verification` (checks, verify), `review_store`, `library.sync`, `llm` (ledger, router, capacity).
 - 💾 Okur: `data/sample_docs/*.pdf`, `data/chunks/chunks.jsonl`, var olan soru dosyası.
 - 💾 Yazar: `data/parsed/<belge>.json`, `data/questions/<belge>_<dil>.jsonl`. Diğer dosyaları çağırdığı modüller yazar.
 
@@ -123,7 +127,7 @@ Bu iki ifadeyi PROMPTS.md'de değiştirirsen kural ekleme sessizce çalışmaz y
 
 Adım adım ne yaptığı (konsola yazdığı `1/6 ...` satırları arayüzdeki ilerleme çubuğunu da besler):
 
-1. **PDF'i bul.** `data/sample_docs/` içinde adı ya da kök adı eşleşen dosya.
+1. **PDF'i bul.** `data/sample_docs/` içinde adı ya da kök adı eşleşen dosya. Ardından [`library.sync()`](../src/library.py#L128): PDF arayüz dışından (elle) konduysa da belge kaydına girer, sahibi ilk hesap olur (bölüm 11).
 2. **`1/6 PDF okuma`.** [`parse_pdf`](../src/ingestion/pdf_parser.py#L401) PDF'i okur, sonuç `data/parsed/<belge>.json`'a yazılır. Hemen ardından [`apply_cached_vision`](../src/ingestion/vision.py#L134) daha önce görselden okunmuş sayfaları önbellekten geri koyar. Yeniden ayrıştırma bu sayfaların okumasını kaybetmesin diye yapılır.
 3. **`2/6 görsel okuma`.** [`_vision_until_done`](../src/pipeline.py#L110) yalnızca henüz okunmamış resim sayfalarını okutur; kota biterse bekler.
 4. **`3/6 bölümleme`.** [`chunking.__main__.main`](../src/chunking/__main__.py#L17) **bütün** ayrıştırılmış belgeleri yeniden parçalar ve `chunks.jsonl` / `sections.jsonl` dosyalarını baştan yazar. Yereldir, hızlıdır.
@@ -163,7 +167,7 @@ Adım adım ne yaptığı (konsola yazdığı `1/6 ...` satırları arayüzdeki 
   3. `new`: kimliği (`question_id`) eskilerde olmayan yeni sorular. Önbellekten aynen gelenler zaten aynı kimliği taşıdığı için elenir. [`mark_duplicates(new, keep=kept)`](../src/verification/checks.py#L203) eskilerin tekrarı olan yenileri reddeder; böylece tekrarlar doğrulamaya gidip kota harcamaz.
 
   Bu fonksiyon 2026-10-05'te bulunan bir hatayı düzeltiyor: eskiden `run` dosyanın üzerine yazıyordu ve doğrulanmış sorular, onlara bağlı kararlarla birlikte kaybolacaktı. Test: [`tests/test_pipeline.py`](../tests/test_pipeline.py).
-- [`run_all(output_language)`](../src/pipeline.py#L203): `--hepsi` ile klasördeki bütün PDF'leri sırayla işler. Soru dosyası PDF'ten yeniyse belgeyi "zaten işlenmiş" sayıp atlar. Her belgeden sonra [`doc_cost`](../src/llm/capacity.py#L39) ile tahmini token maliyetini basar.
-- [`if __name__ == "__main__"`](../src/pipeline.py#L229): komut satırı argümanlarını okur.
+- [`run_all(output_language)`](../src/pipeline.py#L205): `--hepsi` ile klasördeki bütün PDF'leri sırayla işler. Soru dosyası PDF'ten yeniyse belgeyi "zaten işlenmiş" sayıp atlar. Her belgeden sonra [`doc_cost`](../src/llm/capacity.py#L39) ile tahmini token maliyetini basar.
+- [`if __name__ == "__main__"`](../src/pipeline.py#L233): komut satırı argümanlarını okur.
 
 **Neden içe aktarmalar fonksiyonların içinde?** `request.py` bu dosyayı yalnızca `patient` için içe aktarır. Üstte `pymupdf`, `chromadb` gibi ağır kütüphaneler olsaydı sınav isteği gereksiz yere hepsini yüklerdi. Fonksiyon içi içe aktarma bu yükü yalnızca `run` çalışınca öder.

@@ -1,7 +1,11 @@
 """Görsel önizleme (yalnızca geliştirme): çalışma ekranlarını hazır verilerle açar; gerçek kayıtlara yazmaz.
 
     .venv\\Scripts\\streamlit run scripts/onizleme.py --server.port 8502 --server.headless true
-    → http://localhost:8502/?v=setup|session|flip|summary|quiz|results   (ekran görüntüsü: scripts/ekran.py)
+    → http://localhost:8502/?v=setup|session|flip|summary|quiz|results|login|docs|home|home0|profile
+      (ekran görüntüsü: scripts/ekran.py; home = dolu ana sayfa, home0 = yarım oturum yok)
+
+Hesaplar ve belge kaydı geçici bir veritabanında (gerçek data/app.sqlite'a dokunulmaz): içinde tek bir "önizleme"
+hesabı var; ilk hesap olduğu için mevcut belgelerin sahibi o.
 """
 
 import json
@@ -21,18 +25,53 @@ from src.ui import style
 
 style.inject()
 import src.cards as K
+from src import accounts, appdb, library
 from src import request as R
 
 K.LOG = Path(tempfile.gettempdir()) / "nr_preview_cards.jsonl"  # kart değerlendirmeleri gerçek kayda gitmez
+appdb.PATH = Path(tempfile.gettempdir()) / "nr_preview_app.sqlite"  # hesaplar ve belge kaydı da
+if accounts.count() == 0:
+    accounts.create("onizleme", "onizleme-parola", "Önizleme")
+library.sync()
 v = st.query_params.get("v", "session")
 rnd = random.Random(7)
+if v != "login":
+    st.session_state.setdefault("user", accounts.get(accounts.legacy_owner()))
 
 
 def run_page(rel: str) -> None:
     exec(compile((ROOT / rel).read_text(encoding="utf-8"), rel, "exec"), {"__name__": "__page__"})
 
 
-if v in ("setup", "session", "flip", "summary"):
+if v == "login":
+    from src.ui import auth
+    auth.page()
+elif v == "docs":
+    run_page("src/ui/pages/documents.py")
+elif v in ("home", "home0", "profile"):
+    from src import resume
+    uid = st.session_state.user["id"]
+    if v == "home":  # dolu görünüm: yarım kart oturumu, yarım sınav ve bir herkese açık not (yalnızca geçici veritabanında)
+        pool = K.pool(sorted({it["doc"] for it in R.all_items().values()}))
+        ids = [it["id"] for it in rnd.sample(pool, 20)]
+        resume.save(uid, "cards", {"queue": ids, "pos": 7, "res": {q: r for q, r in zip(ids, "ggbgsgb")}, "col": {},
+                                   "skipped": [], "streak": 1, "best": 3, "started": time.time() - 900,
+                                   "ended": False, "v": 7})
+        req = next(r for p in sorted((ROOT / "data/requests").glob("*.json"), reverse=True)
+                   if (r := json.loads(p.read_text(encoding="utf-8"))).get("status") in ("ready", "done")
+                   and len(R.items_of(r)) >= 8)
+        first = [it["id"] for it in R.items_of(req)[:4]]
+        resume.save(uid, "exam", {"id": req["id"], "answers": {q: 0 for q in first}, "submitted": False,
+                                  "recorded": False, "phase": "solve", "cur": 4, "started": time.time() - 600,
+                                  "hints": {first[0]: 1}})
+        with appdb.connect() as con:
+            con.execute("UPDATE documents SET public_since = 1 WHERE doc = 'english'")
+            con.execute("DELETE FROM doc_access WHERE doc = 'english'")
+    elif v == "home0":
+        resume.clear(uid, "cards")
+        resume.clear(uid, "exam")
+    run_page("src/ui/pages/profile.py" if v == "profile" else "src/ui/pages/home.py")
+elif v in ("setup", "session", "flip", "summary"):
     if v != "setup" and "cards" not in st.session_state:
         items = K.pool(sorted({it["doc"] for it in R.all_items().values()}))
         ids = [it["id"] for it in rnd.sample(items, 15)]

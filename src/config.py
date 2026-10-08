@@ -21,6 +21,9 @@ DATA_DIR = ROOT / "data"
 PARSED_DIR = DATA_DIR / "parsed"
 VISION_CACHE_DIR = DATA_DIR / "vision_cache"
 VISION_DPI = 150
+# Hesaplar, oturumlar, belge kaydı (src/appdb.py). Ortam değişkeniyle başka dosyaya yönlendirilebilir: deneme
+# kurulumu gerçek hesaplara dokunmadan çalışsın (ör. ikinci bir Streamlit'i geçici veritabanıyla açmak)
+APP_DB = Path(os.getenv("NOTARAG_APP_DB") or DATA_DIR / "app.sqlite")
 
 # Belgelerin arayüzde ve dışa aktarımda görünen kısa adları (dosya adı → ad)
 DOC_NAMES = {"7.Hafta Sunu Dosyası": "Yapay Zeka", "4_ENERJİ, TARIM, BESLENME": "Ekoloji",

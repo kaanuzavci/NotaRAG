@@ -20,11 +20,11 @@ def definitions(path: Path) -> dict[str, int]:
     """'ad' ve 'Sınıf.metot' → satır (modül düzeyi fonksiyon, sınıf, metot, atama)."""
     out: dict[str, int] = {}
     for node in ast.parse(path.read_text(encoding="utf-8")).body:
-        if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):  # async: scripts/tasarim.py
             out.setdefault(node.name, node.lineno)
             if isinstance(node, ast.ClassDef):
                 for m in node.body:
-                    if isinstance(m, ast.FunctionDef):
+                    if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)):
                         out[f"{node.name}.{m.name}"] = m.lineno
                         out.setdefault(m.name, m.lineno)
         elif isinstance(node, (ast.Assign, ast.AnnAssign)):

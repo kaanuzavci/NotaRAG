@@ -145,7 +145,9 @@ def run(name: str, output_language: str | None = None) -> list[dict]:
     from src.retrieval.index import Index
     from src.verification.verify import verify_item
 
+    from src.library import sync
     pdf = next(p for p in (config.DATA_DIR / "sample_docs").glob("*.pdf") if name in (p.name, p.stem))
+    sync()  # arayüz dışından (elle) konan PDF de belge kaydına girsin (sahibi ilk hesap)
     t0 = time.time()
     print(f"■ {pdf.name}", flush=True)
 

@@ -6,7 +6,8 @@ Odak **metinli (bilgisayarda yazılmış) PDF**; el yazısı ve taranmış notla
 Kullanıcı Türkçe yazar; arayüz, belgeler ve istem dışı metinler Türkçe.
 
 ## Önce oku
-- **ROADMAP.md → "Şu an neredeyiz?"**: güncel durum ve öncelik sıralı sıradaki işler. Önemli bulgu, karar ve ölçümleri
+- **ROADMAP.md → "Şu an neredeyiz?"**: güncel durum ve öncelik sıralı sıradaki işler; site tasarımı için hemen altındaki
+  **"Tasarım: yeni oturumda devam"** bölümü (kullanıcının isteği, çalışma yöntemi, sıradaki işler, bilinen tuzaklar). Önemli bulgu, karar ve ölçümleri
   ROADMAP'in ilgili bölümüne yaz, "Sıradaki işler"i güncel tut.
 - **README.md**: mimari, tasarım kararları (§4), kota mimarisi (§4.4), klasör yapısı (§6), çalıştırma (§8).
 - **PROMPTS.md**: istemler. Kod istemleri buradan okur (`src/prompts.py`, `load_prompt("2c")` gibi) → bu dosyayı değiştirmek
@@ -22,7 +23,12 @@ Kullanıcı Türkçe yazar; arayüz, belgeler ve istem dışı metinler Türkçe
   → http://localhost:8501 (sağlık: `/_stcore/health`). `src/ui/pages/*` dışındaki modüller değişince Streamlit'i yeniden başlat.
 - Belge işleme: `python -m src.pipeline "<pdf kökü>"` (arayüzden yükleme de bunu ayrı süreçte başlatır → `data/jobs/<belge>.log`).
   Sınav istekleri → `data/requests/<id>.log`. İzleme: `python scripts\bekci.py` arka planda; çıkınca kullanıcıya bildir, yeniden başlat.
-- Arayüzü görerek kontrol: `streamlit run scripts/onizleme.py --server.port 8502` (hazır verili ekranlar, `?v=session|flip|summary|quiz|results|setup`) + `python scripts\ekran.py <url> <png>` (görünmez Edge + CDP; Read ile bak). Tasarım değişikliğini kullanıcıya göstermeden önce bununla bak.
+- Arayüz **giriş ister** (rehber 11; rol yok). Gerçek `data/app.sqlite`'ta **hesap açma/silme**: kullanıcının hesabı `kagan` (ilk hesap → eski kayıtların ve belgelerin sahibi).
+- **Tasarım denemesi** (gerçek uygulama, geçici hesap veritabanı `data/tasarim/app.sqlite`, giriş deneme/parola123):
+  `python scripts\tasarim.py baslat` → `ekran ":ana" "profile:profil" ":ana_hover:.stack:nth-child(3)"` (→ `data/tasarim/ekran/*.png`,
+  Read ile bak) → `tikla "<seçici>|ad"` (gerçek fare tıklaması) → `durdur`. Yöntem ve tuzaklar: ROADMAP "Tasarım" bölümü.
+  O kurulumda da sınav bitirmek / kart değerlendirmek gerçek JSONL'lere yazar: basma.
+- Arayüzü görerek kontrol: `streamlit run scripts/onizleme.py --server.port 8502` (hazır verili ekranlar, geçici hesap veritabanıyla; `?v=session|flip|summary|quiz|results|setup|login|docs|home|home0|profile`; yazı tipleri önizlemede yüklenmez → son bakış `scripts\tasarim.py` ile) + `python scripts\ekran.py <url> <png>` (görünmez Edge + CDP; Read ile bak). Tasarım değişikliğini kullanıcıya göstermeden önce bununla bak.
 - Kota durumu: `python -m src.llm.capacity`. Testler (API çağırmaz): `python -m tests.<ad>` (README §8'deki liste).
 - **Uzun ölçüm/deney** (`eval/*`): ayrı Windows süreci olarak başlat (`Start-Process … -WindowStyle Hidden`, günlük `data/*.log`);
   Bash arka plan görevi VS Code / oturum yeniden başlayınca ölüyor. Betikler kaldığı yerden devam eder (`data/<deney>/olcumler.jsonl`),
@@ -42,8 +48,12 @@ Kullanıcı Türkçe yazar; arayüz, belgeler ve istem dışı metinler Türkçe
   yerel ONNX modelleri (`pymupdf_layout`) indirildi ama kullanılmadan önce kullanıcı onayı ister.
 - **Veri bütünlüğü**: soru kimliği = sha1(model|soru metni)[:12]; insan kararları, çözüm kayıtları (`data/review/attempts.jsonl`)
   ve bildirimler bu kimliğe bağlı → `data/questions/*.jsonl` üzerine yazılmaz (`pipeline.merge_existing` ekler).
+  Kişiye ait kayıtlar (`attempts`, `cards`, `reports`, `reviews`) `"user"` alanıyla; alanı olmayan eski satırlar ilk hesabın
+  (`accounts.legacy_owner`). Belge kimliği = veri dosyalarındaki anahtar, değişmez; yükleme `library.register` ile (üzerine yazmaz).
 - **Kod yazımı**: kaçış karakteri içeren Python kodunu bash heredoc ile yazma (`\b`, `\\` bozuldu) → Edit/Write kullan.
   Çevredeki kodun yoğunluğu ve Türkçe yorum/isim üslubuyla yaz.
 - **Streamlit 1.59**: aynı etiketli düğmelere `key=` (yoksa `StreamlitDuplicateElementId`); `st.iframe` (components.html
   kullanımdan kalktı); `st.container(key="x")` → CSS sınıfı `.st-key-x`; tarayıcısız test `streamlit.testing.v1.AppTest`.
   Geçici betiklere pip paketi adı verme (`bottleneck.py` pandas'ın içe aktarmasını bozdu).
+  Tıklanabilir özel HTML (ana sayfa desteleri) → CCv2 (`st.components.v2.component`, `src/ui/shelf.py`; v1 API'leri yasak).
+  Sınıf adı seçmeden önce `src/ui/style.py`'de aynı ad var mı bak (`.nr-weak`, `.nr-tiles`, `.nr-legend` çakıştı).

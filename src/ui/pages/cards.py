@@ -13,6 +13,7 @@ import streamlit as st
 
 from src import cards as K
 from src import request as R
+from src import resume
 from src.ui import data, style
 from src.ui import components as C
 
@@ -42,10 +43,20 @@ def _topic(it: dict) -> str:
 
 # ---------------------------------------------------------------- durum değişiklikleri (düğme geri çağrıları)
 
+def _remember() -> None:
+    """Kaldığın yerden devam et (src/resume.py): yarım oturum kişiye kaydedilir, bitince silinir."""
+    cs = st.session_state.get("cards")
+    if cs and not cs["ended"] and cs["pos"] < len(cs["queue"]):
+        resume.save(data.uid(), "cards", {k: v for k, v in cs.items() if k != "last"})
+    else:
+        resume.clear(data.uid(), "cards")
+
+
 def _begin(ids: list[str]) -> None:
     v = st.session_state.get("cards", {}).get("v", 0) + 1  # yeni tur da kartı sıfırdan çizdirsin
     st.session_state.cards = {"queue": list(ids), "pos": 0, "res": {}, "col": {}, "skipped": [], "streak": 0,
                               "best": 0, "last": None, "started": time.time(), "ended": False, "v": v}
+    _remember()
 
 
 def _grade(result: str) -> None:
@@ -53,7 +64,7 @@ def _grade(result: str) -> None:
     if cs["pos"] >= len(cs["queue"]):
         return
     qid = cs["queue"][cs["pos"]]
-    K.record(qid, result)
+    K.record(qid, result, user=data.uid())
     if result == "skip" and qid not in cs["skipped"]:
         cs["skipped"].append(qid)
         cs["queue"].append(qid)  # destenin sonuna; ikinci kez atlanırsa bir sonraki oturuma kalır
@@ -64,6 +75,7 @@ def _grade(result: str) -> None:
     cs["last"] = {"result": result, "pos": cs["pos"], "text": str(q.get("question", ""))[:140]}
     cs["pos"] += 1
     cs["v"] += 1
+    _remember()
 
 
 def _shuffle() -> None:
@@ -81,10 +93,12 @@ def _only_bad() -> None:
 
 def _end() -> None:
     st.session_state.cards["ended"] = True
+    _remember()
 
 
 def _new() -> None:
     st.session_state.pop("cards", None)
+    _remember()
 
 
 # ---------------------------------------------------------------- HTML parçaları
@@ -176,16 +190,20 @@ def _setup() -> None:
     style.header("Çalış", "Bilgi Kartları",
                  "Doğrulanmış sorular kart olur: önünde soru, arkasında cevap ve notundaki kaynak cümle. Bildiğin kartlar "
                  "giderek seyrek, bilemediklerin sık gelir (aralıklı tekrar).")
-    docs = [d for d in data.documents() if d["verified"]]
+    docs = [d for d in data.my_documents() if d["verified"]]
     if not docs:
         st.info("Henüz doğrulanmış soru yok. Önce **Belgeler** sayfasından bir ders notu ekle.", icon=":material/upload_file:")
         return
-    chosen = st.pills("Belgeler", [d["stem"] for d in docs], selection_mode="multi", default=[d["stem"] for d in docs],
-                      format_func=data.short)
+    names = [d["stem"] for d in docs]
+    if (want := st.session_state.pop("cards_doc", None)) in names:  # ana sayfada destedeki "Kartlar" düğmesi
+        st.session_state.cards_docs = [want]
+    if "cards_docs" not in st.session_state or not set(st.session_state.cards_docs) <= set(names):
+        st.session_state.cards_docs = names
+    chosen = st.pills("Belgeler", names, selection_mode="multi", format_func=data.short, key="cards_docs")
     if not chosen:
         st.caption("En az bir belge seç.")
         return
-    items, hist, now = K.pool(chosen), K.history(), time.time()
+    items, hist, now = K.pool(chosen), K.history(user=data.uid()), time.time()  # kutular kişinin kendi geçmişinden
     s = K.summary(items, hist, now)
     tile = lambda i, v, k: f'<div class="nr-ctile" style="{style.color_vars(i)}"><div class="v">{v}</div><div class="k">{k}</div></div>'
     style.html('<div class="nr-ctiles">' + tile(0, s["total"], "kart") + tile(1, s["due"], "tekrar zamanı gelen")
@@ -231,7 +249,7 @@ def _session() -> None:
     b[0].button("Bilemedim", key="fc_bad", icon=":material/close:", width="stretch", on_click=_grade, args=("bad",))
     b[1].button("Atla", key="fc_skip", icon=":material/redo:", width="stretch", on_click=_grade, args=("skip",))
     b[2].button("Bildim", key="fc_good", icon=":material/check:", width="stretch", on_click=_grade, args=("good",))
-    gap = K.next_gap(K.history().get(it["id"]), "good")
+    gap = K.next_gap(K.history(user=data.uid()).get(it["id"]), "good")
     style.html(f'<div class="nr-gap">Bildim → {_gap(gap)} yeniden · Bilemedim → bugün yine · '
                '<span class="nr-kbd">Boşluk</span> çevir · <span class="nr-kbd">←</span> '
                '<span class="nr-kbd">↓</span> <span class="nr-kbd">→</span></div>')

@@ -4,20 +4,27 @@
 
 Projenin en büyük katmanı (boş satırlar hariç ~2.260 satır, 13 dosya). Arayüz hiçbir LLM'i doğrudan çağırmaz. Dosyaları okur, sonuçları gösterir; uzun işleri ayrı süreç olarak başlatır (`pipeline`, `request`).
 
+Sayfalar yalnızca **giriş yapılınca** çalışır (bölüm 11). Rol yok: herkes aynı sayfaları görür. Belge ya da içeriği gösteren her sayfa, kişinin görebildiği belgelerle süzer ([`data.visible()`](../src/ui/data.py#L67)); kişiye ait kayıtlar (sınav çözümü, kart, bildirim, inceleme kararı) giriş yapan kişinin kimliğiyle ([`data.uid()`](../src/ui/data.py#L55)) yazılır.
+
 Sorulardaki zorluk etiketi, arayüze gelmeden önce ölçümle değiştirilir (`request.all_items` ve `review_store.load_set` içinde `difficulty.apply`; bölüm 10). Bu yüzden arayüzün gösterdiği "Kolay / Orta / Zor" etkin düzeydir, üretecin iddiası değil.
 
 ```
 src/app.py                 menü ve giriş (bölüm 1)
+src/ui/auth.py             giriş ekranı, "beni hatırla" çerezi, çıkış (bölüm 11)
+src/ui/pages/home.py       Ana sayfa (varsayılan): not desteleri, herkese açık notlar, kaldığın yer (bölüm 12)
+src/ui/pages/profile.py    Profil ve beyin analizi (bölüm 12)
+src/ui/shelf.py            ana sayfanın kart desteleri: Streamlit özel bileşeni, CCv2 (bölüm 12)
+src/ui/upload.py           not yükleme akışı (Belgeler + ana sayfa penceresi; bölüm 12)
 src/ui/style.py            görsel dil: CSS + küçük HTML yardımcıları
 src/ui/data.py             arayüzün veri katmanı (dosya okuma, önbellek, arka plan işleri)
 src/ui/components.py       ortak soru kartı, kaynak sayfa kartı, bitiş özeti
 src/ui/quiz.py             sınav çözme deneyimi (başlangıç → odak modu → sonuç)
 src/cards.py               bilgi kartı mantığı: deste, aralıklı tekrar (Streamlit'siz)
-src/ui/pages/exam.py       Sınav Hazırla        (varsayılan sayfa)
+src/ui/pages/exam.py       Sınav Hazırla
 src/ui/pages/cards.py      Bilgi Kartları
 src/ui/pages/documents.py  Belgeler (PDF yükleme dahil)
 src/ui/pages/bank.py       Soru Bankası
-src/ui/pages/review.py     İnceleme (öğretmen)
+src/ui/pages/review.py     İnceleme (kalite kontrol; rol yok, her hesap görür)
 src/ui/pages/report.py     Rapor (nasıl çalışır + ölçümler)
 src/ui/pages/models.py     Modeller ve Kota
 src/ui/parts/evaluation.py Rapor'un ölçüm grafikleri
@@ -58,6 +65,7 @@ Streamlit'i ilk okuyanı en çok şaşırtan şey şu: **her etkileşimde sayfa 
 - `_CSS` ([satır 21-398](../src/ui/style.py#L21)): bütün özel stiller. Bölümleri:
   - kâğıt dokusu (SVG gürültü);
   - sayfa başlığı (`.nr-kicker`, `.nr-title`, çift çizgi);
+  - kenar çubuğunda giriş yapan kişi (`.nr-who`; bölüm 11);
   - fosforlu vurgu (`.nr-hl`);
   - kartlar, durum rozeti (`.nr-pill`), 6 adımlı akış şeması (`.nr-flow`);
   - soru kartı (`.nr-exam`, `.nr-opt`);
@@ -70,18 +78,18 @@ Streamlit'i ilk okuyanı en çok şaşırtan şey şu: **her etkileşimde sayfa 
     - sınav kartının üstündeki soru başına renkli şerit (`.nr-focus::before`);
     - hareket azaltma tercihi (`prefers-reduced-motion`) açıksa animasyonlar kapanır.
 - `PALETTE`: altı pastel kart rengi `(açık, koyu pastel, yazı, vurgu)`. Yazı rengi her pastelde en az 7:1 karşıtlıkta.
-- [`color(i)`](../src/ui/style.py#L409): i. kartın rengi (palet döner).
-- [`color_vars(i)`](../src/ui/style.py#L413): o rengi CSS değişkenleri olarak verir (`--c1`, `--ink`, `--a`…); kart HTML'inin `style=` özniteliğine yazılır.
-- [`inject()`](../src/ui/style.py#L418): CSS'i sayfaya basar (`app.py` çağırır).
-- [`html(markup)`](../src/ui/style.py#L424): HTML'i `st.markdown(..., unsafe_allow_html=True)` ile basar.
+- [`color(i)`](../src/ui/style.py#L445): i. kartın rengi (palet döner).
+- [`color_vars(i)`](../src/ui/style.py#L449): o rengi CSS değişkenleri olarak verir (`--c1`, `--ink`, `--a`…); kart HTML'inin `style=` özniteliğine yazılır.
+- [`inject()`](../src/ui/style.py#L454): CSS'i sayfaya basar (`app.py` çağırır).
+- [`html(markup)`](../src/ui/style.py#L460): HTML'i `st.markdown(..., unsafe_allow_html=True)` ile basar.
   - Neden `st.html` değil? `st.html` içeriği ana sayfanın stillerinden yalıtıyor; sınıflar uygulanmıyordu.
   - Boş satırlar silinir: Markdown boş satırda HTML bloğunu keser.
   - `<div lang="tr">` sarmalayıcısı CSS büyük harf dönüşümünü Türkçe yapar: "ipucu" → "İPUCU" (İngilizce kuralla "IPUCU" olurdu).
-- [`esc(s)`](../src/ui/style.py#L432): HTML kaçışı (`<` → `&lt;`). Metinde `<` geçerse sayfa bozulmasın, betik enjeksiyonu olmasın.
-- [`header(kicker, title, lead, hero_word)`](../src/ui/style.py#L436): sayfa başlığı.
-- [`pill(label)`](../src/ui/style.py#L445): "Doğrulandı / İncelenmeli / Reddedildi" rozeti.
-- [`card(...)`](../src/ui/style.py#L450): kullanılmıyor.
-- [`flow(steps)`](../src/ui/style.py#L455): akış şeması (Rapor → Nasıl çalışır).
+- [`esc(s)`](../src/ui/style.py#L468): HTML kaçışı (`<` → `&lt;`). Metinde `<` geçerse sayfa bozulmasın, betik enjeksiyonu olmasın.
+- [`header(kicker, title, lead, hero_word)`](../src/ui/style.py#L472): sayfa başlığı.
+- [`pill(label)`](../src/ui/style.py#L493): "Doğrulandı / İncelenmeli / Reddedildi" rozeti.
+- [`card(...)`](../src/ui/style.py#L498): kullanılmıyor.
+- [`flow(steps)`](../src/ui/style.py#L503): akış şeması (Rapor → Nasıl çalışır).
 
 ---
 
@@ -95,22 +103,29 @@ Streamlit'i ilk okuyanı en çok şaşırtan şey şu: **her etkileşimde sayfa 
 
 **İçindekiler**
 - [`chunks()`](../src/ui/data.py#L27), [`sections()`](../src/ui/data.py#L32), [`parsed(stem)`](../src/ui/data.py#L37): veri dosyalarını okur (20 sn önbellek).
-- [`short(doc)`](../src/ui/data.py#L45): belgenin kısa adı (`config.doc_name`).
-- [`topics(doc)`](../src/ui/data.py#L50): konu haritası, `build_missing=False` ile. Arayüz konu haritası için LLM'e gitmez.
-- [`has_math(doc)`](../src/ui/data.py#L57): belgede formüllü birim var mı? Varsa Sınav Hazırla'da "Hesap sorusu" tipi gösterilir.
-- [`item_stats()`](../src/ui/data.py#L67), [`reports()`](../src/ui/data.py#L73): `request` modülündekilerin önbellekli hali.
-- [`set_label(name, kind)`](../src/ui/data.py#L78): dosya adından okunur set adı (`'qwen_..._english_tr'` → `'Genetic Algorithms → TR · qwen3.8-27b (pilot)'`).
-- [`doc_of(item)`](../src/ui/data.py#L94): sorunun belgesi (ilk parça kimliğinden).
-- [`question_sets()`](../src/ui/data.py#L100): bütün soru setleri `[{key, name, kind ('belge'|'pilot'), items}]`. Her soruya `doc`, `set`, `set_kind` eklenir.
-- [`all_questions(include_pilot)`](../src/ui/data.py#L114): setlerdeki soruların kimliğe göre tekilleştirilmiş listesi.
-- [`decisions()`](../src/ui/data.py#L126): öğretmen kararları (önbelleksiz; karar verilince hemen görünsün).
-- [`documents()`](../src/ui/data.py#L131): her PDF için özet. Sayfa sayısı, görselden okunan ve bekleyen sayfa, tablo sayfası, parça / bölüm / soru / doğrulanmış soru sayısı.
-- [`eval_json(name)`](../src/ui/data.py#L156): `eval/<ad>.json` ölçüm sonucu.
-- [`quota()`](../src/ui/data.py#L161): `ledger.report()`.
+- [`short(doc)`](../src/ui/data.py#L42): belgenin görünen adı, belge kaydından ([`library.display_name`](../src/library.py#L233); sahibi değiştirebilir).
+- **Kişi ve görünürlük (bölüm 11):**
+  - [`user()`](../src/ui/data.py#L50), [`uid()`](../src/ui/data.py#L55): giriş yapmış kişi `{id, name, username}` ve kimliği (`auth.py` `session_state.user`'a koyar).
+  - [`_visible(user_id)`](../src/ui/data.py#L61): kişinin görebildiği belgeler (10 sn önbellek). Önce `library.sync()` çalışır: elle konan PDF'ler ve girişten önceki belgeler de kayda girer.
+  - [`visible()`](../src/ui/data.py#L67): giriş yapan kişi için `_visible`. Belge gösteren her sayfa bununla süzer.
+  - [`doc_meta()`](../src/ui/data.py#L74): belge kaydı `{doc: {name, owner, public, …}}` (Belgeler sayfasındaki rozet ve düğmeler).
+  - [`my_documents()`](../src/ui/data.py#L80): `documents()`'ın görünür olanları.
+- **Ana sayfa ve profil (bölüm 12):** [`mine()`](../src/ui/data.py#L91) (kişinin kendi listesi), [`items()`](../src/ui/data.py#L97) (bütün sorular, 30 sn önbellek), [`mastery()`](../src/ui/data.py#L109) (beyin analizi), [`home_stats()`](../src/ui/data.py#L129) ve [`due_cards()`](../src/ui/data.py#L134) (selam satırı, bugünün tekrarı), [`avatar_b64(user_id)`](../src/ui/data.py#L140) (profil resmi; değişince `.clear()`).
+- [`topics(doc)`](../src/ui/data.py#L150): konu haritası, `build_missing=False` ile. Arayüz konu haritası için LLM'e gitmez.
+- [`has_math(doc)`](../src/ui/data.py#L157): belgede formüllü birim var mı? Varsa Sınav Hazırla'da "Hesap sorusu" tipi gösterilir.
+- [`item_stats()`](../src/ui/data.py#L167), [`reports()`](../src/ui/data.py#L173): `request` modülündekilerin önbellekli hali.
+- [`set_label(name, kind)`](../src/ui/data.py#L178): dosya adından okunur set adı (`'qwen_..._english_tr'` → `'Genetic Algorithms → TR · qwen3.8-27b (pilot)'`).
+- [`doc_of(item)`](../src/ui/data.py#L194): sorunun belgesi (ilk parça kimliğinden).
+- [`question_sets()`](../src/ui/data.py#L200): bütün soru setleri `[{key, name, kind ('belge'|'pilot'), items}]`. Her soruya `doc`, `set`, `set_kind` eklenir.
+- [`all_questions(include_pilot)`](../src/ui/data.py#L214): setlerdeki soruların kimliğe göre tekilleştirilmiş listesi.
+- [`decisions()`](../src/ui/data.py#L226): inceleme kararları (önbelleksiz; karar verilince hemen görünsün).
+- [`documents()`](../src/ui/data.py#L231): her PDF için özet. Sayfa sayısı, görselden okunan ve bekleyen sayfa, tablo sayfası, parça / bölüm / soru / doğrulanmış soru sayısı. **Bütün** belgeler; sayfalar `my_documents()` kullanır (Rapor ve Modeller ve Kota'daki sistem toplamları hariç: içerik göstermezler).
+- [`eval_json(name)`](../src/ui/data.py#L256): `eval/<ad>.json` ölçüm sonucu.
+- [`quota()`](../src/ui/data.py#L261): `ledger.report()`.
 - **Arka plan işleri:**
-  - [`start_job(pdf_name, language)`](../src/ui/data.py#L171): `python -m src.pipeline "<pdf>"`'i bağımsız süreçte başlatır. Çıktı `data/jobs/<belge>.log`'a, başlangıç zamanı `.json`'a yazılır.
-  - [`job_status(stem)`](../src/ui/data.py#L187): log dosyasını okuyup durumu çıkarır. `STEP_RE` `"3/6 bölümleme"` satırlarını yakalar; "Bitti" görünce iş bitti, "Traceback" görünce hata, "⏳" görünce kota beklemesi sayılır.
-  - [`jobs()`](../src/ui/data.py#L204): bütün işler, en yeni önce.
+  - [`start_job(pdf_name, language)`](../src/ui/data.py#L271): `python -m src.pipeline "<pdf>"`'i bağımsız süreçte başlatır. Çıktı `data/jobs/<belge>.log`'a, başlangıç zamanı `.json`'a yazılır.
+  - [`job_status(stem)`](../src/ui/data.py#L287): log dosyasını okuyup durumu çıkarır. `STEP_RE` `"3/6 bölümleme"` satırlarını yakalar; "Bitti" görünce iş bitti, "Traceback" görünce hata, "⏳" görünce kota beklemesi sayılır.
+  - [`jobs()`](../src/ui/data.py#L304): bütün işler, en yeni önce.
 
   Ayrı süreç ile arayüz arasındaki "iletişim" bu log dosyasıdır.
 
@@ -213,7 +228,7 @@ Streamlit'i ilk okuyanı en çok şaşırtan şey şu: **her etkileşimde sayfa 
   İçerik yalnızca yeni ipucu açılınca değişir; böylece Streamlit çerçeveyi her tıklamada yeniden yüklemez ve sayaç titremez.
 
 **3. Sonuç:** [`results(req, items)`](../src/ui/quiz.py#L316)
-1. Her soruyu puanla. İlk kez geliniyorsa `record_attempt` ile kaydet (madde analizi); `recorded=True` yap.
+1. Her soruyu puanla. İlk kez geliniyorsa `record_attempt` ile, giriş yapan kişinin kimliğiyle kaydet (madde analizi); `recorded=True` yap. "Baştan çöz" yeniden kaydeder ama ölçüme yalnızca kişinin ilk çözümü girer (bölüm 10).
 2. Doğru / yanlış / boş sayıları (itirazlar doğru sayılır).
 3. Özet: her soru için `{durum, zorluk, tip, konu}` kaydı → `components.summary_html` (sınavda soru tipine göre ölçer de var).
    - [`_message`](../src/ui/quiz.py#L294): yüzdeye göre başlık ve not.
@@ -225,7 +240,7 @@ Streamlit'i ilk okuyanı en çok şaşırtan şey şu: **her etkileşimde sayfa 
    - "Baştan çöz" ve "Yeni sınav".
 5. Gözden geçirme ("Yanlış ve boşlar / Tümü / Doğrular" süzgeci): her soru kartıyla, ardından:
    - "Hatalı bildir": `request.report`; soru inceleme bitene kadar sınavlardan çıkar.
-   - Kısa cevapta "Cevabım doğruydu" itirazı: puana yansır, soru öğretmene gider.
+   - Kısa cevapta "Cevabım doğruydu" itirazı: puana yansır, soru İnceleme sayfasına düşer.
 
 ---
 
@@ -242,22 +257,25 @@ Doğru / yanlış ifadeleri, "aşağıdakilerden hangisi" ve olumsuz kök ("…d
 **Aralıklı tekrar (Leitner kutuları).** Her kart 1-5 arası bir kutudadır:
 - Bildim → bir üst kutu; Bilemedim → 1. kutu; Atla → değişmez.
 - Kutu yükseldikçe kart seyrekleşir: 1. kutu her oturumda, sonra 1, 3, 7, 14 gün.
-- Sonuç öğrencinin kendi değerlendirmesidir. Sınavın madde istatistiğine (`attempts.jsonl`) karışmaz; ayrı dosyaya yalnızca eklenir: `data/review/cards.jsonl` (soru kimliğine bağlı). Kutular bu kayıt baştan oynatılarak bulunur.
+- Sonuç öğrencinin kendi değerlendirmesidir. Sınavın madde istatistiğine (`attempts.jsonl`) karışmaz; ayrı dosyaya yalnızca eklenir: `data/review/cards.jsonl` (soru ve kişi kimliğine bağlı). Kutular bu kayıt baştan oynatılarak bulunur.
+- **Kutular kişiye özeldir:** herkes aynı kuralla, yalnızca kendi değerlendirmeleriyle ilerler. Kişi alanı olmayan eski satırlar ilk hesabındır (bölüm 11).
 
-**Bağlantılar:** ← `pages/cards`, `tests/test_cards`. → `request` (`all_items`, `usable`, `blocked_ids`), `config`.
+**Bağlantılar:** ← `pages/cards`, `difficulty.real_attempts` (`first_seen`), `tests/test_cards`. → `request` (`all_items`, `usable`, `blocked_ids`), `accounts.legacy_owner`, `jsonl`, `config`.
 
 **İçindekiler**
 - `LOG`, `INTERVAL_DAYS` (kutu → gün), `RESULTS` (`good`, `bad`, `skip`).
 - `_OPTION_BOUND`: kökü şıklara dayanan soruyu yakalayan düzenli ifade ("aşağıdaki", "seçenek", "şık", "değildir", "which of"…). `\bşık\b`: "yaklaşık" yakalanmasın.
-- [`card_ok(q)`](../src/cards.py#L31): soru şıksız bir karta dönüşebilir mi?
-- [`step(state, result, t)`](../src/cards.py#L40): bir değerlendirmeden sonra kartın yeni durumu `{box, last, seen, good, bad}`. Saf fonksiyon (dosyaya dokunmaz).
-- [`history(path)`](../src/cards.py#L56): kayıt dosyasını baştan oynatır → kart kimliği → durum.
-- [`record(qid, result, path)`](../src/cards.py#L68): bir değerlendirmeyi dosyaya ekler. `path` çağrı anında okunur; testler geçici dosyaya yönlendirebilsin.
-- [`is_due(state, now)`](../src/cards.py#L76): hiç görülmemiş ya da kutusunun aralığı dolmuş kart.
-- [`next_gap(state, result)`](../src/cards.py#L81): bu sonuçtan sonra kart kaç gün sonra gelir (ekrandaki "Bildim → 3 gün sonra yeniden" ipucu).
-- [`pick(items, hist, n, now, only_due, seed)`](../src/cards.py#L86): deste. Önce zamanı gelmiş tekrar kartları (düşük kutu önce), sonra hiç görülmemişler; eşitlerde karışık.
-- [`pool(docs)`](../src/cards.py#L95): seçili belgelerdeki kart olabilen sorular. Sınavla aynı kural: doğrulanmış, reddedilmemiş, bildirilmemiş.
-- [`summary(items, hist, now)`](../src/cards.py#L103): kurulum ekranındaki sayılar (toplam, yeni, zamanı gelen, ustalaşılan = kutu ≥ 4).
+- [`card_ok(q)`](../src/cards.py#L32): soru şıksız bir karta dönüşebilir mi?
+- [`step(state, result, t)`](../src/cards.py#L41): bir değerlendirmeden sonra kartın yeni durumu `{box, last, seen, good, bad}`. Saf fonksiyon (dosyaya dokunmaz).
+- [`_mine(rows, user)`](../src/cards.py#L57): yalnızca o kişinin satırları (`user` verilmezse hepsi).
+- [`history(path, user)`](../src/cards.py#L66): kayıt dosyasını baştan oynatır → kart kimliği → durum. Sayfa `user=` ile çağırır: kişinin kendi kutuları.
+- [`first_seen(path)`](../src/cards.py#L74): (kişi, soru) → kartta ilk değerlendirildiği an. Kartta cevabı görülmüş soru sonra sınavda çıkarsa o deneme "taze" sayılmaz (bölüm 10). "Atla" sayılmaz: cevap görülmemiş olabilir.
+- [`record(qid, result, path, user)`](../src/cards.py#L85): bir değerlendirmeyi kişiyle birlikte dosyaya ekler. `path` çağrı anında okunur; testler geçici dosyaya yönlendirebilsin.
+- [`is_due(state, now)`](../src/cards.py#L93): hiç görülmemiş ya da kutusunun aralığı dolmuş kart.
+- [`next_gap(state, result)`](../src/cards.py#L98): bu sonuçtan sonra kart kaç gün sonra gelir (ekrandaki "Bildim → 3 gün sonra yeniden" ipucu).
+- [`pick(items, hist, n, now, only_due, seed)`](../src/cards.py#L103): deste. Önce zamanı gelmiş tekrar kartları (düşük kutu önce), sonra hiç görülmemişler; eşitlerde karışık.
+- [`pool(docs)`](../src/cards.py#L112): seçili belgelerdeki kart olabilen sorular. Sınavla aynı kural: doğrulanmış, reddedilmemiş, bildirilmemiş.
+- [`summary(items, hist, now)`](../src/cards.py#L120): kurulum ekranındaki sayılar (toplam, yeni, zamanı gelen, ustalaşılan = kutu ≥ 4).
 
 ---
 
@@ -285,24 +303,24 @@ Klavye: Boşluk çevir · ← bilemedim · ↓ atla · → bildim.
 | `started`, `ended` | Süre ve "Bitir" |
 
 **İçindekiler**
-- [`_items()`](../src/ui/pages/cards.py#L29): bütün sorular (30 sn önbellek).
-- [`_topic(it)`](../src/ui/pages/cards.py#L37): kartın konusu. Bölüm adı yalnızca numaraysa ("01") belge adıyla birlikte.
+- [`_items()`](../src/ui/pages/cards.py#L30): bütün sorular (30 sn önbellek).
+- [`_topic(it)`](../src/ui/pages/cards.py#L38): kartın konusu. Bölüm adı yalnızca numaraysa ("01") belge adıyla birlikte.
 - Geri çağırmalar:
-  - [`_begin(ids)`](../src/ui/pages/cards.py#L45): yeni oturum durumu.
-  - [`_grade(result)`](../src/ui/pages/cards.py#L51): sonucu `cards.record` ile kaydeder; seriyi, yığınları ve sırayı günceller.
-  - [`_shuffle`](../src/ui/pages/cards.py#L69): kalan kartları karıştırır (ekrandaki kart yerinde kalır).
-  - [`_only_bad`](../src/ui/pages/cards.py#L76): yalnızca bilinemeyenlerle yeni tur.
-  - [`_end`](../src/ui/pages/cards.py#L82), [`_new`](../src/ui/pages/cards.py#L86): bitir, baştan.
+  - [`_begin(ids)`](../src/ui/pages/cards.py#L55): yeni oturum durumu.
+  - [`_grade(result)`](../src/ui/pages/cards.py#L62): sonucu `cards.record` ile, giriş yapan kişinin kimliğiyle kaydeder; seriyi, yığınları ve sırayı günceller.
+  - [`_shuffle`](../src/ui/pages/cards.py#L81): kalan kartları karıştırır (ekrandaki kart yerinde kalır).
+  - [`_only_bad`](../src/ui/pages/cards.py#L88): yalnızca bilinemeyenlerle yeni tur.
+  - [`_end`](../src/ui/pages/cards.py#L94), [`_new`](../src/ui/pages/cards.py#L99): bitir, baştan.
 - HTML parçaları:
-  - [`_front(it)`](../src/ui/pages/cards.py#L92), [`_back(it)`](../src/ui/pages/cards.py#L99): kartın iki yüzü.
-  - [`_length_class(q)`](../src/ui/pages/cards.py#L115): uzun soruda yazı küçülür (`long`, `xlong`).
-  - [`_piles(cs, bump)`](../src/ui/pages/cards.py#L120): üç yığın; az önce kart düşen yığın hafifçe büyür.
-  - [`_stage(it, cs)`](../src/ui/pages/cards.py#L131): deste + kart + uçan kart + yığınlar.
+  - [`_front(it)`](../src/ui/pages/cards.py#L106), [`_back(it)`](../src/ui/pages/cards.py#L113): kartın iki yüzü.
+  - [`_length_class(q)`](../src/ui/pages/cards.py#L129): uzun soruda yazı küçülür (`long`, `xlong`).
+  - [`_piles(cs, bump)`](../src/ui/pages/cards.py#L134): üç yığın; az önce kart düşen yığın hafifçe büyür.
+  - [`_stage(it, cs)`](../src/ui/pages/cards.py#L145): deste + kart + uçan kart + yığınlar.
     - Kart bir `<details>` öğesidir: tıklamak onu açıp kapatır, CSS bunu 3B dönüşe çevirir. Böylece çevirmek sunucuya gitmez.
     - Sarmalayıcı etiketi her değerlendirmede `div` ↔ `section` değişir. Tarayıcı sahneyi sıfırdan kurar: animasyon her seferinde oynar ve çevrilmiş kart bir sonraki karta çevrili geçmez.
-- [`_keys()`](../src/ui/pages/cards.py#L148): klavye kısayolları (`st.iframe` içinde küçük JavaScript). Boşluk `<details>`'i açıp kapatır; ok tuşları CSS sınıfıyla bulunan düğmeye `click()` yaptırır.
-- Ekranlar: [`_setup()`](../src/ui/pages/cards.py#L175), [`_session()`](../src/ui/pages/cards.py#L207), [`_summary()`](../src/ui/pages/cards.py#L241).
-- [`render()`](../src/ui/pages/cards.py#L263): sınavdan `cards_preset` geldiyse o sorularla oturum açar (hiçbiri karta dönüşmüyorsa bildirim gösterir); oturum varsa oturum, yoksa seçim ekranı.
+- [`_keys()`](../src/ui/pages/cards.py#L162): klavye kısayolları (`st.iframe` içinde küçük JavaScript). Boşluk `<details>`'i açıp kapatır; ok tuşları CSS sınıfıyla bulunan düğmeye `click()` yaptırır.
+- Ekranlar: [`_setup()`](../src/ui/pages/cards.py#L189), [`_session()`](../src/ui/pages/cards.py#L225), [`_summary()`](../src/ui/pages/cards.py#L259). Seçimde yalnızca görebildiğin belgeler listelenir; sayılar ve deste kişinin kendi kutularından (`history(user=…)`).
+- [`render()`](../src/ui/pages/cards.py#L281): sınavdan `cards_preset` geldiyse o sorularla oturum açar (hiçbiri karta dönüşmüyorsa bildirim gösterir); oturum varsa oturum, yoksa seçim ekranı.
 
 ---
 
@@ -315,39 +333,43 @@ Klavye: Boşluk çevir · ← bilemedim · ↓ atla · → bildim.
 **İçindekiler**
 - `DIFF`: ekrandaki zorluk adı → kod değeri ("Karışık" → `None`).
 - [`_builder()`](../src/ui/pages/exam.py#L20): seçim formu.
-  1. Belgeler (varsayılan: en çok doğrulanmış sorusu olan).
+  1. Belgeler (yalnızca görebildiklerin; varsayılan: en çok doğrulanmış sorusu olan).
   2. Konular (konu haritasından; boşsa hepsi).
   3. Zorluk, tipler ("Hesap sorusu" yalnızca formüllü belgede), sayı (5/10/15/20).
 
   "Sınavı hazırla" düğmesi `R.prepare(...)` çağırır; arama ve havuz eşleştirmesi saniyeler sürer.
-- [`_open(req_id)`](../src/ui/pages/exam.py#L57): `session_state.exam`'ı kurar, adres çubuğuna `?sinav=<id>` yazar.
-- [`_summary(req)`](../src/ui/pages/exam.py#L64): sınavın özeti ve "Notlarında bulunan kaynak sayfalar" açılır paneli: her konunun aramada bulduğu sayfalar. RAG'in görünür kanıtı budur.
-- [`_live(req_id)`](../src/ui/pages/exam.py#L85) (`@st.fragment(run_every=3)`): eksik sorular üretilirken her 3 saniyede istek dosyasını okuyup ilerleme çubuğunu günceller. İş bitince bütün sayfayı yeniler.
-- [`_progress_value(text)`](../src/ui/pages/exam.py#L97): `"Doğrulanıyor 3/8"` metninden çubuk değeri.
-- [`_status(req, items)`](../src/ui/pages/exam.py#L103): sınava geçilebilir mi?
+- [`_open(req_id)`](../src/ui/pages/exam.py#L62): `session_state.exam`'ı kurar, adres çubuğuna `?sinav=<id>` yazar.
+- [`_summary(req)`](../src/ui/pages/exam.py#L69): sınavın özeti ve "Notlarında bulunan kaynak sayfalar" açılır paneli: her konunun aramada bulduğu sayfalar. RAG'in görünür kanıtı budur.
+- [`_live(req_id)`](../src/ui/pages/exam.py#L90) (`@st.fragment(run_every=3)`): eksik sorular üretilirken her 3 saniyede istek dosyasını okuyup ilerleme çubuğunu günceller. İş bitince bütün sayfayı yeniler.
+- [`_progress_value(text)`](../src/ui/pages/exam.py#L102): `"Doğrulanıyor 3/8"` metninden çubuk değeri.
+- [`_status(req, items)`](../src/ui/pages/exam.py#L108): sınava geçilebilir mi?
   - Üretiliyorsa canlı ilerleme.
   - `"partial"` ise "eksik N soruyu üret" (`R.start`) ya da "hazır olanlarla başla".
   - Hiç soru yoksa uyarı.
-- [`_export(req, items)`](../src/ui/pages/exam.py#L134): dört indirme düğmesi (sınav kâğıdı, Moodle XML, GIFT, CSV).
-- [`render()`](../src/ui/pages/exam.py#L153): sayfanın akışı. Adreste `?sinav=` varsa sınavı açar. Faz `"solve"` ise yalnızca odak modu gösterilir (başlık yok). Değilse başlık → form ya da özet → durum → sonuç ya da başlangıç ekranı → dışa aktarma.
+- [`_export(req, items)`](../src/ui/pages/exam.py#L139): dört indirme düğmesi (sınav kâğıdı, Moodle XML, GIFT, CSV).
+- [`render()`](../src/ui/pages/exam.py#L169): sayfanın akışı. Adreste `?sinav=` varsa sınavı açar; ama yalnızca sınavın belgelerinin hepsini görebiliyorsan (bağlantıyı açan herkes kendi hesabıyla çözer; göremiyorsan "not herkese açılırsa bağlantı çalışır" uyarısı). Faz `"solve"` ise yalnızca odak modu gösterilir (başlık yok). Değilse başlık → form ya da özet → durum → sonuç ya da başlangıç ekranı → dışa aktarma.
 
 ---
 
 ## `src/ui/pages/documents.py` — Belgeler (152 satır)
 
-**Ne işe yarar?** Yeni PDF yüklenir ve işlenir. Çalışan işler izlenir. Her belgenin konuları, sayfaları (görüntü + çıkarılan metin) ve okuma kalitesi gösterilir.
+**Ne işe yarar?** Yeni PDF yüklenir ve işlenir. Çalışan işler izlenir. Her belgenin konuları, sayfaları (görüntü + çıkarılan metin) ve okuma kalitesi gösterilir. Belge kütüphanesinin (bölüm 11) arayüzü de burada: yüklenen not yalnızca yükleyene görünür, istenirse herkese açılır; sistemde zaten olan not yeniden işlenmez.
 
-**Bağlantılar:** → `data` (`start_job`, `jobs`, `documents`, `topics`, `parsed`), `request` (`all_items`, `usable`), `pymupdf`.
+**Bağlantılar:** → `library` (`register`, `publish`, `rename`, `has_access`), `data` (`start_job`, `jobs`, `my_documents`, `visible`, `doc_meta`, `topics`, `parsed`), `request` (`all_items`, `usable`), `config`, `pymupdf`.
 
 **İçindekiler**
-- [`_add()`](../src/ui/pages/documents.py#L21): dosya yükleyici + "Soruların dili" seçimi. PDF `data/sample_docs/`'a kaydedilir; düğmeyle `data.start_job` çağrılır.
-- [`_jobs()`](../src/ui/pages/documents.py#L41) (`fragment`, 4 sn): çalışan işlerin adım adı, ilerleme çubuğu ve son satırı. Kota bekleniyorsa "iş duraklamadı" notu.
-- [`_detail(tail)`](../src/ui/pages/documents.py#L54): log'un son satırını kullanıcıya uygun metne çevirir ("Gemini'nin kotası dolu, qwen ile tek tek üretiliyor").
-- [`_page_png(file, page)`](../src/ui/pages/documents.py#L67): sayfa görüntüsü (85 dpi, önbellekli).
-- [`_topics_tab(d)`](../src/ui/pages/documents.py#L72): konu tablosu. Konu, sayfalar ve **hazır soru** sayısı (o sayfalara bağlı doğrulanmış sorular).
-- [`_pages_tab(d)`](../src/ui/pages/documents.py#L90): sayfa kaydırıcısı. Solda PDF görüntüsü, sağda sistemin çıkardığı metin ve rozetler (metin katmanı / görselden okundu / bekliyor / bayraklar).
-- [`_quality_tab(d)`](../src/ui/pages/documents.py#L114): görselden okunan sayfa, tablosu çıkarılan sayfa, silinen üst/alt bilgi satırı, üretimden çıkarılan sayfalar.
-- [`render()`](../src/ui/pages/documents.py#L128): yükleme → işler → belge seçici → üç sekme.
+- [`_add()`](../src/ui/pages/documents.py#L25): "Yeni ders notu ekle" açılır paneli. İçindeki akış (dosya seçici, soru dili, `library.register`, sonuç, işleme başlatma) 2026-10-08'de [`ui/upload.py`](../src/ui/upload.py)'ye taşındı; ana sayfadaki "+ Yeni not ekle" penceresi de aynısını kullanır (bölüm 12).
+- [`_start(file, lang)`](../src/ui/pages/documents.py#L32): `upload.start` + sayfayı yenile ("Notu işle" düğmesi).
+- Seçili not: ana sayfada bir karta tıklanınca `session_state.doc_open` ile gelir ve belge seçici (`doc_sel`) o nota ayarlanır.
+- [`_publish(d)`](../src/ui/pages/documents.py#L38) (`@st.dialog`): "Notu herkese aç" onay penceresi. Neyin açılacağını (sayfalar, metin, sorular, kanıtlar) ve **geri alınamayacağını** söyler.
+- [`_actions(d)`](../src/ui/pages/documents.py#L51): seçili belgenin rozeti (Gizli / Herkese açık), "Herkese aç" düğmesi (erişimin varsa), "Adını değiştir" (yalnızca sahibi). Not henüz işlenmediyse "Notu işle" düğmesi.
+- [`_jobs()`](../src/ui/pages/documents.py#L82) (`fragment`, 4 sn): çalışan işlerin adım adı, ilerleme çubuğu ve son satırı (yalnızca görebildiğin belgelerin işleri). Kota bekleniyorsa "iş duraklamadı" notu.
+- [`_detail(tail)`](../src/ui/pages/documents.py#L96): log'un son satırını kullanıcıya uygun metne çevirir ("Gemini'nin kotası dolu, qwen ile tek tek üretiliyor").
+- [`_page_png(file, page)`](../src/ui/pages/documents.py#L109): sayfa görüntüsü (85 dpi, önbellekli).
+- [`_topics_tab(d)`](../src/ui/pages/documents.py#L114): konu tablosu. Konu, sayfalar ve **hazır soru** sayısı (o sayfalara bağlı doğrulanmış sorular).
+- [`_pages_tab(d)`](../src/ui/pages/documents.py#L132): sayfa kaydırıcısı. Solda PDF görüntüsü, sağda sistemin çıkardığı metin ve rozetler (metin katmanı / görselden okundu / bekliyor / bayraklar).
+- [`_quality_tab(d)`](../src/ui/pages/documents.py#L156): görselden okunan sayfa, tablosu çıkarılan sayfa, silinen üst/alt bilgi satırı, üretimden çıkarılan sayfalar.
+- [`render()`](../src/ui/pages/documents.py#L170): yükleme → işler → belge seçici (görebildiğin belgeler) → rozet ve düğmeler → üç sekme.
 
 ---
 
@@ -358,9 +380,10 @@ Klavye: Boşluk çevir · ← bilemedim · ↓ atla · → bildim.
 **Bağlantılar:** → `data`, `request` (`KINDS`, `kind`), `components` (`TYPE_TR`, `DIFF_TR`, `type_label`), `export`, `textnorm.pretty_math`.
 
 - [`render()`](../src/ui/pages/bank.py#L14):
+  - Yalnızca görebildiğin belgelerin soruları.
   - "Gelişmiş" anahtarları: pilot setleri göster, doğrulanamayanları göster.
   - Süzgeçler: belge, tip, zorluk, metin arama.
-  - `st.dataframe` tablosu: "Öğrenci başarısı" ilerleme çubuğu olarak.
+  - `st.dataframe` tablosu: "Öğrenci başarısı" ilerleme çubuğu olarak; "Çözen kişi" her kişinin yalnızca ilk çözümünü sayar.
   - Beş indirme düğmesi (sınav kâğıdı, Moodle XML, GIFT, CSV, JSON).
 - İç fonksiyon `human(q)`: "Onaylandı / Reddedildi / Bildirildi / —".
 
@@ -368,19 +391,20 @@ Klavye: Boşluk çevir · ← bilemedim · ↓ atla · → bildim.
 
 ## `src/ui/pages/review.py` — İnceleme (147 satır)
 
-**Ne işe yarar?** Öğretmen ya da kalite kontrol ekranı. Soru kartı ile kanıtın sarıyla işaretlendiği PDF sayfası yan yana durur; altında onay/red kararı ve doğrulama ayrıntıları. Kararlar doğrulayıcının isabetini ölçmeye yarar. Reddedilen soru sınavlara konmaz.
+**Ne işe yarar?** Kalite kontrol ekranı (rol yok, her hesap görür). Soru kartı ile kanıtın sarıyla işaretlendiği PDF sayfası yan yana durur; altında onay/red kararı ve doğrulama ayrıntıları. Kararlar doğrulayıcının isabetini ölçmeye yarar. Reddedilen soru sınavlara konmaz (ortak havuz); kararı kimin verdiği kayda yazılır.
 
 **Bağlantılar:** → `review_store` (`render_evidence`, `save_decision`, `REJECT_REASONS`, `FLAG_TR`), `components`, `data`, `style`.
 
 **İçindekiler**
 - `_WIDE`: bu sayfada içerik genişliği artırılır (iki kart yan yana sığsın).
 - [`_evidence_png(qid, key)`](../src/ui/pages/review.py#L23) (önbellekli): `render_evidence` ile işaretli sayfa görüntüsü.
-- [`_filters()`](../src/ui/pages/review.py#L28): set seçimi (belge setleri önce, en büyük önce), görünüm (İncelenmemiş / İncelenmeli / Bildirilen / Tümü), "Önce kendin çöz" anahtarı (cevabı ve sayfayı gizler).
-- [`_pager(idx, n_view, done, total)`](../src/ui/pages/review.py#L46): Önceki / Sonraki + "Bu sette incelenen: X / Y" çubuğu.
-- [`_decide(item, source, n_view)`](../src/ui/pages/review.py#L61): red nedenleri, not, Onayla / Reddet / Atla. Karar verilince sonraki soruya geçilir.
-- [`_details(item, reveal)`](../src/ui/pages/review.py#L82): üreten ve doğrulayan model, SymPy sonucu, şık kararları, doğrulayıcının kendi cevabı ve gerekçesi, uyarılar.
-- [`_advance(n_view)`](../src/ui/pages/review.py#L110): sıradaki soruya geçer.
-- [`render()`](../src/ui/pages/review.py#L115): öğrenci bildirimi varsa uyarı gösterir. `.nr-pair` ızgarasında iki kart, altında karar ve ayrıntılar. Sıra `st.session_state.idx`'te tutulur.
+- [`_mine(s)`](../src/ui/pages/review.py#L28): setin yalnızca görebildiğin belgelere ait soruları (istek setinde birden çok belgenin sorusu olabilir).
+- [`_filters()`](../src/ui/pages/review.py#L34): set seçimi (belge setleri önce, en büyük önce; görünür sorusu olmayan set listelenmez), görünüm (İncelenmemiş / İncelenmeli / Bildirilen / Tümü), "Önce kendin çöz" anahtarı (cevabı ve sayfayı gizler).
+- [`_pager(idx, n_view, done, total)`](../src/ui/pages/review.py#L55): Önceki / Sonraki + "Bu sette incelenen: X / Y" çubuğu.
+- [`_decide(item, source, n_view)`](../src/ui/pages/review.py#L70): red nedenleri, not, Onayla / Reddet / Atla. Karar verilince sonraki soruya geçilir.
+- [`_details(item, reveal)`](../src/ui/pages/review.py#L91): üreten ve doğrulayan model, SymPy sonucu, şık kararları, doğrulayıcının kendi cevabı ve gerekçesi, uyarılar.
+- [`_advance(n_view)`](../src/ui/pages/review.py#L119): sıradaki soruya geçer.
+- [`render()`](../src/ui/pages/review.py#L124): öğrenci bildirimi varsa uyarı gösterir. `.nr-pair` ızgarasında iki kart, altında karar ve ayrıntılar. Sıra `st.session_state.idx`'te tutulur.
 
 ---
 
@@ -396,8 +420,8 @@ Her sonuç tekrar çalıştırılabilir bir eval betiğinden gelir.
 
 - [`_how()`](../src/ui/pages/report.py#L11): açıklama paragrafı ve `style.flow`. Okunan sayfa → konu → parça → üretilen → kod kontrolünden geçen → doğrulanan.
 - [`_compute()`](../src/ui/pages/report.py#L37): hesap kontrolü duyarlılığı (`eval/sonuclar_hesap_kontrol.json`).
-- [`_students()`](../src/ui/pages/report.py#L56): madde analizi tablosu (en düşük doğru oranı üstte).
-- [`render()`](../src/ui/pages/report.py#L79): ölçüm seçici → ilgili fonksiyon. Çoğu `parts/evaluation.py`'den alınır.
+- [`_students()`](../src/ui/pages/report.py#L56): madde analizi tablosu (en düşük doğru oranı üstte), yalnızca görebildiğin belgelerin soruları. "Çözen kişi": her kişinin yalnızca soruyu ilk görüşü sayılır.
+- [`render()`](../src/ui/pages/report.py#L81): ölçüm seçici → ilgili fonksiyon. Çoğu `parts/evaluation.py`'den alınır.
 
 ---
 
@@ -436,7 +460,7 @@ Her sonuç tekrar çalıştırılabilir bir eval betiğinden gelir.
 - [`_stacked`](../src/ui/parts/evaluation.py#L107) / [`_with_ends`](../src/ui/parts/evaluation.py#L122): yığılmış çubuk ve etiket konumları.
 - [`_bloom()`](../src/ui/parts/evaluation.py#L128): hatırlama ve uygulama koşullarında doğrulandı / incelenmeli / reddedildi.
 - [`_batch()`](../src/ui/parts/evaluation.py#L152): toplu üretim karşılaştırma tablosu.
-- [`_human()`](../src/ui/parts/evaluation.py#L168): öğretmen kararları. "Doğrulananlarda kabul" oranı doğrulayıcının isabetidir.
+- [`_human()`](../src/ui/parts/evaluation.py#L168): inceleme kararları. "Doğrulananlarda kabul" oranı doğrulayıcının isabetidir.
 - [`render()`](../src/ui/parts/evaluation.py#L194): **hiç çağrılmıyor.** Eskiden ayrı bir "Değerlendirme" sayfasıydı.
 
 ## `src/ui/parts/system.py` — (ölü kod) (85 satır)

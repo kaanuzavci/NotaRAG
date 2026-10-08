@@ -320,7 +320,7 @@ def results(req: dict, items: list[dict]) -> None:
     graded = {it["id"]: grade(it, ex["answers"].get(it["id"])) for it in v}
     if not ex["recorded"]:  # madde analizi (ilk deneme; itirazlar ve ikinci denemeler istatistiği değiştirmez)
         R.record_attempt(req["id"], graded, retry=bool(ex.get("retry")),
-                         answers={k: ex["answers"].get(k) for k in graded}, hints=ex.get("hints", {}))
+                         answers={k: ex["answers"].get(k) for k in graded}, hints=ex.get("hints", {}), user=data.uid())
         ex["recorded"] = True
         data.item_stats.clear()
     ok = {k: g or k in overrides for k, g in graded.items()}
@@ -379,7 +379,7 @@ def results(req: dict, items: list[dict]) -> None:
         with row[1].popover("Hatalı bildir", icon=":material/flag:"):
             note = st.text_input("Ne yanlış?", key=f"rep_{it['id']}", placeholder="ör. iki şık da doğru")
             if st.button("Gönder", key=f"repb_{it['id']}", type="primary"):
-                R.report(it["id"], note, req["id"])
+                R.report(it["id"], note, req["id"], user=data.uid())
                 data.reports.clear()
                 st.toast("Bildirildi. Soru incelenene kadar sınavlara konmayacak.", icon=":material/flag:")
         # Kısa cevap otomatik karşılaştırılır ve yanılabilir: öğrenci itiraz eder, soru öğretmen incelemesine düşer
@@ -390,7 +390,7 @@ def results(req: dict, items: list[dict]) -> None:
                 why = st.text_input("Neden doğru? (isteğe bağlı)", key=f"obj_{it['id']}")
                 if st.button("İtiraz et", key=f"objb_{it['id']}", type="primary"):
                     R.report(it["id"], f"Kısa cevap itirazı: öğrenci '{ans}' yazdı, beklenen "
-                                       f"'{it['q']['answer']}'. {why}".strip(), req["id"])
+                                       f"'{it['q']['answer']}'. {why}".strip(), req["id"], user=data.uid())
                     ex["overrides"] = sorted(overrides | {it["id"]})
                     data.reports.clear()
                     st.rerun()

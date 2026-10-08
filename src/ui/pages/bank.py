@@ -18,7 +18,8 @@ def render() -> None:
         include_pilot = st.toggle("Pilot ve deney setlerini de göster", value=False,
                                   help="Geliştirme sırasındaki model karşılaştırmalarının soruları (farklı istem/modeller).")
         show_all = st.toggle("Doğrulanamayan soruları da göster", value=False)
-    qs = [q for q in data.all_questions(include_pilot=include_pilot) if q["q"].get("type") in C.TYPE_TR]
+    mine = data.visible()  # yalnızca görebildiğin notların soruları
+    qs = [q for q in data.all_questions(include_pilot=include_pilot) if q["q"].get("type") in C.TYPE_TR and q["doc"] in mine]
     if not qs:
         st.info("Henüz soru yok. **Belgeler** sayfasından bir not ekle ya da **Sınav Hazırla** ile soru iste.")
         return
@@ -51,15 +52,16 @@ def render() -> None:
         [{"Soru": pretty_math(q["q"]["question"]), "Belge": data.short(q["doc"]), "Tip": C.type_label(q["q"]),
           "Zorluk": C.DIFF_TR.get(q["q"].get("difficulty"), "—"), "Sayfa": q.get("check", {}).get("evidence_page"),
           "Öğrenci başarısı": stats.get(q["id"], {}).get("rate"),
-          "Çözülme": stats.get(q["id"], {}).get("n", 0), "İnceleme": human(q)} for q in sel],
+          "Çözen kişi": stats.get(q["id"], {}).get("n", 0), "İnceleme": human(q)} for q in sel],
         hide_index=True, width="stretch", height=460,
         column_config={"Soru": st.column_config.TextColumn(width="large"),
                        "Sayfa": st.column_config.NumberColumn(format="s.%d", width="small"),
                        "Öğrenci başarısı": st.column_config.ProgressColumn(
                            format="percent", min_value=0, max_value=1,
-                           help="Sınavlarda bu soruyu doğru cevaplayanların oranı (madde güçlüğü). Herkesin "
-                                "yanlış yaptığı bir soru, hatalı cevap anahtarının işareti olabilir."),
-                       "Çözülme": st.column_config.NumberColumn(width="small")})
+                           help="Sınavlarda bu soruyu doğru cevaplayanların oranı (madde güçlüğü; her kişinin "
+                                "yalnızca ilk çözümü). Herkesin yanlış yaptığı bir soru, hatalı cevap anahtarının "
+                                "işareti olabilir."),
+                       "Çözen kişi": st.column_config.NumberColumn(width="small")})
 
     st.space("small")
     st.markdown("##### Dışa aktar")

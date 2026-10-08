@@ -55,20 +55,22 @@ def _compute() -> None:
 
 def _students() -> None:
     st.subheader("Öğrenci sonuçları (madde analizi)")
-    stats = data.item_stats()
+    items, seen = R.all_items(), data.visible()
+    items = {q: it for q, it in items.items() if it["doc"] in seen}  # yalnızca görebildiğin notların soruları
+    stats = {q: s for q, s in data.item_stats().items() if q in items}
     if not stats:
         st.info("Henüz çözülmüş sınav yok. **Sınav Hazırla** sayfasında çözülen her soru burada sayılır.",
                 icon=":material/quiz:")
         return
-    items = R.all_items()
-    rows = [{"Soru": items[q]["q"]["question"], "Çözülme": s["n"], "Doğru oranı": s["rate"]}
-            for q, s in stats.items() if q in items]
-    df = pd.DataFrame(rows).sort_values(["Doğru oranı", "Çözülme"])
+    rows = [{"Soru": items[q]["q"]["question"], "Çözen kişi": s["n"], "Doğru oranı": s["rate"]}
+            for q, s in stats.items()]
+    df = pd.DataFrame(rows).sort_values(["Doğru oranı", "Çözen kişi"])
     c = st.columns(3, gap="medium")
     c[0].metric("Çözülen soru", len(df), border=True)
     c[1].metric("Ortalama doğru oranı", f"%{100 * df['Doğru oranı'].mean():.0f}", border=True)
-    c[2].metric("Bildirilen soru", len(data.reports()), border=True)
-    st.caption("En düşük doğru oranlı sorular üstte. Çok çözülmüş ve herkesin yanlış yaptığı bir soru, cevap anahtarı "
+    c[2].metric("Bildirilen soru", sum(q in items for q in data.reports()), border=True)
+    st.caption("En düşük doğru oranlı sorular üstte. Her kişinin bir soruyu yalnızca ilk görüşü sayılır (yeniden "
+               "çözmeler ve kartta görülmüş sorular sayılmaz). Çok kişinin yanlış yaptığı bir soru, cevap anahtarı "
                "hatasının işareti olabilir; İnceleme'de kontrol edilmeli.")
     st.dataframe(df, hide_index=True, width="stretch",
                  column_config={"Soru": st.column_config.TextColumn(width="large"),
