@@ -9,7 +9,7 @@ import streamlit as st
 
 from src import export, resume
 from src import request as R
-from src.ui import data, style
+from src.ui import data, reader, style
 from src.ui import quiz as Q
 
 DIFF = {"Karışık": None, "Kolay": "easy", "Orta": "medium", "Zor": "hard"}
@@ -167,6 +167,9 @@ def _remember(ex: dict | None) -> None:
 
 
 def render() -> None:
+    if reader.active():  # sonuçtaki "Kaynağı aç": okuyucu kapanınca sonuç ekranı aynı yerde geri gelir
+        reader.show(on_close=lambda r, page: None)
+        return
     link = st.query_params.get("sinav")
     if "exam" not in st.session_state and link and (shared := R.load(link)):
         # Sınav bağlantısı: açan kişi kendi hesabıyla çözer; ancak sınavın belgelerini görebiliyorsa

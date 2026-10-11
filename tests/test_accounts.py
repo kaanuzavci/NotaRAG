@@ -199,7 +199,39 @@ def test_profile_and_resume() -> None:
         assert back["phase"] == "solve" and "updated" not in back
         assert abs((time.time() - back["started"]) - 600) < 5  # beklenen bir saat süreye eklenmez
         resume.clear(a, "exam")
-        assert resume.load(a, "exam") is None and appdb.version() == len(appdb.MIGRATIONS) == 2
+        assert resume.load(a, "exam") is None and appdb.version() == len(appdb.MIGRATIONS) == 3
+
+
+def test_folders() -> None:
+    """Klasörler: kişiye özel; not en çok bir klasörde; silinen klasörün notları silinmez; görmediğin not konamaz."""
+    with tempfile.TemporaryDirectory() as d:
+        _fresh(d)
+        a = accounts.create("kaan", "parola123")["id"]
+        b = accounts.create("demo", "parola123")["id"]
+        n1 = library.register(_pdf(["Birinci hafta notu."]), "h1.pdf", a)[0]["doc"]
+        n2 = library.register(_pdf(["İkinci hafta notu."]), "h2.pdf", a)[0]["doc"]
+        n3 = library.register(_pdf(["Başkasının gizli notu."]), "gizli.pdf", b)[0]["doc"]
+        f = library.create_folder(a, "  Bilgisayar   Mimarisi ", [n1, n2, n3])
+        (fa,) = library.folders(a)
+        assert fa["name"] == "Bilgisayar Mimarisi" and sorted(fa["docs"]) == sorted([n1, n2]) and not library.folders(b)
+        for bad in ("", "x" * 61, "bilgisayar mimarisi"):  # boş, uzun, aynı ad (büyük/küçük harf farkı sayılmaz)
+            try:
+                library.create_folder(a, bad)
+                raise AssertionError(f"kabul edilmemeliydi: {bad!r}")
+            except library.LibraryError:
+                pass
+        g = library.create_folder(a, "Seçmeli", [n2])  # başka klasöre taşınır, iki klasörde birden durmaz
+        assert {x["id"]: x["docs"] for x in library.folders(a)} == {f: [n1], g: [n2]}
+        try:
+            library.rename_folder(b, f, "Başkasının")
+            raise AssertionError("başkasının klasörü değişmemeli")
+        except library.LibraryError:
+            pass
+        library.rename_folder(a, f, "BIL 201")
+        library.move_to_folder(a, [n1], None)
+        library.delete_folder(a, g)
+        assert [x["name"] for x in library.folders(a)] == ["BIL 201"] and library.folders(a)[0]["docs"] == []
+        assert n2 in library.visible(a)  # klasörü silmek notu silmez
 
 
 def test_free_key_avoids_leftovers() -> None:
@@ -224,5 +256,6 @@ if __name__ == "__main__":
     test_accounts_and_sessions()
     test_library()
     test_profile_and_resume()
+    test_folders()
     test_free_key_avoids_leftovers()
     print(f"accounts: tüm testler geçti ({time.time() - t0:.1f} sn)")

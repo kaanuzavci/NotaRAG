@@ -30,7 +30,7 @@ Bu bölüm dört dosyayı ve bir istem dosyasını anlatıyor:
 - [Satır 19-22](../src/config.py#L19): `DATA_DIR` (`data/`), `PARSED_DIR` (`data/parsed/`), `VISION_CACHE_DIR` (`data/vision_cache/`), `VISION_DPI = 150` (görsel okuma için sayfa görüntüsünün çözünürlüğü).
 - [`APP_DB`](../src/config.py#L26): hesapların ve belge kaydının veritabanı (`data/app.sqlite`; bölüm 11). `NOTARAG_APP_DB` ortam değişkeniyle başka bir dosyaya yönlendirilebilir: deneme amaçlı ikinci bir Streamlit, gerçek hesaplara dokunmadan geçici bir veritabanıyla açılabilsin.
 - [Satır 25 `DOC_NAMES`](../src/config.py#L29): dosya adı → ekranda görünen kısa ad (ör. `"english"` → `"Genetic Algorithms"`).
-- [Satır 31 `doc_name(stem)`](../src/config.py#L35): kısa adı döndürür. Listede olmayan (arayüzden yeni yüklenmiş) belgede alt çizgileri boşluğa çevirir. Artık yalnızca **ilk ad** için kullanılıyor: belge kaydına girerken görünen ad buradan alınır; sonra ad kayıttan okunur ve sahibi değiştirebilir ([`library.display_name`](../src/library.py#L233)).
+- [Satır 31 `doc_name(stem)`](../src/config.py#L35): kısa adı döndürür. Listede olmayan (arayüzden yeni yüklenmiş) belgede alt çizgileri boşluğa çevirir. Artık yalnızca **ilk ad** için kullanılıyor: belge kaydına girerken görünen ad buradan alınır; sonra ad kayıttan okunur ve sahibi değiştirebilir ([`library.display_name`](../src/library.py#L299)).
 
 **Neden böyle?** Anahtarlar koda yazılmaz, `.env`'de durur; `.env` de `.gitignore` sayesinde repoya girmez. Şablonu [`.env.example`](../.env.example).
 
@@ -106,7 +106,7 @@ Bu iki ifadeyi PROMPTS.md'de değiştirirsen kural ekleme sessizce çalışmaz y
   - **Kalite:** İnceleme, Rapor, Modeller ve Kota
   - **Hesap:** Profil ve beyin analizi (bölüm 12)
 - [Satır 28](../src/app.py#L28) `st.logo(...)`: kenar çubuğunda açık renkli logo (`logo.svg`, koyu zemin için); kenar çubuğu kapalıyken üst şeritte mürekkep renkli olanı (`icon_image=logo_ink.svg`; açık renkli logo kâğıt zeminde okunmuyordu, 2026-10-08).
-- [`nav`](../src/app.py#L48) `= st.navigation(...)`: menüyü kurar. `auth.sidebar(user)` kenar çubuğunun **en altına** kim giriş yaptı ve "Çıkış" kutusunu koyar (bölüm 13); `nav.run()` seçilen sayfanın dosyasını çalıştırır.
+- [`nav`](../src/app.py#L49) `= st.navigation(...)`: menüyü kurar. `auth.sidebar(user)` kenar çubuğunun **en altına** kim giriş yaptı ve "Çıkış" kutusunu koyar (bölüm 13); `nav.run()` seçilen sayfanın dosyasını çalıştırır.
 
 **Streamlit'in çalışma biçimi:** Her sayfa dosyası (ör. [`ui/pages/exam.py`](../src/ui/pages/exam.py)) en altta `render()` çağırır. Streamlit sayfayı her açtığında ve her tıklamada o dosyayı **baştan sona** yeniden çalıştırır. Ayrıntısı bölüm 8'de.
 

@@ -107,20 +107,26 @@ section[data-testid="stSidebar"] .st-key-nr_account { padding: .85rem .2rem 0; b
 @media (min-width: 769px) {
   section[data-testid="stSidebar"] { position: fixed !important; top: 0; bottom: 0; left: 0; z-index: 1000001;
     width: 300px !important; min-width: 300px !important; max-width: 300px !important; }
-  [data-testid="stMain"] { margin-left: 300px; width: calc(100% - 300px) !important; }
+  [data-testid="stMain"] { margin-left: 300px; width: calc(100% - 300px) !important;
+    transition: margin-left .38s cubic-bezier(.2, .8, .2, 1), width .38s cubic-bezier(.2, .8, .2, 1); }
+  /* Çubuk kapanınca sol taraf boş kalmasın (kullanıcı isteği 2026-10-09): ana alan pencerenin tamamına yayılır, içerik
+     ortaya kayar. Ana sayfa ve Belgeler'de içeriğin genişliği sabit (min(1320 px, pencere − 300 px)): kartlar büyüyüp
+     küçülmez, yeniden dizilmez; yalnızca yumuşakça ortalanır. */
+  .stApp:has(section[data-testid="stSidebar"][aria-expanded="false"]) [data-testid="stMain"] { margin-left: 0;
+    width: 100% !important; }
 }
+@media (prefers-reduced-motion: reduce) { [data-testid="stMain"] { transition: none !important; } }
 header[data-testid="stHeader"] { position: fixed !important; left: 0 !important; right: 0 !important; width: auto !important;
   background: transparent !important; pointer-events: none !important; }
 header[data-testid="stHeader"] button, header[data-testid="stHeader"] a, header[data-testid="stHeader"] img {
   pointer-events: auto; }
 
-/* Pencereler (st.dialog): arka plandaki sayfa hafifçe bulanıklaşır ve kararır; pencere kâğıt beyazı. Bulanıklık hafif
-   tutuldu ve pencere ekrandan taşmıyor (içerik pencerenin içinde kayar): örtü kaydıkça bulanıklık her karede yeniden
-   hesaplanıyor, kaydırma takılıyordu. */
-div[data-testid="stDialog"] { background: rgba(30, 36, 51, .26) !important; backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px); }
+/* Pencereler (st.dialog): arkadaki sayfa kararır, bulanıklaşmaz. Eskiden backdrop-filter: blur vardı; pencerenin içi
+   (konu listesi, sayfa metni) kayarken tarayıcı her karede arkadaki bütün sayfayı yeniden bulanıklaştırıyordu →
+   kaydırma kasıyordu. Düz yarı saydam örtü bedava; pencerenin kendisi ayrı katmanda (will-change) çizilir. */
+div[data-testid="stDialog"] { background: rgba(30, 36, 51, .5) !important; }
 div[data-testid="stDialog"] > div { background: #FBF8F1 !important; border: 1px solid #E4DCC9; border-radius: 22px !important;
-  box-shadow: 0 24px 60px -34px rgba(30, 36, 51, .55); }
+  box-shadow: 0 12px 30px -16px rgba(30, 36, 51, .5); will-change: transform; contain: layout paint; }
 div[data-testid="stDialog"] [role="dialog"] h2 p { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.45rem;
   color: #1E2433; }
 
@@ -230,23 +236,23 @@ div[data-testid="stDialog"] [role="dialog"] h2 p { font-family: 'Fraunces', seri
 .nr-qprog .bar i { display: block; height: 100%; border-radius: 99px; transition: width .45s ease;
   background: linear-gradient(90deg, #1F3A5F, #3A7BB8); }
 /* Sabit yükseklikler: kısa/uzun soru ve farklı soru tiplerinde düzen oynamasın; yeni soru ortadan büyüyerek gelir */
-.nr-focus { background: #FFFDF8; border: 1px solid #E2DAC8; border-radius: 1.1rem; padding: 1.6rem 1.9rem 1.5rem;
-  min-height: 13rem; display: flex; flex-direction: column; justify-content: center; transform-origin: 50% 50%;
+.nr-focus { background: #FFFDF8; border: 1px solid #E2DAC8; border-radius: 1.1rem; padding: 1.9rem 2.4rem 1.7rem;
+  min-height: 15rem; display: flex; flex-direction: column; justify-content: center; transform-origin: 50% 50%;
   box-shadow: 0 1px 0 rgba(30,36,51,.04), 0 18px 40px -28px rgba(30,36,51,.55); animation: nr-pop .32s ease-out both; }
 .nr-focus .nr-qhead { margin-bottom: .7rem; }
-.nr-focus .nr-q { font-size: 1.5rem; line-height: 1.42; margin: 0; }
+.nr-focus .nr-q { font-size: clamp(1.5rem, 2vw, 1.85rem); line-height: 1.42; margin: 0; }
 @keyframes nr-pop { from { opacity: 0; transform: scale(.965); } to { opacity: 1; transform: none; } }
-.st-key-nr_answer { min-height: 28.5rem; margin-top: .7rem; }
+.st-key-nr_answer { min-height: 30rem; margin-top: .7rem; }
 .st-key-nr_opts input { font-size: 1.25rem; padding: 1rem 1.1rem; min-height: 3.6rem; }
 .nr-sa-help { font-size: .86rem; color: #6B6F7B; margin-top: .55rem; line-height: 1.55; }
-.st-key-nr_opts { min-height: 18.6rem; }
+.st-key-nr_opts { min-height: 19.8rem; }
 .st-key-nr_nav { position: sticky; bottom: 0; z-index: 20; padding: .9rem 0 .7rem;
   background: linear-gradient(to top, #F4F1EA 72%, rgba(244,241,234,0)); }
-.st-key-nr_opts button { justify-content: flex-start; text-align: left; min-height: 4.1rem; padding: .85rem 1.15rem;
+.st-key-nr_opts button { justify-content: flex-start; text-align: left; min-height: 4.4rem; padding: .85rem 1.3rem;
   border-radius: .9rem; transition: transform .14s ease, box-shadow .14s ease, background-color .14s ease; }
 .st-key-nr_opts button:hover { transform: translateY(-2px); box-shadow: 0 10px 22px -14px rgba(30,36,51,.55); }
 .st-key-nr_opts button:active { transform: translateY(0) scale(.995); }
-.st-key-nr_opts button p { font-size: 1.06rem; text-align: left; line-height: 1.45; }
+.st-key-nr_opts button p { font-size: 1.15rem; text-align: left; line-height: 1.45; }
 .st-key-nr_opts button > div, .st-key-nr_opts button [data-testid="stMarkdownContainer"] { justify-content: flex-start;
   width: 100%; text-align: left; }
 .st-key-nr_opts button[kind="primary"] { box-shadow: 0 0 0 3px rgba(58,123,184,.25); }
@@ -347,7 +353,7 @@ section[data-testid="stSidebar"] .nr-foot { font-size: .74rem; color: #8F876F; }
 /* Bilgi kartı (NotebookLM gibi: önde soru, arkada cevap). Ortada ve büyük; tıklayınca 3B döner, yine tıklayınca geri.
    Her yeni kartta sarmalayıcı etiket değişir (div/section) → tarayıcı kartı sıfırdan çizer: animasyon her seferinde
    oynar, çevrilmiş kart bir sonrakine çevrili geçmez (React aynı etiketli öğeyi yeniden kullanıyordu). */
-.nr-deck { position: relative; perspective: 1800px; height: 27rem; margin-top: .3rem; }
+.nr-deck { position: relative; perspective: 1800px; height: clamp(26rem, calc(100vh - 31rem), 42rem); margin-top: .3rem; }
 .nr-stack { position: absolute; inset: 0; border-radius: 26px; background: var(--s); box-shadow: var(--nr-shadow); }
 .nr-stack.s1 { transform: translateY(14px) scale(.96); opacity: .8; }
 .nr-stack.s2 { transform: translateY(28px) scale(.92); opacity: .5; }
@@ -360,20 +366,20 @@ details.nr-fc > summary::marker { content: ""; }
 details.nr-fc:not([open]) > summary:hover .nr-flip { transform: translateY(-3px); }
 details.nr-fc[open] .nr-flip { transform: rotateY(180deg); }
 .nr-face { position: absolute; inset: 0; display: flex; flex-direction: column; border-radius: 26px; overflow: hidden;
-  backface-visibility: hidden; -webkit-backface-visibility: hidden; padding: 1.8rem 2.6rem 1.4rem; box-shadow: var(--nr-shadow); }
+  backface-visibility: hidden; -webkit-backface-visibility: hidden; padding: 2rem 3.2rem 1.5rem; box-shadow: var(--nr-shadow); }
 .nr-face.front { background: linear-gradient(160deg, var(--c1) 0%, var(--c2) 100%); color: var(--ink); }
 .nr-face.back { transform: rotateY(180deg); background: var(--nr-paper); border: 1px solid var(--nr-edge); color: var(--nr-ink); overflow-y: auto; }
 .nr-face.back::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 5px; background: var(--a); }
 .nr-fc .meta { display: flex; flex-wrap: wrap; gap: .4rem; }
 .nr-fc .meta span { font-size: .76rem; font-weight: 600; color: var(--ink); background: rgba(255,255,255,.6); padding: .2rem .7rem; border-radius: 999px; }
 .nr-fc .body { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: .4rem 1rem; }
-.nr-fc .fq { font-family: 'Fraunces', serif; font-size: 1.95rem; line-height: 1.36; font-weight: 600; max-width: 38ch; }
-.nr-fc.long .fq { font-size: 1.55rem; } .nr-fc.xlong .fq { font-size: 1.28rem; }
+.nr-fc .fq { font-family: 'Fraunces', serif; font-size: clamp(2rem, 2.5vw, 2.6rem); line-height: 1.34; font-weight: 600; max-width: 44ch; }
+.nr-fc.long .fq { font-size: clamp(1.6rem, 2vw, 2rem); } .nr-fc.xlong .fq { font-size: clamp(1.3rem, 1.6vw, 1.6rem); }
 .nr-fc .hint { text-align: center; font-size: .84rem; color: var(--ink); opacity: .72; }
 .nr-fc .back .lab { font-size: .7rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--a); margin: 1.05rem 0 .3rem; }
 .nr-fc .back .lab:first-child { margin-top: .3rem; }
 .nr-fc .back .q2 { color: var(--nr-mute); font-size: .92rem; line-height: 1.5; }
-.nr-fc .back .ans { font-family: 'Fraunces', serif; font-size: 1.7rem; font-weight: 600; line-height: 1.32; }
+.nr-fc .back .ans { font-family: 'Fraunces', serif; font-size: 1.9rem; font-weight: 600; line-height: 1.32; }
 .nr-fc .back .nr-evidence { border-left-color: var(--a); border-radius: 0 12px 12px 0; }
 .nr-fc .back .flipback { margin-top: auto; padding-top: .9rem; font-size: .8rem; color: var(--nr-mute); text-align: center; }
 /* Değerlendirilen kart yığınına gider; üstünde sonuç rozeti */
@@ -508,6 +514,20 @@ def color(i: int) -> tuple[str, str, str, str]:
 def color_vars(i: int) -> str:
     c1, c2, ink, a = color(i)
     return f"--c1:{c1};--c2:{c2};--ink:{ink};--a:{a};--c:{a};--glow:{a}66"
+
+
+def focus_css(max_width: str = "1120px", top: str = "1.3rem", extra: str = "") -> str:
+    """Odak ekranları (kart oturumu, sınav çözme, giriş): kenar çubuğu gizlenir ve ana alan pencerenin tamamına yayılıp
+    ortalanır. Eskiden yalnızca çubuk gizleniyordu; ana alan çubuğun yerini (margin-left: 300px) tutmaya devam ediyor,
+    içerik pencerenin ortasından 150 px sağda, yamuk duruyordu. extra: aynı <style> bloğuna eklenecek kurallar (Markdown
+    HTML bloğu ilk </style>'ta biter, ikinci blok metin olarak görünür)."""
+    return f"""<style>
+section[data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"], [data-testid="stExpandSidebarButton"] {{ display: none !important; }}
+[data-testid="stMain"] {{ margin-left: 0 !important; width: 100% !important; }}
+.block-container, [data-testid="stMainBlockContainer"] {{ max-width: min({max_width}, 94vw); margin-left: auto; margin-right: auto;
+  padding-top: {top}; }}
+{extra}
+</style>"""
 
 
 def inject() -> None:

@@ -260,7 +260,7 @@ Bunlar hata değil; projenin nasıl büyüdüğünü gösteren izler. İleride t
 1. **Ölü kod** (kimse kullanmıyor):
    - [`ui/parts/system.py`](../src/ui/parts/system.py): dosyanın tamamı; yerini `ui/pages/models.py` aldı.
    - [`ui/parts/evaluation.render`](../src/ui/parts/evaluation.py#L194): Rapor sayfası alt fonksiyonları doğrudan çağırıyor.
-   - [`schema.Batch`](../src/generation/schema.py#L71), [`review_store.agreement`](../src/review_store.py#L226), `review_store.LABEL_TR`, [`style.card`](../src/ui/style.py#L557), `style.INK / PAPER / HIGHLIGHT`. (`ui/data.DOC_SHORT` 2026-10-07'de silindi.)
+   - [`schema.Batch`](../src/generation/schema.py#L71), [`review_store.agreement`](../src/review_store.py#L226), `review_store.LABEL_TR`, [`style.card`](../src/ui/style.py#L577), `style.INK / PAPER / HIGHLIGHT`. (`ui/data.DOC_SHORT` 2026-10-07'de silindi.)
 2. **Tanımlı ama hiç çağrılmayan rol:** `models.py`'deki `"judge"` (kısa cevap hakemi). Hakem istemi (§4d) aslında doğrulayıcı rolüyle çağrılıyor ([`verify_short`](../src/verification/verify.py#L174)). Arayüz bu rolü listeliyor, kod kullanmıyor.
 3. **Tekrarlanan kod:**
    - `chunks.jsonl` okuyan fonksiyonun yaklaşık 9 kopyası var (`index.load_chunks`, `generate._load`, `review_store.load_chunks`, `topics._chunks`, `pipeline.run` içinde, `verification/__main__`, `sensitivity`, `requote`, `eval/batch_compare`).

@@ -65,6 +65,9 @@ _CSS = """<style>
 .dv-legend i { width: 18px; height: 18px; border-radius: 6px; display: inline-grid; place-items: center; font-style: normal;
   font-size: .68rem; font-weight: 700; color: #FFFFFF; }
 .dv-legend em { font-style: normal; color: #7A6F57; margin-left: auto; font-size: .8rem; }
+/* Herkese aç onayı: düğmelerin yerinde kısa uyarı */
+.dv-confirm { font-size: .84rem; line-height: 1.45; color: #4A5163; text-align: right; margin: 0 0 .1rem; }
+.dv-confirm b { color: #1E2433; } .dv-confirm em { font-style: normal; font-weight: 600; color: #A0412D; }
 /* Sayfalar sekmesi: görüntü ve metin pencereye sığar (pencere ekranın altına taşmasın), metin kendi içinde kayar */
 .dv-sheet { background: #EFE9DC; border-radius: 16px; padding: 14px; display: flex; justify-content: center; align-items: center;
   height: max(220px, calc(100vh - 510px)); }
@@ -223,10 +226,12 @@ def _study(kind: str, stem: str) -> None:
 def open_doc(stem: str, tab: str = "Konular") -> None:
     st.session_state.doc_open = stem
     st.session_state.dv_tab = tab
+    st.session_state.pop("dv_panel", None)
 
 
 def _dismissed() -> None:
     st.session_state.pop("doc_open", None)
+    st.session_state.pop("dv_panel", None)
 
 
 def show() -> None:
@@ -332,27 +337,55 @@ def _actions(d: dict, meta: dict, n_ready: int) -> None:
             _study("exam", stem)
         if row.button("Kartları çalış", icon=":material/style:", key="dv_cards"):
             _study("cards", stem)
-    row2 = st.container(horizontal=True, horizontal_alignment="right", gap="small")
-    if meta.get("owner") == uid:
-        with row2.popover("Adını değiştir", icon=":material/edit:", type="tertiary"):
-            new = st.text_input("Görünen ad", value=data.short(stem), key=f"dv_ren_{stem}", max_chars=80)
-            if st.button("Kaydet", key=f"dv_renb_{stem}", type="primary"):
-                try:
-                    library.rename(stem, uid, new)
-                    st.cache_data.clear()
-                    st.rerun()  # pencere yeni adıyla yeniden açılır (doc_open duruyor)
-                except library.LibraryError as e:
-                    st.error(str(e))
-    if not meta.get("public") and library.has_access(stem, uid):
-        with row2.popover("Herkese aç", icon=":material/public:", type="tertiary"):
-            st.markdown(f"**{data.short(stem)}** bütün hesaplara açılacak: sayfaları, sistemin çıkardığı metin, "
-                        "soruları ve kanıt alıntıları herkes görebilecek, bu nottan sınav hazırlayıp kart çalışabilecek.")
-            st.warning("Bu işlem geri alınamaz: herkese açılan not yeniden gizlenemez.", icon=":material/warning:")
-            if st.button("Anladım, herkese aç", type="primary", key=f"dv_pub_{stem}", width="stretch"):
-                library.publish(stem, uid)
-                st.cache_data.clear()
-                st.toast("Not artık herkese açık.", icon=":material/public:")
-                st.rerun()
+    panel = st.session_state.get("dv_panel")
+    if panel == "publish" and not meta.get("public") and library.has_access(stem, uid):
+        _confirm_publish(stem, uid)
+    elif panel == "rename" and meta.get("owner") == uid:
+        _rename(stem, uid)
+    else:
+        row2 = st.container(horizontal=True, horizontal_alignment="right", gap="small")
+        if meta.get("owner") == uid:
+            row2.button("Adını değiştir", icon=":material/edit:", type="tertiary", key="dv_open_ren", on_click=_toggle,
+                        args=("rename",))
+        if not meta.get("public") and library.has_access(stem, uid):
+            row2.button("Herkese aç", icon=":material/public:", type="tertiary", key="dv_open_pub", on_click=_toggle,
+                        args=("publish",))
+
+
+def _toggle(panel: str) -> None:
+    st.session_state.dv_panel = None if st.session_state.get("dv_panel") == panel else panel
+
+
+# Onaylar düğmelerin yerinde, sağ sütunda: kısa uyarı + iki düğme. (Önce st.popover'dı: alttaki konu listesinin üstüne
+# biniyor, "Anladım" tıklaması altındaki satıra geçip okuyucuyu açıyordu, not yayımlanmıyordu. Sonra konuların üstünde
+# ayrı bir kutu oldu; kullanıcı fazla buldu, 2026-10-09.)
+
+def _confirm_publish(stem: str, uid: str) -> None:
+    style.html('<div class="dv-confirm"><b>Herkese açılsın mı?</b> Bütün hesaplar sayfaları ve soruları görebilir, '
+               'kendi notlarına ekleyebilir. <em>Geri alınamaz.</em></div>')
+    c = st.container(horizontal=True, horizontal_alignment="right", gap="small")
+    c.button("Vazgeç", key="dv_pub_x", on_click=_toggle, args=("publish",), type="tertiary")
+    if c.button("Herkese aç", type="primary", key=f"dv_pub_{stem}", icon=":material/public:"):
+        library.publish(stem, uid)
+        st.session_state.dv_panel = None
+        st.cache_data.clear()
+        st.toast("Not artık herkese açık.", icon=":material/public:")
+        st.rerun()
+
+
+def _rename(stem: str, uid: str) -> None:
+    new = st.text_input("Görünen ad", value=data.short(stem), key=f"dv_ren_{stem}", max_chars=80,
+                        label_visibility="collapsed", placeholder="Notun yeni adı")
+    c = st.container(horizontal=True, horizontal_alignment="right", gap="small")
+    c.button("Vazgeç", key="dv_ren_x", on_click=_toggle, args=("rename",), type="tertiary")
+    if c.button("Kaydet", key=f"dv_renb_{stem}", type="primary", icon=":material/check:"):
+        try:
+            library.rename(stem, uid, new)
+            st.session_state.dv_panel = None
+            st.cache_data.clear()
+            st.rerun()  # pencere yeni adıyla yeniden açılır (doc_open duruyor)
+        except library.LibraryError as e:
+            st.error(str(e))
 
 
 def _state(d: dict) -> None:

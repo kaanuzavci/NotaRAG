@@ -294,7 +294,9 @@ def start_job(pdf_name: str, language: str | None) -> Path:
 
 def job_status(stem: str) -> dict | None:
     meta, log = JOBS_DIR / f"{stem}.json", JOBS_DIR / f"{stem}.log"
-    if not meta.exists():
+    try:  # BOM'lu ya da yarım yazılmış iş dosyası tüm sayfaları çökertmesin (başka araçla yazılmış olabilir)
+        started = json.loads(meta.read_text(encoding="utf-8-sig"))["started"]
+    except (OSError, ValueError, KeyError):
         return None
     lines = log.read_text(encoding="utf-8", errors="replace").splitlines() if log.exists() else []
     step, label = 0, "Başlıyor"
@@ -306,7 +308,7 @@ def job_status(stem: str) -> dict | None:
     failed = any("Traceback" in ln for ln in lines) and not done
     waiting = next((ln.strip() for ln in reversed(lines[-5:]) if "⏳" in ln), None)
     return {"step": 6 if done else step, "label": label, "done": done, "failed": failed, "waiting": waiting,
-            "tail": [ln for ln in lines if ln.strip()][-8:], "started": json.loads(meta.read_text())["started"]}
+            "tail": [ln for ln in lines if ln.strip()][-8:], "started": started}
 
 
 def jobs() -> list[tuple[str, dict]]:

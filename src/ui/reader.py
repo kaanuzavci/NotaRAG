@@ -316,16 +316,21 @@ _READER = Component("nr_reader", html=_HTML, css=_CSS, js=_JS)
 # ---------------------------------------------------------------- sayfa görüntüleri ve içindekiler
 
 @st.cache_data(max_entries=200, show_spinner=False)
-def page_jpeg(file: str, page: int) -> bytes:
-    """Sayfanın görüntüsü (JPEG; uzun kenarı LONG_EDGE). Not penceresi de aynısını kullanır."""
+def page_jpeg(file: str, page: int, mark: str = "") -> bytes:
+    """Sayfanın görüntüsü (JPEG; uzun kenarı LONG_EDGE). Not penceresi de aynısını kullanır. mark: sayfada sarıyla
+    işaretlenecek kanıt alıntısı (İnceleme sayfasıyla aynı eşleştirme: review_store; PDF'in kendisi değişmez)."""
     with pymupdf.open(data.DOCS_DIR / file) as doc:
         pg = doc[page - 1]
+        if mark:
+            from src.review_store import _highlight_rects
+            for r in _highlight_rects(pg, mark):
+                pg.add_highlight_annot(r)
         z = LONG_EDGE / max(pg.rect.width, pg.rect.height)
-        return pg.get_pixmap(matrix=pymupdf.Matrix(z, z), alpha=False).tobytes("jpg", jpg_quality=82)
+        return pg.get_pixmap(matrix=pymupdf.Matrix(z, z), alpha=False, annots=True).tobytes("jpg", jpg_quality=82)
 
 
-def data_url(file: str, page: int) -> str:
-    return "data:image/jpeg;base64," + base64.b64encode(page_jpeg(file, page)).decode("ascii")
+def data_url(file: str, page: int, mark: str = "") -> str:
+    return "data:image/jpeg;base64," + base64.b64encode(page_jpeg(file, page, mark)).decode("ascii")
 
 
 def pages_label(pages: list[int]) -> str:
@@ -362,6 +367,13 @@ def open_reader(stem: str, page: int = 1, **back) -> None:
     st.session_state.reader = {"doc": stem, "page": page, "nonce": time.time_ns(), **back}
 
 
+def open_source(item: dict, back: str) -> None:
+    """Sorunun kaynağını aç: notun kanıt sayfası tam ekran okuyucuda, kanıt cümlesi sarıyla işaretli (sınav sonucu ve
+    bilgi kartı; kullanıcı isteği 2026-10-09). back: kapanınca dönülecek ekran (bilgi amaçlı)."""
+    page = item.get("check", {}).get("evidence_page") or 1
+    open_reader(item["doc"], page, mark=item["q"].get("evidence_quote", ""), mark_page=page, back=back)
+
+
 def active() -> bool:
     return bool(st.session_state.get("reader"))
 
@@ -387,7 +399,7 @@ def _view(on_close) -> None:
     pages = [p for p in (cur, *(cur + k for k in AHEAD)) if 1 <= p <= n]
     qp = per_page(d["stem"])
     res = _READER(key=key, data={"nonce": r["nonce"], "title": data.short(d["stem"]), "n": n, "cur": cur,
-                                 "img": {p: data_url(d["file"], p) for p in pages}, "toc": toc(d["stem"]),
+                                 "img": {p: data_url(d["file"], p, r.get("mark", "") if p == r.get("mark_page") else "") for p in pages}, "toc": toc(d["stem"]),
                                  "qp": {p: c for p, c in qp.items() if p}, "topic": r.get("topic")},
                   default={"page": cur}, on_page_change=lambda: None, on_close_change=lambda: None)
     if res.close:

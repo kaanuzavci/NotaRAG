@@ -72,13 +72,13 @@ Pencere neden `session_state.doc_open` ile tutuluyor? Streamlit'te pencere (`st.
 - `STEPS`, `TABS`, `SOURCE_TR`, `FLAG_TR`: adım adları, sekmeler, rozet yazıları.
 - `_CSS`: pencerenin stilleri. Sınıflar `dv-` önekli (genel stil dosyasıyla çakışmasın).
 - `_TOPICS` (`_TOPICS_CSS`, `_TOPICS_JS`): Konular sekmesindeki tıklanabilir satırlar. Düz HTML tıklamayı Python'a iletemediği için küçük bir CCv2 bileşeni. Tıklanan satırın sırasını `setTriggerValue("open", k)` ile verir. Listenin yüksekliğini JS ölçer: ekran yüksekliği − listenin üstü − pencerenin alt payı (pencere açılış animasyonundan sonra ve ekran boyu değişince yeniden).
-- [`running(stem, jobs)`](../src/ui/docview.py#L152): notun süren işi (son 6 saatte başlamış, bitmemiş, çökmemiş) ya da `None`.
-- [`card(d, meta, jobs, prog, public_view)`](../src/ui/docview.py#L158): notu bileşenin anlayacağı karta çevirir (eskiden `home._doc_card`):
+- [`running(stem, jobs)`](../src/ui/docview.py#L155): notun süren işi (son 6 saatte başlamış, bitmemiş, çökmemiş) ya da `None`.
+- [`card(d, meta, jobs, prog, public_view)`](../src/ui/docview.py#L161): notu bileşenin anlayacağı karta çevirir (eskiden `home._doc_card`):
   - başlık, sayfa ve konu sayısı; çizgili satırlarda notun ilk 3 konusu (başlık uzunsa 2);
   - rozet: Gizli / Herkese açık / İşleniyor; renk kütüphaneye giriş sırasından;
   - deste kalınlığı ve "Henüz çalışmadın · 18 soru" gibi yazılar **hazır soru** sayısından (`data.ready`, aşağıda);
   - işleniyorsa adım ("Sorular üretiliyor 5/6") ve canlı çubuk.
-- [`act(ident, action, in_fragment)`](../src/ui/docview.py#L193): karttaki tıklama. `in_fragment`: raf, işlenen not varken kendiliğinden yenilenen bir parçanın içinde çizildiyse (o çalıştırma sayfanın sonundaki `show()`'a gelmez, sayfa baştan çalıştırılır).
+- [`act(ident, action, in_fragment)`](../src/ui/docview.py#L196): karttaki tıklama. `in_fragment`: raf, işlenen not varken kendiliğinden yenilenen bir parçanın içinde çizildiyse (o çalıştırma sayfanın sonundaki `show()`'a gelmez, sayfa baştan çalıştırılır).
 
   | Tıklanan | Ne olur |
   |---|---|
@@ -86,13 +86,13 @@ Pencere neden `session_state.doc_open` ile tutuluyor? Streamlit'te pencere (`st.
   | "Sınav" / "Kartlar" | `_study`: Sınav Hazırla / Bilgi Kartları o not seçili açılır |
   | "Notlarıma ekle" | `library.add_to_library`; not kişinin rafına geçer |
 
-- [`_study(kind, stem)`](../src/ui/docview.py#L210): pencereyi kapatır, sınav ya da kart sayfasına geçer. Yarım sınav kaybolmaz ("kaldığın yer"de durur).
-- [`open_doc(stem, tab)`](../src/ui/docview.py#L223), [`_dismissed()`](../src/ui/docview.py#L228), [`show()`](../src/ui/docview.py#L232): pencereyi açma, kişi kapatınca temizleme, sayfanın sonunda açık pencereyi çizme. Pencere başlığı notun adı, genişliği `large` (en çok 1280 px).
-- [`reading()`](../src/ui/docview.py#L243), [`reader_view()`](../src/ui/docview.py#L248), [`_back(r, page)`](../src/ui/docview.py#L252), [`_read(stem, page, tab, topic)`](../src/ui/docview.py#L258): okuyucuya geçiş ve dönüş. `_read` okuyucuya hangi sekmeden geldiğini ve (Konular'dan geldiyse) hangi konuya tıklandığını da yazar.
-- [`_body(stem)`](../src/ui/docview.py#L268): pencerenin içi. Sekmeler durum tutar (`st.tabs(key="dv_tab", on_change="rerun")`): yalnızca seçili sekme çalışır, sayfa görüntüsü boşuna hazırlanmaz. Sekme değiştirmek yalnızca pencereyi yeniden çalıştırır. Hazır soru sayısı `data.ready()`'den (önbellekli).
-- [`_hero(d, meta, n_ready)`](../src/ui/docview.py#L291), [`_actions(d, meta, n_ready)`](../src/ui/docview.py#L320): üst kısım ve düğmeler. "Herkese aç" eskiden ayrı bir onay penceresiydi; Streamlit pencere içinde pencere açamadığı için artık açılır kutu (`st.popover`) içinde uyarı + "Anladım, herkese aç".
-- [`_state(d)`](../src/ui/docview.py#L358), [`_job(stem)`](../src/ui/docview.py#L371), [`_detail(tail)`](../src/ui/docview.py#L383): not işleniyorsa adım ve son ilerleme satırı (pencerenin içinde 4 saniyede bir kendiliğinden yenilenen parça; iş bitince pencere yeni verilerle baştan çizilir). Hiç işlenmediyse "Notu işle".
-- [`_topics_tab`](../src/ui/docview.py#L395), [`_pages_tab`](../src/ui/docview.py#L426), [`_step`](../src/ui/docview.py#L422), [`_quality_tab`](../src/ui/docview.py#L467): sekmeler. Sayfalar sekmesindeki sayfa numarası `dv_pg_<not>` anahtarında; okuyucu kapanınca buraya son okunan sayfa yazılır. Sayfa görüntüsü ve metin kutusunun yüksekliği ekran yüksekliğinden (`calc(100vh - …)`): pencere ekrandan taşmaz.
+- [`_study(kind, stem)`](../src/ui/docview.py#L213): pencereyi kapatır, sınav ya da kart sayfasına geçer. Yarım sınav kaybolmaz ("kaldığın yer"de durur).
+- [`open_doc(stem, tab)`](../src/ui/docview.py#L226), [`_dismissed()`](../src/ui/docview.py#L232), [`show()`](../src/ui/docview.py#L237): pencereyi açma, kişi kapatınca temizleme, sayfanın sonunda açık pencereyi çizme. Pencere başlığı notun adı, genişliği `large` (en çok 1280 px).
+- [`reading()`](../src/ui/docview.py#L248), [`reader_view()`](../src/ui/docview.py#L253), [`_back(r, page)`](../src/ui/docview.py#L257), [`_read(stem, page, tab, topic)`](../src/ui/docview.py#L263): okuyucuya geçiş ve dönüş. `_read` okuyucuya hangi sekmeden geldiğini ve (Konular'dan geldiyse) hangi konuya tıklandığını da yazar.
+- [`_body(stem)`](../src/ui/docview.py#L273): pencerenin içi. Sekmeler durum tutar (`st.tabs(key="dv_tab", on_change="rerun")`): yalnızca seçili sekme çalışır, sayfa görüntüsü boşuna hazırlanmaz. Sekme değiştirmek yalnızca pencereyi yeniden çalıştırır. Hazır soru sayısı `data.ready()`'den (önbellekli).
+- [`_hero(d, meta, n_ready)`](../src/ui/docview.py#L296), [`_actions(d, meta, n_ready)`](../src/ui/docview.py#L325): üst kısım ve düğmeler. "Herkese aç" eskiden ayrı bir onay penceresiydi; Streamlit pencere içinde pencere açamadığı için artık açılır kutu (`st.popover`) içinde uyarı + "Anladım, herkese aç".
+- [`_state(d)`](../src/ui/docview.py#L391), [`_job(stem)`](../src/ui/docview.py#L404), [`_detail(tail)`](../src/ui/docview.py#L416): not işleniyorsa adım ve son ilerleme satırı (pencerenin içinde 4 saniyede bir kendiliğinden yenilenen parça; iş bitince pencere yeni verilerle baştan çizilir). Hiç işlenmediyse "Notu işle".
+- [`_topics_tab`](../src/ui/docview.py#L428), [`_pages_tab`](../src/ui/docview.py#L459), [`_step`](../src/ui/docview.py#L455), [`_quality_tab`](../src/ui/docview.py#L500): sekmeler. Sayfalar sekmesindeki sayfa numarası `dv_pg_<not>` anahtarında; okuyucu kapanınca buraya son okunan sayfa yazılır. Sayfa görüntüsü ve metin kutusunun yüksekliği ekran yüksekliğinden (`calc(100vh - …)`): pencere ekrandan taşmaz.
 
 ---
 
@@ -114,11 +114,11 @@ Pencere neden `session_state.doc_open` ile tutuluyor? Streamlit'te pencere (`st.
 
 **İçindekiler**
 - `_CSS`, `_HTML`, `_JS`: bileşen. `build()` iskeleti bir kez kurar, `render()` her değişiklikte günceller; `topicOf()` sayfanın konusunu bulur (tıklanan konu o sayfayı kapsıyorsa o, yoksa sayfayı içeren ilk konu). Klavye dinleyicisi pencereye bağlanır ve bileşen kaldırılınca çıkarılır.
-- [`page_jpeg(file, page)`](../src/ui/reader.py#L319): sayfa görüntüsü (PyMuPDF, önbellekli, en çok 200 sayfa). Pencerenin Sayfalar sekmesi de bunu kullanır ([`data_url`](../src/ui/reader.py#L327) ile).
-- [`pages_label(pages)`](../src/ui/reader.py#L331): `[3, 5, 6]` → `"s. 3, 5–6"`.
-- [`per_page(stem)`](../src/ui/reader.py#L343): sayfa → o sayfaya dayanan hazır soru sayısı (`data.ready` ile aynı süzgeç; 30 sn önbellekli: okuyucu her sayfa çevirişinde, pencere her sekmede çağırıyor).
-- [`toc(stem)`](../src/ui/reader.py#L351): içindekiler: konu haritası (yoksa bölüm başlıkları), ilk sayfa, soru sayısı.
-- [`open_reader(stem, page, **back)`](../src/ui/reader.py#L360), [`active()`](../src/ui/reader.py#L365), [`show(on_close)`](../src/ui/reader.py#L369), [`_view(on_close)`](../src/ui/reader.py#L375): açma ve çizme. Kapatılınca (`setTriggerValue("close", sayfa)`) `on_close(okuyucu durumu, son sayfa)` çağrılır ve uygulama baştan çalışır.
+- [`page_jpeg(file, page)`](../src/ui/reader.py#L319): sayfa görüntüsü (PyMuPDF, önbellekli, en çok 200 sayfa). Pencerenin Sayfalar sekmesi de bunu kullanır ([`data_url`](../src/ui/reader.py#L332) ile).
+- [`pages_label(pages)`](../src/ui/reader.py#L336): `[3, 5, 6]` → `"s. 3, 5–6"`.
+- [`per_page(stem)`](../src/ui/reader.py#L348): sayfa → o sayfaya dayanan hazır soru sayısı (`data.ready` ile aynı süzgeç; 30 sn önbellekli: okuyucu her sayfa çevirişinde, pencere her sekmede çağırıyor).
+- [`toc(stem)`](../src/ui/reader.py#L356): içindekiler: konu haritası (yoksa bölüm başlıkları), ilk sayfa, soru sayısı.
+- [`open_reader(stem, page, **back)`](../src/ui/reader.py#L365), [`active()`](../src/ui/reader.py#L377), [`show(on_close)`](../src/ui/reader.py#L381), [`_view(on_close)`](../src/ui/reader.py#L387): açma ve çizme. Kapatılınca (`setTriggerValue("close", sayfa)`) `on_close(okuyucu durumu, son sayfa)` çağrılır ve uygulama baştan çalışır.
 
 ---
 
@@ -137,9 +137,9 @@ Pencere neden `session_state.doc_open` ile tutuluyor? Streamlit'te pencere (`st.
 Bir karta tıklayınca pencere bu sayfanın üstünde açılır. **Yükleme kutusu artık burada yok** (kullanıcı kararı): not ekleme ana sayfadaki "+ Yeni not ekle" kartından. Eski "çalışan işler" kutusu da kalktı: işlenen notun kartı canlı ilerleme gösteriyor, ayrıntısı (adım, kota bekleniyor mu) pencerede.
 
 **İçindekiler**
-- [`_fold(s)`](../src/ui/pages/documents.py#L38), [`_match(d, words)`](../src/ui/pages/documents.py#L43): arama.
-- [`_grid(stems, empty, view, live)`](../src/ui/pages/documents.py#L50): kartlar, seçili görünümde (iki görünümün bileşen anahtarı ayrı: görünüm değişince eskisi kendi dinleyicileriyle birlikte kalkar). Kişinin listesinde olmayan herkese açık not "Notlarıma ekle / Göz at" düğmeli kartla gelir. İşlenen bir not varsa ızgara 5 saniyede bir kendiliğinden yenilenen bir parçada çizilir (`live`).
-- [`render()`](../src/ui/pages/documents.py#L64): okuyucu açıksa yalnızca onu çizer; değilse başlık, süzgeç, kartlar ve (açıksa) pencere. Ana sayfadaki "Tümünü gör" `session_state.docs_filter` ile hangi süzgecin seçili geleceğini söyler.
+- [`_fold(s)`](../src/ui/pages/documents.py#L51), [`_match(d, words)`](../src/ui/pages/documents.py#L56): arama.
+- [`_grid(stems, empty, view, live)`](../src/ui/pages/documents.py#L80): kartlar, seçili görünümde (iki görünümün bileşen anahtarı ayrı: görünüm değişince eskisi kendi dinleyicileriyle birlikte kalkar). Kişinin listesinde olmayan herkese açık not "Notlarıma ekle / Göz at" düğmeli kartla gelir. İşlenen bir not varsa ızgara 5 saniyede bir kendiliğinden yenilenen bir parçada çizilir (`live`).
+- [`render()`](../src/ui/pages/documents.py#L180): okuyucu açıksa yalnızca onu çizer; değilse başlık, süzgeç, kartlar ve (açıksa) pencere. Ana sayfadaki "Tümünü gör" `session_state.docs_filter` ile hangi süzgecin seçili geleceğini söyler.
 
 ---
 
@@ -155,9 +155,9 @@ Bir karta tıklayınca pencere bu sayfanın üstünde açılır. **Yükleme kutu
 - **[`ui/shelf.py`](../src/ui/shelf.py)** (bölüm 12):
   - Kartlar büyüdü (genişlik ~230-300 px, oran 3:4, 3 konu satırı) ve **sütun sayısı JS'te** bileşenin genişliğinden hesaplanır (en çok 4). Pencere daralınca `ResizeObserver` yeniden dizer; ilk çizimden sonraki yeniden dizilişlerde giriş animasyonu oynamaz (`.still`).
   - İki yeni görünüm (Belgeler): `layout="pages"` (`pagesLayout`, `renderPages`, `goPage`, `drawPages`) ve `lazy=True` (`drawLazy`). Ayrıntı yukarıda, Belgeler bölümünde. Küçük kartlar için kap sorgusu (`@container`): konu satırları gizlenir, yazılar küçülür.
-  - `shelf(..., rows, more)`: raf en çok `rows` satır, son yer `more` kartı ([`all_card`](../src/ui/shelf.py#L483): notların renklerinden küçük bir yelpaze, "Tümünü gör", ok).
-  - [`Component`](../src/ui/shelf.py#L457): üç CCv2 bileşeninin (raf, okuyucu, konu listesi) ortak kaydı. Kayıt yoksa (AppTest, Streamlit'in yeniden başlaması) yeniden kaydeder; eskiden yalnızca rafta `_component()` vardı.
-- **[`ui/auth.py`](../src/ui/auth.py)** [`sidebar(u)`](../src/ui/auth.py#L65): hesap kutusu yatay (resim, ad, @kullanıcı adı, "Çıkış") ve `st.container(key="nr_account")` içinde; CSS kutuyu kenar çubuğunun dibine iter.
+  - `shelf(..., rows, more)`: raf en çok `rows` satır, son yer `more` kartı ([`all_card`](../src/ui/shelf.py#L572): notların renklerinden küçük bir yelpaze, "Tümünü gör", ok).
+  - [`Component`](../src/ui/shelf.py#L540): üç CCv2 bileşeninin (raf, okuyucu, konu listesi) ortak kaydı. Kayıt yoksa (AppTest, Streamlit'in yeniden başlaması) yeniden kaydeder; eskiden yalnızca rafta `_component()` vardı.
+- **[`ui/auth.py`](../src/ui/auth.py)** [`sidebar(u)`](../src/ui/auth.py#L122): hesap kutusu yatay (resim, ad, @kullanıcı adı, "Çıkış") ve `st.container(key="nr_account")` içinde; CSS kutuyu kenar çubuğunun dibine iter.
 - **[`app.py`](../src/app.py):** "Ders notlarından kanıta dayalı sorular" yazısı kalktı. `st.logo(..., icon_image=logo_ink.svg)`: kenar çubuğu kapalıyken üst şeritte koyu logo (açık renkli logo kâğıt zeminde parlıyor, okunmuyordu).
 - **[`ui/style.py`](../src/ui/style.py):**
   - Kenar çubuğu içeriği dikey esnek kutu, hesap kutusu üstten `auto` boşlukla en altta; menü ile hesap arasındaki ayırıcı çizgi kalktı (kutunun kendi üst çizgisi var).

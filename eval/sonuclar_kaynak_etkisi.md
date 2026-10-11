@@ -5,8 +5,8 @@ Aynı soru Gemma 4 26B-A4B'ye (düşünmeden, sıcaklık 0) üç koşulda soruld
 | Veri | n | Kaynaksız | Doğru kaynakla | Yanlış kaynakla | Kaynağa muhtaç¹ | Yanlış kaynağın zararı² | Eşli test p³ (doğru / yanlış kaynak) |
 |---|---|---|---|---|---|---|---|
 | Belebele-TR · okuma | 300 | %56 (50–61) | %90 (86–93) | %46 (41–52) | %38 | %18 | 1,7e-23 (+114 −10) / 0,0026 (−55 +27) |
-| Havuz · hesap | 34 | %59 (42–74) | %68 (51–81) | %56 (39–71) | %24 | %18 | 0,58 (+8 −5) / 1 (−6 +5) |
-| Havuz · sözel | 88 | %93 (86–97) | %99 (94–100) | %94 (87–98) | %7 | %1 | 0,12 (+6 −1) / 1 (−1 +2) |
+| Havuz · hesap | 38 | %55 (40–70) | %68 (53–81) | %58 (42–72) | %26 | %16 | 0,3 (+10 −5) / 1 (−6 +7) |
+| Havuz · sözel | 129 | %92 (86–96) | %99 (96–100) | %92 (86–96) | %8 | %3 | 0,012 (+10 −1) / 1 (−4 +4) |
 
 ¹ Doğru kaynakla doğru, kaynaksız yanlış cevaplanan soruların oranı: cevabı gerçekten kaynağa bağlı sorular. Havuzda düşükse sorular genel bilgiyle cevaplanabiliyor (ders notuna özgü değil).
 ² Kaynaksız doğru cevaplanıp yanlış kaynakla yanlışa dönen soruların oranı: arama yanlış sayfa getirirse doğruluk ne kadar düşer.
@@ -18,11 +18,11 @@ Aynı soru Gemma 4 26B-A4B'ye (düşünmeden, sıcaklık 0) üç koşulda soruld
 |---|---|---|---|---|
 | belge: 4_ENERJİ, TARIM, BESLENME | 8 | %88 | %100 | %12 |
 | belge: 7.Hafta Sunu Dosyası | 9 | %78 | %89 | %11 |
-| belge: Hafta_01_Bilgisayar_Mimarisi_ve_Organizasyonuna_Giris | 11 | %91 | %91 | %9 |
-| belge: Hafta_02_Bilgisayar_Performansina_Giris | 22 | %91 | %100 | %9 |
-| belge: english | 12 | %83 | %92 | %8 |
+| belge: Hafta_01_Bilgisayar_Mimarisi_ve_Organizasyonuna_Giris | 19 | %89 | %95 | %11 |
+| belge: Hafta_02_Bilgisayar_Performansina_Giris | 37 | %95 | %100 | %5 |
+| belge: english | 34 | %76 | %94 | %18 |
 | belge: tyt-matematik | 60 | %80 | %85 | %13 |
-| zorluk: easy | 69 | %86 | %94 | %10 |
+| zorluk: easy | 90 | %84 | %94 | %11 |
 | zorluk: hard | 1 | %100 | %100 | %0 |
-| zorluk: medium | 52 | %81 | %85 | %13 |
+| zorluk: medium | 76 | %83 | %89 | %13 |
 

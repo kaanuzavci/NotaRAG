@@ -80,18 +80,18 @@ Streamlit'i ilk okuyanı en çok şaşırtan şey şu: **her etkileşimde sayfa 
     - sınav kartının üstündeki soru başına renkli şerit (`.nr-focus::before`);
     - hareket azaltma tercihi (`prefers-reduced-motion`) açıksa animasyonlar kapanır.
 - `PALETTE`: altı pastel kart rengi `(açık, koyu pastel, yazı, vurgu)`. Yazı rengi her pastelde en az 7:1 karşıtlıkta.
-- [`color(i)`](../src/ui/style.py#L504): i. kartın rengi (palet döner).
-- [`color_vars(i)`](../src/ui/style.py#L508): o rengi CSS değişkenleri olarak verir (`--c1`, `--ink`, `--a`…); kart HTML'inin `style=` özniteliğine yazılır.
-- [`inject()`](../src/ui/style.py#L513): CSS'i sayfaya basar (`app.py` çağırır).
-- [`html(markup)`](../src/ui/style.py#L519): HTML'i `st.markdown(..., unsafe_allow_html=True)` ile basar.
+- [`color(i)`](../src/ui/style.py#L510): i. kartın rengi (palet döner).
+- [`color_vars(i)`](../src/ui/style.py#L514): o rengi CSS değişkenleri olarak verir (`--c1`, `--ink`, `--a`…); kart HTML'inin `style=` özniteliğine yazılır.
+- [`inject()`](../src/ui/style.py#L533): CSS'i sayfaya basar (`app.py` çağırır).
+- [`html(markup)`](../src/ui/style.py#L539): HTML'i `st.markdown(..., unsafe_allow_html=True)` ile basar.
   - Neden `st.html` değil? `st.html` içeriği ana sayfanın stillerinden yalıtıyor; sınıflar uygulanmıyordu.
   - Boş satırlar silinir: Markdown boş satırda HTML bloğunu keser.
   - `<div lang="tr">` sarmalayıcısı CSS büyük harf dönüşümünü Türkçe yapar: "ipucu" → "İPUCU" (İngilizce kuralla "IPUCU" olurdu).
-- [`esc(s)`](../src/ui/style.py#L527): HTML kaçışı (`<` → `&lt;`). Metinde `<` geçerse sayfa bozulmasın, betik enjeksiyonu olmasın.
-- [`header(kicker, title, lead, hero_word)`](../src/ui/style.py#L531): sayfa başlığı.
-- [`pill(label)`](../src/ui/style.py#L552): "Doğrulandı / İncelenmeli / Reddedildi" rozeti.
-- [`card(...)`](../src/ui/style.py#L557): kullanılmıyor.
-- [`flow(steps)`](../src/ui/style.py#L562): akış şeması (Rapor → Nasıl çalışır).
+- [`esc(s)`](../src/ui/style.py#L547): HTML kaçışı (`<` → `&lt;`). Metinde `<` geçerse sayfa bozulmasın, betik enjeksiyonu olmasın.
+- [`header(kicker, title, lead, hero_word)`](../src/ui/style.py#L551): sayfa başlığı.
+- [`pill(label)`](../src/ui/style.py#L572): "Doğrulandı / İncelenmeli / Reddedildi" rozeti.
+- [`card(...)`](../src/ui/style.py#L577): kullanılmıyor.
+- [`flow(steps)`](../src/ui/style.py#L582): akış şeması (Rapor → Nasıl çalışır).
 
 ---
 
@@ -105,7 +105,7 @@ Streamlit'i ilk okuyanı en çok şaşırtan şey şu: **her etkileşimde sayfa 
 
 **İçindekiler**
 - [`chunks()`](../src/ui/data.py#L27), [`sections()`](../src/ui/data.py#L32), [`parsed(stem)`](../src/ui/data.py#L37): veri dosyalarını okur (20 sn önbellek).
-- [`short(doc)`](../src/ui/data.py#L42): belgenin görünen adı, belge kaydından ([`library.display_name`](../src/library.py#L233); sahibi değiştirebilir).
+- [`short(doc)`](../src/ui/data.py#L42): belgenin görünen adı, belge kaydından ([`library.display_name`](../src/library.py#L299); sahibi değiştirebilir).
 - **Kişi ve görünürlük (bölüm 11):**
   - [`user()`](../src/ui/data.py#L50), [`uid()`](../src/ui/data.py#L55): giriş yapmış kişi `{id, name, username}` ve kimliği (`auth.py` `session_state.user`'a koyar).
   - [`_visible(user_id)`](../src/ui/data.py#L61): kişinin görebildiği belgeler (10 sn önbellek). Önce `library.sync()` çalışır: elle konan PDF'ler ve girişten önceki belgeler de kayda girer.
@@ -128,7 +128,7 @@ Streamlit'i ilk okuyanı en çok şaşırtan şey şu: **her etkileşimde sayfa 
 - **Arka plan işleri:**
   - [`start_job(pdf_name, language)`](../src/ui/data.py#L279): `python -m src.pipeline "<pdf>"`'i bağımsız süreçte başlatır. Çıktı `data/jobs/<belge>.log`'a, başlangıç zamanı `.json`'a yazılır.
   - [`job_status(stem)`](../src/ui/data.py#L295): log dosyasını okuyup durumu çıkarır. `STEP_RE` `"3/6 bölümleme"` satırlarını yakalar; "Bitti" görünce iş bitti, "Traceback" görünce hata, "⏳" görünce kota beklemesi sayılır.
-  - [`jobs()`](../src/ui/data.py#L312): bütün işler, en yeni önce.
+  - [`jobs()`](../src/ui/data.py#L314): bütün işler, en yeni önce.
 
   Ayrı süreç ile arayüz arasındaki "iletişim" bu log dosyasıdır.
 
@@ -202,7 +202,7 @@ Streamlit'i ilk okuyanı en çok şaşırtan şey şu: **her etkileşimde sayfa 
 
 **1. Başlangıç:** [`start_screen(req, items)`](../src/ui/quiz.py#L85): özet kutusu ve "Sınava başla" düğmesi. Düğme fazı `"solve"` yapar.
 
-**2. Odak modu:** [`solve(req, items)`](../src/ui/quiz.py#L195)
+**2. Odak modu:** [`solve(req, items)`](../src/ui/quiz.py#L192)
 - `_FOCUS_CSS` kenar çubuğunu gizler ve içeriği daraltır.
 - Üst şerit: ilerleme, süre sayacı, "Çık" düğmesi.
 - Soru haritası (`st.pills`): numaraya tıklayıp soruya atlanır, cevaplananlarda ✓.
@@ -217,28 +217,28 @@ Streamlit'i ilk okuyanı en çok şaşırtan şey şu: **her etkileşimde sayfa 
 - Açılmış ipuçları; yeni açılan parlayarak gelir.
 - Gezinme: Önceki / İpucu al / Sonraki ya da Sınavı bitir. Boş soru varsa onay penceresi açılır.
 - Geri çağırmalar:
-  - [`_pick`](../src/ui/quiz.py#L116): şık seçimi.
-  - [`_sync_text`](../src/ui/quiz.py#L121): kısa cevabı `answers`'a kopyalar.
-  - [`_go`](../src/ui/quiz.py#L127): soru değiştirir.
-  - [`_hint`](../src/ui/quiz.py#L134): ipucu sayısını artırır.
-  - [`_jump`](../src/ui/quiz.py#L140): haritadan atlar.
-  - [`_finish`](../src/ui/quiz.py#L145): sonuca geçer.
-- [`_confirm_finish`](../src/ui/quiz.py#L151) (`@st.dialog`): "N soru boş, yine de bitir?" penceresi.
-- [`_keys_and_scroll(started, flash)`](../src/ui/quiz.py#L162): tarayıcıda çalışan küçük bir JavaScript (`st.iframe` içinde). İki işi var:
+  - [`_pick`](../src/ui/quiz.py#L113): şık seçimi.
+  - [`_sync_text`](../src/ui/quiz.py#L118): kısa cevabı `answers`'a kopyalar.
+  - [`_go`](../src/ui/quiz.py#L124): soru değiştirir.
+  - [`_hint`](../src/ui/quiz.py#L131): ipucu sayısını artırır.
+  - [`_jump`](../src/ui/quiz.py#L137): haritadan atlar.
+  - [`_finish`](../src/ui/quiz.py#L142): sonuca geçer.
+- [`_confirm_finish`](../src/ui/quiz.py#L148) (`@st.dialog`): "N soru boş, yine de bitir?" penceresi.
+- [`_keys_and_scroll(started, flash)`](../src/ui/quiz.py#L159): tarayıcıda çalışan küçük bir JavaScript (`st.iframe` içinde). İki işi var:
   - Süre sayacını her saniye günceller; sunucuya istek atmaz.
   - Klavye kısayollarını kurar: A–D şık, ← → soru, H ipucu. Basılan tuş, CSS sınıfıyla bulunan düğmeye `click()` yaptırır.
 
   İçerik yalnızca yeni ipucu açılınca değişir; böylece Streamlit çerçeveyi her tıklamada yeniden yüklemez ve sayaç titremez.
 
-**3. Sonuç:** [`results(req, items)`](../src/ui/quiz.py#L316)
+**3. Sonuç:** [`results(req, items)`](../src/ui/quiz.py#L313)
 1. Her soruyu puanla. İlk kez geliniyorsa `record_attempt` ile, giriş yapan kişinin kimliğiyle kaydet (madde analizi); `recorded=True` yap. "Baştan çöz" yeniden kaydeder ama ölçüme yalnızca kişinin ilk çözümü girer (bölüm 10).
 2. Doğru / yanlış / boş sayıları (itirazlar doğru sayılır).
 3. Özet: her soru için `{durum, zorluk, tip, konu}` kaydı → `components.summary_html` (sınavda soru tipine göre ölçer de var).
-   - [`_message`](../src/ui/quiz.py#L294): yüzdeye göre başlık ve not.
+   - [`_message`](../src/ui/quiz.py#L291): yüzdeye göre başlık ve not.
    - Süre kutusu; ipucu kullanıldıysa sayısı.
    - Zorluk sütunu etkin düzeydir (ölçülmüş), üretecin iddiası değil.
 4. Düğmeler:
-   - "Yanlışları tekrar çöz": [`restart`](../src/ui/quiz.py#L304) `retry` ile yeni deneme açar.
+   - "Yanlışları tekrar çöz": [`restart`](../src/ui/quiz.py#L301) `retry` ile yeni deneme açar.
    - "Kartla çalış": yanlış ve boş soruları `st.session_state.cards_preset`'e koyup Bilgi Kartları sayfasına geçer. Orada yalnızca şıksız anlaşılan sorular karta dönüşür.
    - "Baştan çöz" ve "Yeni sınav".
 5. Gözden geçirme ("Yanlış ve boşlar / Tümü / Doğrular" süzgeci): her soru kartıyla, ardından:
@@ -268,17 +268,17 @@ Doğru / yanlış ifadeleri, "aşağıdakilerden hangisi" ve olumsuz kök ("…d
 **İçindekiler**
 - `LOG`, `INTERVAL_DAYS` (kutu → gün), `RESULTS` (`good`, `bad`, `skip`).
 - `_OPTION_BOUND`: kökü şıklara dayanan soruyu yakalayan düzenli ifade ("aşağıdaki", "seçenek", "şık", "değildir", "which of"…). `\bşık\b`: "yaklaşık" yakalanmasın.
-- [`card_ok(q)`](../src/cards.py#L32): soru şıksız bir karta dönüşebilir mi?
-- [`step(state, result, t)`](../src/cards.py#L41): bir değerlendirmeden sonra kartın yeni durumu `{box, last, seen, good, bad}`. Saf fonksiyon (dosyaya dokunmaz).
-- [`_mine(rows, user)`](../src/cards.py#L57): yalnızca o kişinin satırları (`user` verilmezse hepsi).
-- [`history(path, user)`](../src/cards.py#L66): kayıt dosyasını baştan oynatır → kart kimliği → durum. Sayfa `user=` ile çağırır: kişinin kendi kutuları.
-- [`first_seen(path)`](../src/cards.py#L74): (kişi, soru) → kartta ilk değerlendirildiği an. Kartta cevabı görülmüş soru sonra sınavda çıkarsa o deneme "taze" sayılmaz (bölüm 10). "Atla" sayılmaz: cevap görülmemiş olabilir.
-- [`record(qid, result, path, user)`](../src/cards.py#L85): bir değerlendirmeyi kişiyle birlikte dosyaya ekler. `path` çağrı anında okunur; testler geçici dosyaya yönlendirebilsin.
-- [`is_due(state, now)`](../src/cards.py#L93): hiç görülmemiş ya da kutusunun aralığı dolmuş kart.
-- [`next_gap(state, result)`](../src/cards.py#L98): bu sonuçtan sonra kart kaç gün sonra gelir (ekrandaki "Bildim → 3 gün sonra yeniden" ipucu).
-- [`pick(items, hist, n, now, only_due, seed)`](../src/cards.py#L103): deste. Önce zamanı gelmiş tekrar kartları (düşük kutu önce), sonra hiç görülmemişler; eşitlerde karışık.
-- [`pool(docs)`](../src/cards.py#L112): seçili belgelerdeki kart olabilen sorular. Sınavla aynı kural: doğrulanmış, reddedilmemiş, bildirilmemiş.
-- [`summary(items, hist, now)`](../src/cards.py#L120): kurulum ekranındaki sayılar (toplam, yeni, zamanı gelen, ustalaşılan = kutu ≥ 4).
+- [`card_ok(q)`](../src/cards.py#L45): soru şıksız bir karta dönüşebilir mi?
+- [`step(state, result, t)`](../src/cards.py#L81): bir değerlendirmeden sonra kartın yeni durumu `{box, last, seen, good, bad}`. Saf fonksiyon (dosyaya dokunmaz).
+- [`_mine(rows, user)`](../src/cards.py#L107): yalnızca o kişinin satırları (`user` verilmezse hepsi).
+- [`history(path, user)`](../src/cards.py#L116): kayıt dosyasını baştan oynatır → kart kimliği → durum. Sayfa `user=` ile çağırır: kişinin kendi kutuları.
+- [`first_seen(path)`](../src/cards.py#L124): (kişi, soru) → kartta ilk değerlendirildiği an. Kartta cevabı görülmüş soru sonra sınavda çıkarsa o deneme "taze" sayılmaz (bölüm 10). "Atla" sayılmaz: cevap görülmemiş olabilir.
+- [`record(qid, result, path, user)`](../src/cards.py#L135): bir değerlendirmeyi kişiyle birlikte dosyaya ekler. `path` çağrı anında okunur; testler geçici dosyaya yönlendirebilsin.
+- [`is_due(state, now)`](../src/cards.py#L148): hiç görülmemiş ya da kutusunun aralığı dolmuş kart.
+- [`next_gap(state, result)`](../src/cards.py#L153): bu sonuçtan sonra kart kaç gün sonra gelir (ekrandaki "Bildim → 3 gün sonra yeniden" ipucu).
+- [`pick(items, hist, n, now, only_due, seed)`](../src/cards.py#L158): deste. Önce zamanı gelmiş tekrar kartları (düşük kutu önce), sonra hiç görülmemişler; eşitlerde karışık.
+- [`pool(docs)`](../src/cards.py#L174): seçili belgelerdeki kart olabilen sorular. Sınavla aynı kural: doğrulanmış, reddedilmemiş, bildirilmemiş.
+- [`summary(items, hist, now)`](../src/cards.py#L182): kurulum ekranındaki sayılar (toplam, yeni, zamanı gelen, ustalaşılan = kutu ≥ 4).
 
 ---
 
@@ -306,24 +306,24 @@ Klavye: Boşluk çevir · ← bilemedim · ↓ atla · → bildim.
 | `started`, `ended` | Süre ve "Bitir" |
 
 **İçindekiler**
-- [`_items()`](../src/ui/pages/cards.py#L30): bütün sorular (30 sn önbellek).
-- [`_topic(it)`](../src/ui/pages/cards.py#L38): kartın konusu. Bölüm adı yalnızca numaraysa ("01") belge adıyla birlikte.
+- [`_items()`](../src/ui/pages/cards.py#L160): bütün sorular (30 sn önbellek).
+- [`_topic(it)`](../src/ui/pages/cards.py#L164): kartın konusu. Bölüm adı yalnızca numaraysa ("01") belge adıyla birlikte.
 - Geri çağırmalar:
-  - [`_begin(ids)`](../src/ui/pages/cards.py#L55): yeni oturum durumu.
-  - [`_grade(result)`](../src/ui/pages/cards.py#L62): sonucu `cards.record` ile, giriş yapan kişinin kimliğiyle kaydeder; seriyi, yığınları ve sırayı günceller.
-  - [`_shuffle`](../src/ui/pages/cards.py#L81): kalan kartları karıştırır (ekrandaki kart yerinde kalır).
-  - [`_only_bad`](../src/ui/pages/cards.py#L88): yalnızca bilinemeyenlerle yeni tur.
-  - [`_end`](../src/ui/pages/cards.py#L94), [`_new`](../src/ui/pages/cards.py#L99): bitir, baştan.
+  - [`_begin(ids)`](../src/ui/pages/cards.py#L181): yeni oturum durumu.
+  - [`_grade(result)`](../src/ui/pages/cards.py#L188): sonucu `cards.record` ile, giriş yapan kişinin kimliğiyle kaydeder; seriyi, yığınları ve sırayı günceller.
+  - [`_shuffle`](../src/ui/pages/cards.py#L210): kalan kartları karıştırır (ekrandaki kart yerinde kalır).
+  - [`_only_bad`](../src/ui/pages/cards.py#L229): yalnızca bilinemeyenlerle yeni tur.
+  - [`_end`](../src/ui/pages/cards.py#L235), [`_new`](../src/ui/pages/cards.py#L240): bitir, baştan.
 - HTML parçaları:
-  - [`_front(it)`](../src/ui/pages/cards.py#L106), [`_back(it)`](../src/ui/pages/cards.py#L113): kartın iki yüzü.
-  - [`_length_class(q)`](../src/ui/pages/cards.py#L129): uzun soruda yazı küçülür (`long`, `xlong`).
-  - [`_piles(cs, bump)`](../src/ui/pages/cards.py#L134): üç yığın; az önce kart düşen yığın hafifçe büyür.
-  - [`_stage(it, cs)`](../src/ui/pages/cards.py#L145): deste + kart + uçan kart + yığınlar.
+  - [`_front(it)`](../src/ui/pages/cards.py#L247), [`_back(it)`](../src/ui/pages/cards.py#L254): kartın iki yüzü.
+  - [`_length_class(q)`](../src/ui/pages/cards.py#L270): uzun soruda yazı küçülür (`long`, `xlong`).
+  - [`_piles(cs, bump)`](../src/ui/pages/cards.py#L275): üç yığın; az önce kart düşen yığın hafifçe büyür.
+  - [`_stage(it, cs)`](../src/ui/pages/cards.py#L286): deste + kart + uçan kart + yığınlar.
     - Kart bir `<details>` öğesidir: tıklamak onu açıp kapatır, CSS bunu 3B dönüşe çevirir. Böylece çevirmek sunucuya gitmez.
     - Sarmalayıcı etiketi her değerlendirmede `div` ↔ `section` değişir. Tarayıcı sahneyi sıfırdan kurar: animasyon her seferinde oynar ve çevrilmiş kart bir sonraki karta çevrili geçmez.
-- [`_keys()`](../src/ui/pages/cards.py#L162): klavye kısayolları (`st.iframe` içinde küçük JavaScript). Boşluk `<details>`'i açıp kapatır; ok tuşları CSS sınıfıyla bulunan düğmeye `click()` yaptırır.
-- Ekranlar: [`_setup()`](../src/ui/pages/cards.py#L189), [`_session()`](../src/ui/pages/cards.py#L225), [`_summary()`](../src/ui/pages/cards.py#L259). Seçimde yalnızca görebildiğin belgeler listelenir; sayılar ve deste kişinin kendi kutularından (`history(user=…)`).
-- [`render()`](../src/ui/pages/cards.py#L281): sınavdan `cards_preset` geldiyse o sorularla oturum açar (hiçbiri karta dönüşmüyorsa bildirim gösterir); oturum varsa oturum, yoksa seçim ekranı.
+- [`_keys()`](../src/ui/pages/cards.py#L330): klavye kısayolları (`st.iframe` içinde küçük JavaScript). Boşluk `<details>`'i açıp kapatır; ok tuşları CSS sınıfıyla bulunan düğmeye `click()` yaptırır.
+- Ekranlar: [`_setup()`](../src/ui/pages/cards.py#L357), [`_session()`](../src/ui/pages/cards.py#L393), [`_summary()`](../src/ui/pages/cards.py#L429). Seçimde yalnızca görebildiğin belgeler listelenir; sayılar ve deste kişinin kendi kutularından (`history(user=…)`).
+- [`render()`](../src/ui/pages/cards.py#L451): sınavdan `cards_preset` geldiyse o sorularla oturum açar (hiçbiri karta dönüşmüyorsa bildirim gösterir); oturum varsa oturum, yoksa seçim ekranı.
 
 ---
 

@@ -65,6 +65,8 @@ def render() -> None:
 
     st.space("small")
     st.markdown("##### Dışa aktar")
+    st.page_link("ui/pages/paper.py", label="A4 / A3 basılı sınav kâğıdı hazırla (PDF, ortalı başlık, üst ve son yazı)",
+                 icon=":material/print:")
     title = st.text_input("Sınav başlığı", value="Ara Sınav Hazırlık Soruları")
     x = st.columns(5, gap="small")
     x[0].download_button("Sınav kâğıdı", export.to_exam_html(sel, title), file_name="notarag_sinav.html",

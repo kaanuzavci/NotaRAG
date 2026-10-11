@@ -37,17 +37,17 @@ Tasarım ilkesi değişmedi: kâğıt zemin, lacivert mürekkep, sakin. Hareket 
 
 **İçindekiler**
 - `_CSS`: sayfaya özgü daha geniş içerik alanı (en çok 1320 px), kartlara yer açmak için.
-- [`_ago(t)`](../src/ui/pages/home.py#L25): "az önce", "12 dk önce", "dün"…
-- [`_greeting()`](../src/ui/pages/home.py#L38): saate göre "Günaydın / İyi günler / İyi akşamlar".
-- [`_resume_cards(items)`](../src/ui/pages/home.py#L43): iki "kaldığın yer" kartı. Kart oturumunda kaçıncı kartta olunduğu ve bildim/bilemedim sayısı; sınavda kaç sorunun cevaplandığı. Sınavın belgeleri artık görünmüyorsa gösterilmez.
-- [`_new_note()`](../src/ui/pages/home.py#L77) (`@st.dialog`): "Yeni not ekle" penceresi (`upload.uploader`).
-- [`_see_all(which)`](../src/ui/pages/home.py#L108): "Tümünü gör" → Belgeler; hangi süzgecin seçili geleceği `session_state.docs_filter`'da.
-- [`_resume(ident)`](../src/ui/pages/home.py#L114): yarım kart oturumu ya da sınav: kayıtlı durum `session_state`'e konur, ilgili sayfaya gidilir (sınavda `resume.restore_exam`).
-- [`_review_today(ids)`](../src/ui/pages/home.py#L129): bugünün tekrarı. Kart sayfasının sınav sonucundan gelen `cards_preset` yolunu kullanır.
-- [`_section(title, sub, count)`](../src/ui/pages/home.py#L138): bölüm başlığı (`.nr-shelf-h`: başlık, sayı hapı ve yanında kısa açıklama tek satırda).
-- [`_hello()`](../src/ui/pages/home.py#L144): selam satırı ve bugünün tekrarı düğmesi.
-- [`_mine_shelf()`](../src/ui/pages/home.py#L162), [`_public_shelf()`](../src/ui/pages/home.py#L183): iki raf (`rows=2` / `rows=1`, son kart `all_card`). Tıklama: "+ Yeni" → yükleme penceresi, herkese açık raftaki "+" → [`_share_note()`](../src/ui/pages/home.py#L83) (kendi gizli notlarından birini herkese aç, geri alınamaz uyarısıyla; ya da yeni not yükle), "Tümünü gör" → Belgeler, diğerleri `docview.act`. Kişinin işlenen bir notu varsa raf `st.fragment(run_every=5)` içinde çizilir: ilerleme kendiliğinden güncellenir, sayfanın geri kalanı yeniden çalışmaz.
-- [`render()`](../src/ui/pages/home.py#L206): tam ekran okuyucu açıksa yalnızca onu çizer; değilse selam → raflar → kaldığın yer → (açıksa) not penceresi (`docview.show`).
+- [`_ago(t)`](../src/ui/pages/home.py#L27): "az önce", "12 dk önce", "dün"…
+- [`_greeting()`](../src/ui/pages/home.py#L40): saate göre "Günaydın / İyi günler / İyi akşamlar".
+- [`_resume_cards(items)`](../src/ui/pages/home.py#L45): iki "kaldığın yer" kartı. Kart oturumunda kaçıncı kartta olunduğu ve bildim/bilemedim sayısı; sınavda kaç sorunun cevaplandığı. Sınavın belgeleri artık görünmüyorsa gösterilmez.
+- [`_new_note()`](../src/ui/pages/home.py#L79) (`@st.dialog`): "Yeni not ekle" penceresi (`upload.uploader`).
+- [`_see_all(which)`](../src/ui/pages/home.py#L110): "Tümünü gör" → Belgeler; hangi süzgecin seçili geleceği `session_state.docs_filter`'da.
+- [`_resume(ident)`](../src/ui/pages/home.py#L116): yarım kart oturumu ya da sınav: kayıtlı durum `session_state`'e konur, ilgili sayfaya gidilir (sınavda `resume.restore_exam`).
+- [`_review_today(ids)`](../src/ui/pages/home.py#L131): bugünün tekrarı. Kart sayfasının sınav sonucundan gelen `cards_preset` yolunu kullanır.
+- [`_section(title, sub, count)`](../src/ui/pages/home.py#L140): bölüm başlığı (`.nr-shelf-h`: başlık, sayı hapı ve yanında kısa açıklama tek satırda).
+- [`_hello()`](../src/ui/pages/home.py#L146): selam satırı ve bugünün tekrarı düğmesi.
+- [`_mine_shelf()`](../src/ui/pages/home.py#L164), [`_public_shelf()`](../src/ui/pages/home.py#L185): iki raf (`rows=2` / `rows=1`, son kart `all_card`). Tıklama: "+ Yeni" → yükleme penceresi, herkese açık raftaki "+" → [`_share_note()`](../src/ui/pages/home.py#L85) (kendi gizli notlarından birini herkese aç, geri alınamaz uyarısıyla; ya da yeni not yükle), "Tümünü gör" → Belgeler, diğerleri `docview.act`. Kişinin işlenen bir notu varsa raf `st.fragment(run_every=5)` içinde çizilir: ilerleme kendiliğinden güncellenir, sayfanın geri kalanı yeniden çalışmaz.
+- [`render()`](../src/ui/pages/home.py#L208): tam ekran okuyucu açıksa yalnızca onu çizer; değilse selam → raflar → kaldığın yer → (açıksa) not penceresi (`docview.show`).
 
 ---
 
@@ -81,10 +81,10 @@ Tasarım ilkesi değişmedi: kâğıt zemin, lacivert mürekkep, sakin. Hareket 
   - `esc()`: kullanıcının verdiği adlar HTML'e kaçışla girer.
   - `colsFor()`: sütun sayısı. `stackCard` / `resumeCard`: kartları çizer ("yeni", "tümünü gör" ve not kartı).
   - Tıklama ve Enter/Boşluk aynı yoldan tetikler.
-- [`Component`](../src/ui/shelf.py#L457): CCv2 bileşeni kaydı (raf, okuyucu ve konu listesi ortak). Kayıt çalışma ortamına (Runtime) bağlı; modül bir kez yüklendiği hâlde ortam yeniden kurulursa kayıt yoksa yeniden kaydedilir (test aracı `AppTest` böyle bir durumda "kayıtlı değil" hatası veriyordu).
-- [`palette(key, order)`](../src/ui/shelf.py#L476): notun rengi. Kütüphaneye giriş sırasından alınır (`library.all_docs` → `order`): ardışık notlar farklı renk alır ve renk, süzme ya da sıralama değişse de aynı kalır. İlk denemede kimliğin özetiyle seçiliyordu; altı notun beşi iki renkte toplandı.
-- [`all_card(palettes, sub)`](../src/ui/shelf.py#L483): "Tümünü gör" kartının verisi.
-- [`shelf(items, key, layout, empty, rows, more)`](../src/ui/shelf.py#L488): bileşeni çizer; tıklandıysa `(kimlik, eylem)`, yoksa `None`. "Tümünü gör"ün kimliği `all`.
+- [`Component`](../src/ui/shelf.py#L540): CCv2 bileşeni kaydı (raf, okuyucu ve konu listesi ortak). Kayıt çalışma ortamına (Runtime) bağlı; modül bir kez yüklendiği hâlde ortam yeniden kurulursa kayıt yoksa yeniden kaydedilir (test aracı `AppTest` böyle bir durumda "kayıtlı değil" hatası veriyordu).
+- [`palette(key, order)`](../src/ui/shelf.py#L559): notun rengi. Kütüphaneye giriş sırasından alınır (`library.all_docs` → `order`): ardışık notlar farklı renk alır ve renk, süzme ya da sıralama değişse de aynı kalır. İlk denemede kimliğin özetiyle seçiliyordu; altı notun beşi iki renkte toplandı.
+- [`all_card(palettes, sub)`](../src/ui/shelf.py#L572): "Tümünü gör" kartının verisi.
+- [`shelf(items, key, layout, empty, rows, more)`](../src/ui/shelf.py#L577): bileşeni çizer; tıklandıysa `(kimlik, eylem)`, yoksa `None`. "Tümünü gör"ün kimliği `all`.
 
 ---
 
@@ -185,7 +185,7 @@ Bu, ölçümden (madde güçlüğü, Elo; bölüm 10) farklıdır: orada yalnız
 - **[`library.py`](../src/library.py):** [`add_to_library`](../src/library.py#L201) (yalnızca herkese açık not), [`mine`](../src/library.py#L210), kayıtta `order` (giriş sırası; renk için).
 - **[`ui/data.py`](../src/ui/data.py):** [`mine`](../src/ui/data.py#L91), [`items`](../src/ui/data.py#L97), [`mastery`](../src/ui/data.py#L120), [`home_stats`](../src/ui/data.py#L137), [`due_cards`](../src/ui/data.py#L142), [`avatar_b64`](../src/ui/data.py#L148).
 - **[`ui/style.py`](../src/ui/style.py):**
-  - [`avatar(user, b64, size)`](../src/ui/style.py#L540), `.nr-hello`, `.nr-sec` (profil), `.nr-avatar`; ana sayfa başlıkları bölüm 13'te `.nr-shelf-h`'ye geçti.
+  - [`avatar(user, b64, size)`](../src/ui/style.py#L560), `.nr-hello`, `.nr-sec` (profil), `.nr-avatar`; ana sayfa başlıkları bölüm 13'te `.nr-shelf-h`'ye geçti.
   - Sitenin genelinde seçili hap ve bölmeli düğmeler artık lacivert dolgulu (`[data-selected="true"]`); eskiden açık griydi, seçilmemişle neredeyse aynı görünüyordu.
   - `st.container(key="nr_card_…")` kâğıt beyazı kart görünümü alır (Sınav Hazırla formu).
 - **Sayfalar:**

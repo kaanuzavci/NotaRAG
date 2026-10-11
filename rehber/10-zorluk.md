@@ -79,7 +79,7 @@ Soru dosyalarına (`data/questions/*.jsonl`) **hiçbir şey yazılmaz** (veri b�
 - [`fresh_attempts(rows, legacy, card_seen)`](../src/difficulty.py#L213): **ölçüme giren denemeler = kişinin soruyu ilk görüşü.** Sayılmayanlar:
   - ikinci denemeler (yalnızca yanlışlar, `retry`);
   - aynı kişinin aynı soruyu yeniden çözmesi ("Baştan çöz", soru başka bir sınavda yine çıktı). Eskiden bunlar da ilk deneme sayılıyor, doğru oranını şişiriyordu;
-  - önce kartta cevabı görülmüş soru (`card_seen`: [`cards.first_seen`](../src/cards.py#L74)).
+  - önce kartta cevabı görülmüş soru (`card_seen`: [`cards.first_seen`](../src/cards.py#L124)).
 
   `legacy`: kişi alanı olmayan eski satırların sahibi (ilk hesap; bölüm 11). Bu yüzden [`MIN_REAL`](../src/difficulty.py#L38) = 5 artık "5 farklı kişi" demek: 1-2 hesapla (ikisi de aynı kişi) gerçek öğrenci etiketi devreye girmez, zorluk öbür katmanlardan gelir.
 - [`real_attempts()`](../src/difficulty.py#L234): `attempts.jsonl` → `fresh_attempts`. Madde analizi ([`request.item_stats`](../src/request.py#L364)) ve Elo aynı listeyi kullanır.

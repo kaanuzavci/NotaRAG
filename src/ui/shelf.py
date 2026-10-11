@@ -162,6 +162,54 @@ _CSS = """
   background-position: 0 0, 0 0, 0 0, 22px 17px, 22px 35px, 22px 53px; background-repeat: no-repeat; }
 .illu.exam i:nth-child(3) { display: none; }
 
+/* ---- klasör (Belgeler): dosya klasörü; arkada sekmeli kapak, içinden notların kapakları görünür, önde ön yüz.
+   Üzerine gelince notlar yukarı kalkar, ön yüz hafifçe öne açılır ---- */
+.stack.folder .fback { position: absolute; left: 0; right: 0; top: 24px; bottom: 0; border-radius: 6px 20px 20px 20px;
+  background: #D8C7A0; border: 1px solid rgba(30, 36, 51, .1); box-shadow: 0 20px 36px -26px rgba(30, 36, 51, .6); }
+.stack.folder .fback::before { content: ""; position: absolute; left: -1px; top: -20px; width: 44%; height: 22px;
+  border-radius: 14px 14px 0 0; background: #D8C7A0; border: 1px solid rgba(30, 36, 51, .1); border-bottom: 0; }
+.peek { position: absolute; left: 9%; right: 9%; top: 34px; height: 50%; }
+.peek i { position: absolute; top: 0; width: 46%; height: 100%; border-radius: 10px; border: 1px solid rgba(30, 36, 51, .1);
+  background: linear-gradient(var(--c) 0 34%, #FFFDF8 34%); box-shadow: 0 6px 14px -10px rgba(30, 36, 51, .7);
+  transition: transform .34s cubic-bezier(.2, .8, .2, 1); }
+.peek i:nth-child(1) { left: 0; transform: rotate(-6deg); }
+.peek i:nth-child(2) { left: 27%; transform: rotate(1deg) translateY(-6px); }
+.peek i:nth-child(3) { left: 54%; transform: rotate(7deg); }
+.stack.folder:hover .peek i:nth-child(1), .stack.folder:focus-visible .peek i:nth-child(1) { transform: rotate(-11deg) translate(-6px, -16px); }
+.stack.folder:hover .peek i:nth-child(2), .stack.folder:focus-visible .peek i:nth-child(2) { transform: rotate(0deg) translateY(-24px); }
+.stack.folder:hover .peek i:nth-child(3), .stack.folder:focus-visible .peek i:nth-child(3) { transform: rotate(12deg) translate(6px, -16px); }
+.ffront { position: absolute; left: 0; right: 0; bottom: 0; height: 64%; border-radius: 16px 16px 20px 20px;
+  background: linear-gradient(180deg, #F1E6CC 0%, #E8DBBB 100%); border: 1px solid rgba(30, 36, 51, .12);
+  padding: 16px 18px 15px; display: flex; flex-direction: column; justify-content: flex-end; gap: 5px;
+  transform-origin: 50% 100%; transition: transform .34s cubic-bezier(.2, .8, .2, 1), box-shadow .34s;
+  box-shadow: 0 -1px 0 rgba(255, 255, 255, .6) inset, 0 -10px 20px -18px rgba(30, 36, 51, .5); }
+.stack.folder:hover .ffront, .stack.folder:focus-visible .ffront { transform: perspective(700px) rotateX(-12deg); }
+.stack.folder:focus-visible .ffront { outline: 2px solid #1F3A5F; outline-offset: 3px; }
+.fkick { display: flex; align-items: center; gap: 6px; font: 500 .62rem/1 'JetBrains Mono', monospace; letter-spacing: .12em;
+  text-transform: uppercase; color: #7A6440; }
+.fkick svg { width: 14px; height: 14px; }
+.ftitle { font: 600 clamp(1.04rem, 7cqi, 1.3rem)/1.22 'Fraunces', serif; color: #1E2433; display: -webkit-box;
+  -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.fmeta { font-size: .8rem; color: #5B4F38; }
+.flines { border-top: 1px solid rgba(122, 100, 64, .22); margin-top: 4px; padding-top: 5px; }
+.flines div { font-size: .78rem; line-height: 20px; color: #4A4030; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.flines div::before { content: "– "; color: #A8946A; }
+.fdots { display: flex; gap: 4px; margin-top: 3px; }
+.fdots b { width: 10px; height: 10px; border-radius: 3px; background: var(--c); border: 1px solid rgba(30, 36, 51, .12); }
+.stack.folder.empty .peek { opacity: .35; }
+
+/* ---- seçim kipi (Belgeler: klasör oluştururken kartlar işaretlenir; ayrı pencere yok) ---- */
+.chk { position: absolute; top: 12px; left: 12px; z-index: 4; width: 28px; height: 28px; border-radius: 50%;
+  background: rgba(255, 253, 248, .94); border: 2px solid #8A7E63; display: grid; place-items: center;
+  transition: background .15s, border-color .15s, transform .15s; }
+.chk svg { width: 17px; height: 17px; fill: #FFFFFF; opacity: 0; transition: opacity .12s; }
+.stack.pick:hover .chk { border-color: #1E2433; transform: scale(1.08); }
+.stack.sel .chk { background: #1E2433; border-color: #1E2433; }
+.stack.sel .chk svg { opacity: 1; }
+.stack.sel .card { box-shadow: 0 0 0 3px #1E2433, 0 20px 36px -26px rgba(30, 36, 51, .6); }
+.root.selecting .actions { display: none; }
+.root.selecting .stack:not(.pick) { opacity: .4; cursor: default; }
+.root.selecting .stack:not(.pick):hover .card { transform: none; }
 .empty-note { padding: 18px 6px; color: #6B6F7B; font-size: .9rem; }
 
 /* ---- sayfalı görünüm (Belgeler): ekranda 2 satır × 4 kart, oklarla yana kayar; kart boyu ekrana sığacak kadar (JS) ---- */
@@ -209,7 +257,7 @@ _CSS = """
 }
 @media (prefers-reduced-motion: reduce) {
   .stack, .rcard { animation: none; }
-  .sheet, .card, .actions, .rcard, .plus, .fan i, .go, .track, .cnav { transition: none; }
+  .sheet, .card, .actions, .rcard, .plus, .fan i, .go, .track, .cnav, .peek i, .ffront { transition: none; }
   .bar.live i { animation: none; }
 }
 """
@@ -223,6 +271,8 @@ _JS = """
 const ICON = {
   lock: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 22q-.8 0-1.4-.6T4 20V10q0-.8.6-1.4T6 8h1V6q0-2.1 1.5-3.5T12 1q2.1 0 3.5 1.5T17 6v2h1q.8 0 1.4.6T20 10v10q0 .8-.6 1.4T18 22Zm3-14h6V6q0-1.3-.9-2.1T12 3q-1.3 0-2.1.9T9 6Z"/></svg>',
   globe: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22q-2.1 0-3.9-.8t-3.2-2.1q-1.4-1.4-2.1-3.2T2 12q0-2.1.8-3.9t2.1-3.2Q6.3 3.5 8.1 2.8T12 2q2.1 0 3.9.8t3.2 2.1q1.4 1.4 2.1 3.2T22 12q0 2.1-.8 3.9t-2.1 3.2q-1.4 1.4-3.2 2.1T12 22Zm-1-2.1V18q-.8 0-1.4-.6T9 16v-1l-4.8-4.8q-.1.5-.1.9V12q0 3 2 5.3t4.9 2.6Zm6.9-2.5q1-1.1 1.6-2.5T20 12q0-2.5-1.4-4.5T15 4.6V5q0 .8-.6 1.4T13 7h-2v2q0 .4-.3.7T10 10H8v2h6q.4 0 .7.3t.3.7v3h1q.7 0 1.2.4t.7 1Z"/></svg>',
+  check: '<svg viewBox="0 0 24 24"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>',
+  folder: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 20q-.8 0-1.4-.6T2 18V6q0-.8.6-1.4T4 4h6l2 2h8q.8 0 1.4.6T22 8v10q0 .8-.6 1.4T20 20Z"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 13H5v-2h6V5h2v6h6v2h-6v6h-2Z"/></svg>',
   arrow: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.2 13H4v-2h12.2l-5.6-5.6L12 4l8 8-8 8-1.4-1.4Z"/></svg>',
   back: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7.8 13l5.6 5.6L12 20l-8-8 8-8 1.4 1.4L7.8 11H20v2Z"/></svg>',
@@ -242,6 +292,14 @@ function colors(it) {
 const COL = 256
 function colsFor(w) { return w ? Math.max(1, Math.min(4, Math.floor(w / COL))) : 4 }
 
+let SEL = new Set()  // seçim kipinde işaretli kartlar (draw() her çağrıda günceller)
+const stable = (d) => JSON.stringify({ ...d, selected: undefined })  // işaretler değişince kartlar yeniden çizilmesin
+
+function applySel(root) {
+  root.classList.toggle("selecting", !!root._select)
+  root.querySelectorAll(".stack.pick").forEach(e => e.classList.toggle("sel", SEL.has(e.dataset.id)))
+}
+
 function stackCard(it, i) {
   if (it.kind === "new") {
     return `<div class="stack new" role="button" tabindex="0" data-id="${esc(it.id)}" data-default="open" style="--i:${i}">
@@ -256,6 +314,18 @@ function stackCard(it, i) {
       <div class="card"><div class="fan" style="--m:${(ps.length - 1) / 2}">${fan}</div><div class="nt">${esc(it.title)}</div>
       <div class="ns">${esc(it.sub)}</div><span class="go">${ICON.arrow}</span></div></div>`
   }
+  if (it.kind === "folder") {
+    const ps = (it.palettes || []).slice(0, 3)
+    const peek = ps.map(p => `<i style="--c:${p[1]}"></i>`).join("")
+    const dots = (it.palettes || []).slice(0, 8).map(p => `<b style="--c:${p[1]}"></b>`).join("")
+    return `<div class="stack folder${ps.length ? "" : " empty"}" role="button" tabindex="0" aria-label="${esc(it.title)} klasörü"
+        data-id="${esc(it.id)}" data-default="open" style="--i:${i}">
+      <div class="fback"></div><div class="peek">${peek}</div>
+      <div class="ffront"><div class="fkick">${ICON.folder}Klasör</div><div class="ftitle">${esc(it.title)}</div>
+        <div class="fmeta">${esc(it.meta)}</div>
+        <div class="flines">${(it.lines || []).map(l => `<div>${esc(l)}</div>`).join("")}</div>
+        <div class="fdots">${dots}</div></div></div>`
+  }
   const sheets = (it.sheets >= 2 ? '<span class="sheet s2"></span>' : "") + (it.sheets >= 1 ? '<span class="sheet s1"></span>' : "")
   const badge = it.badge ? `<span class="badge">${ICON[it.badge_icon] || ""}${esc(it.badge)}</span>` : ""
   const bar = it.progress == null ? "" :
@@ -264,9 +334,11 @@ function stackCard(it, i) {
   const acts = (it.actions || []).map((a, k) =>
     `<button type="button" class="${k ? "alt" : ""}" data-act="${esc(a.id)}">${esc(a.label)}</button>`).join("")
   const mono = esc(String(it.title || "?").trim().charAt(0).toLocaleUpperCase("tr"))
-  return `<div class="stack" role="button" tabindex="0" aria-label="${esc(it.title)}" data-id="${esc(it.id)}"
+  const pick = it.selectable ? ` pick${SEL.has(it.id) ? " sel" : ""}` : ""
+  const chk = it.selectable ? `<span class="chk" aria-hidden="true">${ICON.check}</span>` : ""
+  return `<div class="stack${pick}" role="button" tabindex="0" aria-label="${esc(it.title)}" data-id="${esc(it.id)}"
       data-default="open" style="--i:${i};${colors(it)}">${sheets}
-    <div class="card"><div class="cover">${badge}<span class="mono">${mono}</span></div>
+    <div class="card"><div class="cover">${chk}${badge}<span class="mono">${mono}</span></div>
       <div class="body"><div class="title">${esc(it.title)}</div><div class="meta">${esc(it.meta)}</div>
         <div class="lines">${(it.lines || []).map(l => `<div>${esc(l)}</div>`).join("")}</div>
         <div class="foot">${bar}${pl}</div>
@@ -324,7 +396,7 @@ function drawPages(root, S, items, data) {
   const L = pagesLayout(root)
   const ids = items.map(it => it.id).join("|")
   if (ids !== S.ids) { S.ids = ids; S.page = 0 }  // süzgeç ya da arama değişti: ilk sayfadan
-  const sig = JSON.stringify(data) + "|" + L.cols
+  const sig = stable(data) + "|" + L.cols
   if (root.dataset.sig !== sig) {
     root.classList.toggle("still", !!root.dataset.sig)
     root.dataset.sig = sig
@@ -367,17 +439,20 @@ function drawLazy(root, S, items, cols, quiet) {
 }
 
 export default function (component) {
-  const { data, parentElement, setTriggerValue } = component
+  const { data, parentElement, setTriggerValue, setStateValue } = component
   const root = parentElement.querySelector(".root")
   if (!root) return
   const S = root._s || (root._s = { page: 0, ids: "" })
+  root._select = !!data.select
+  root._sel = new Set(data.selected || [])  // Python'dan gelen işaretler (yerel tıklamalar da buraya yazılır)
   const draw = () => {
+    SEL = root._sel
     const items = (data && data.items) || []
-    if (data.layout === "pages") return drawPages(root, S, items, data)
+    if (data.layout === "pages") { drawPages(root, S, items, data); return applySel(root) }
     const grid = data.layout !== "resume"
     const cols = grid ? colsFor(root.clientWidth) : 0
-    const sig = JSON.stringify(data) + "|" + cols
-    if (root.dataset.sig === sig) return  // görünüm değişmediyse yeniden çizme (üzerine gelme ve animasyon sıfırlanmasın)
+    const sig = stable(data) + "|" + cols
+    if (root.dataset.sig === sig) return applySel(root)  // görünüm değişmediyse yeniden çizme (üzerine gelme ve animasyon sıfırlanmasın)
     const ids = items.map(it => it.id).join("|")
     const quiet = !!root.dataset.sig && ids === S.ids
     S.ids = ids
@@ -397,6 +472,7 @@ export default function (component) {
   }
   root._draw = draw
   draw()
+  applySel(root)
   if (!root._ro) {  // pencere daralınca sütun sayısı (sayfalı görünümde kart boyu da) değişir
     root._ro = new ResizeObserver(() => root._draw && root._draw())
     root._ro.observe(root)
@@ -404,6 +480,13 @@ export default function (component) {
   const fire = (target) => {
     const card = target.closest("[data-id]")
     if (!card) return
+    if (data.select) {  // seçim kipi: tıklama kartı açmaz, işaretler / işareti kaldırır
+      if (!card.classList.contains("pick")) return
+      const id = card.dataset.id
+      if (root._sel.has(id)) root._sel.delete(id); else root._sel.add(id)
+      card.classList.toggle("sel", root._sel.has(id))
+      return setStateValue("sel", [...root._sel])
+    }
     const btn = target.closest("[data-act]")
     setTriggerValue("action", card.dataset.id + "|" + (btn ? btn.dataset.act : card.dataset.default))
   }
@@ -480,19 +563,29 @@ def palette(key: str, order: int | None = None) -> list[str]:
     return list(style.color(i % len(style.PALETTE)))
 
 
+def folder_card(folder: dict, palettes: list[list[str]], meta: str, lines: list[str] = ()) -> dict:
+    """Klasör kartı (Belgeler). Kimliği 'folder:<klasör>'; tıklanınca klasörün içi açılır. lines: içindeki notların adları."""
+    return {"id": f"folder:{folder['id']}", "kind": "folder", "title": folder["name"], "meta": meta, "palettes": palettes,
+            "lines": list(lines)[:3]}
+
+
 def all_card(palettes: list[list[str]], sub: str) -> dict:
     """Rafın son kartı: "Tümünü gör" (notların renklerinden küçük bir yelpaze). Tıklanınca kimliği 'all'."""
     return {"id": "all", "kind": "all", "title": "Tümünü gör", "sub": sub, "palettes": palettes[:4]}
 
 
 def shelf(items: list[dict], *, key: str, layout: str = "grid", empty: str = "", rows: int | None = None,
-          more: dict | None = None, lazy: bool = False) -> tuple[str, str] | None:
+          more: dict | None = None, lazy: bool = False, select: list[str] | None = None) -> tuple[str, str] | None:
     """Kartları çizer; tıklanan kart ve eylem → (kimlik, eylem) ya da None. Eylem: kartın kendisi 'open', düğmeler
     kendi kimliği (ör. 'exam', 'cards', 'add').
     layout: 'grid' (raf) · 'pages' (sayfalı: 2 satır × 4, oklarla yana kayar, sayfa kaymaz) · 'resume' (kaldığın yer).
-    rows + more (all_card): raf en çok rows satır, son yer "Tümünü gör". lazy: satırlar sayfa kaydıkça birer birer."""
+    rows + more (all_card): raf en çok rows satır, son yer "Tümünü gör". lazy: satırlar sayfa kaydıkça birer birer.
+    select: verilirse seçim kipi (Belgeler'de klasör oluşturma): select = işaretli kimlikler; selectable=True kartlar
+    işaretlenir, tıklama kartı açmaz. İşaretler bileşenin durumudur (setStateValue 'sel'): Python bileşeni çağırmadan önce
+    st.session_state[key]['sel']'den okur, böylece aynı çalıştırmada sayaç ve düğme güncel olur."""
     res = _SHELF(key=key, data={"items": items, "layout": layout, "empty": empty, "rows": rows, "all": more,
-                                "lazy": lazy}, on_action_change=lambda: None)
+                                "lazy": lazy, "select": select is not None, "selected": list(select or [])},
+                 default={"sel": list(select or [])}, on_action_change=lambda: None, on_sel_change=lambda: None)
     act = getattr(res, "action", None)
     if not act or "|" not in act:
         return None

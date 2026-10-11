@@ -52,9 +52,9 @@ Kutular, "ilk deneme" ve seviye **saklanmaz, kayıtlardan hesaplanır**. Aynı b
   - `documents` ve `doc_access`: belge kaydı ve kimin hangi belgeye erişimi olduğu.
 
   2. adım (2026-10-08, bölüm 12): `users.avatar` (profil resmi), `users.about` (kısa tanıtım), `progress` (kaldığın yerden devam et). Var olan veritabanı açılışta bu adıma kendiliğinden geçti; kayıtlara dokunulmadı.
-- [`_migrate(con)`](../src/appdb.py#L85): dosyanın sürümünü (`PRAGMA user_version`) okur, eksik adımları sırayla uygular.
-- [`connect()`](../src/appdb.py#L97): `with appdb.connect() as con:` biçiminde kullanılır. Çıkışta değişiklikleri kaydeder; hata olursa geri alır; bağlantıyı kapatır.
-- [`version()`](../src/appdb.py#L116): şemanın şu anki adımı (testler kullanır).
+- [`_migrate(con)`](../src/appdb.py#L100): dosyanın sürümünü (`PRAGMA user_version`) okur, eksik adımları sırayla uygular.
+- [`connect()`](../src/appdb.py#L112): `with appdb.connect() as con:` biçiminde kullanılır. Çıkışta değişiklikleri kaydeder; hata olursa geri alır; bağlantıyı kapatır.
+- [`version()`](../src/appdb.py#L131): şemanın şu anki adımı (testler kullanır).
 
 **Neden böyle?**
 - **Şema sürümlemesi:** yarın bir alan ya da tablo eklemek gerekirse listenin **sonuna** yeni bir adım yazılır, eskilere dokunulmaz. Açılışta eksik adım uygulanır, var olan veri bozulmaz. "Sonradan bir şey eklersek sorun yaşamayalım" isteğinin karşılığı budur.
@@ -134,7 +134,7 @@ Eşleşen belge yükleyene açılır: hazır sorular, konu haritası ve dizin ol
 - [`get`](../src/library.py#L175), [`all_docs`](../src/library.py#L181), [`has_access`](../src/library.py#L186): okuma yardımcıları.
 - [`publish(doc, user_id)`](../src/library.py#L191): belgeyi herkese açar. Yalnızca erişimi olan açabilir. Geri alma fonksiyonu yoktur (testi de bunu denetler).
 - [`rename(doc, user_id, name)`](../src/library.py#L216): görünen adı değiştirir; yalnızca sahibi.
-- [`display_name(doc)`](../src/library.py#L233): görünen ad. Dışa aktarma ve soru kartları her soru için çağırdığı için adlar 10 saniye bellekte tutulur.
+- [`display_name(doc)`](../src/library.py#L299): görünen ad. Dışa aktarma ve soru kartları her soru için çağırdığı için adlar 10 saniye bellekte tutulur.
 - Komut satırı: `python -m src.library` kayıtlı belgeleri listeler (sahip, görünürlük, erişim sayısı).
 
 **Neden böyle?** Eskiden belgenin kimliği dosya adıydı. Aynı adla farklı bir PDF yüklenince, boyutu farklıysa eskisinin üzerine yazılıyordu ve eski sorular, sayfa metinleri ve konu haritası yeni dosyayla karışıyordu. Boyutu aynıysa yeni dosya sessizce yok sayılıyordu. Şimdi hiçbir yükleme var olan bir belgenin üzerine yazmaz.
@@ -166,15 +166,15 @@ Eşleşen belge yükleyene açılır: hazır sorular, konu haritası ve dizin ol
 - Tarayıcı çerezi: `nr_oturum`.
 
 **İçindekiler**
-- [`current()`](../src/ui/auth.py#L26): giriş yapmış kişi. `session_state`'te yoksa tarayıcının gönderdiği çerezde geçerli bir oturum var mı diye **bir kez** bakar.
-- [`_cookie(value, max_age)`](../src/ui/auth.py#L40): çerezi ana sayfaya yazar.
+- [`current()`](../src/ui/auth.py#L83): giriş yapmış kişi. `session_state`'te yoksa tarayıcının gönderdiği çerezde geçerli bir oturum var mı diye **bir kez** bakar.
+- [`_cookie(value, max_age)`](../src/ui/auth.py#L97): çerezi ana sayfaya yazar.
   - Streamlit çerezi okuyabiliyor (`st.context.cookies`) ama yazamıyor.
   - Bu yüzden görünmez bir çerçeve (`st.iframe`) içindeki küçük bir betik `window.parent.document.cookie`'ye yazar. Sınav ekranındaki klavye kısayolları da aynı yolla ana sayfaya erişiyor (bölüm 8).
-- [`_sign_in(u, remember)`](../src/ui/auth.py#L48): kişiyi oturuma koyar. "Beni hatırla" seçiliyse yeni bir oturum belirteci alır ve çerez yazılmak üzere işaretlenir.
-- [`_logout()`](../src/ui/auth.py#L56): oturumu veritabanından siler ve `session_state`'i tamamen temizler; açık sınav ve kart oturumu sıradaki kişiye kalmasın. Çerezi silmek için işaret bırakır.
-- [`sidebar(u)`](../src/ui/auth.py#L65): kenar çubuğunun en altı (CSS ile dibe sabit; bölüm 13). Çerezi bu oturumda yazılacaksa burada yazar; profil resmi, ad, @kullanıcı adı ve "Çıkış".
-- [`_login_form()`](../src/ui/auth.py#L81), [`_create_form(first)`](../src/ui/auth.py#L95): iki form. Hiç hesap yoksa "Hesap oluştur" açık gelir ve ilk hesabın eski kayıtların sahibi olacağı söylenir.
-- [`page()`](../src/ui/auth.py#L121): giriş ekranının kendisi. Kenar çubuğu gizli, dar ve ortalı.
+- [`_sign_in(u, remember)`](../src/ui/auth.py#L105): kişiyi oturuma koyar. "Beni hatırla" seçiliyse yeni bir oturum belirteci alır ve çerez yazılmak üzere işaretlenir.
+- [`_logout()`](../src/ui/auth.py#L113): oturumu veritabanından siler ve `session_state`'i tamamen temizler; açık sınav ve kart oturumu sıradaki kişiye kalmasın. Çerezi silmek için işaret bırakır.
+- [`sidebar(u)`](../src/ui/auth.py#L122): kenar çubuğunun en altı (CSS ile dibe sabit; bölüm 13). Çerezi bu oturumda yazılacaksa burada yazar; profil resmi, ad, @kullanıcı adı ve "Çıkış".
+- [`_login_form()`](../src/ui/auth.py#L138), [`_create_form(first)`](../src/ui/auth.py#L152): iki form. Hiç hesap yoksa "Hesap oluştur" açık gelir ve ilk hesabın eski kayıtların sahibi olacağı söylenir.
+- [`page()`](../src/ui/auth.py#L183): giriş ekranının kendisi. Kenar çubuğu gizli, dar ve ortalı.
 
 **Akış (tarayıcıda denendi):** giriş → çerez yazılır → sayfa yenilenince `current()` çerezden oturumu geri getirir → çıkış → oturum silinir, çerez temizlenir → yenileyince giriş ekranı.
 
@@ -187,7 +187,7 @@ Eşleşen belge yükleyene açılır: hazır sorular, konu haritası ve dizin ol
 | Kayıt | Yazan | Kişi alanı | Okuyan |
 |---|---|---|---|
 | `attempts.jsonl` | [`request.record_attempt`](../src/request.py#L342) | `user`, ayrıca kesin zaman `t` | [`difficulty.real_attempts`](../src/difficulty.py#L234) → madde analizi ve Elo |
-| `cards.jsonl` | [`cards.record`](../src/cards.py#L85) | `user` | [`cards.history(user=…)`](../src/cards.py#L66) → kişinin kutuları |
+| `cards.jsonl` | [`cards.record`](../src/cards.py#L135) | `user` | [`cards.history(user=…)`](../src/cards.py#L116) → kişinin kutuları |
 | `reports.jsonl` | [`request.report`](../src/request.py#L378) | `user` | `blocked_ids` (ortak havuz) |
 | `reviews.jsonl` | [`review_store.save_decision`](../src/review_store.py#L74) | `user` | `decisions` (ortak havuz) |
 | `requests/<id>.json` | [`request.prepare`](../src/request.py#L113) | `user` (hazırlayan) | — (sınavı bağlantıyla açan herkes kendi hesabıyla çözer) |

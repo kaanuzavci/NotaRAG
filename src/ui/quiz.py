@@ -14,7 +14,7 @@ import streamlit as st
 
 from src import request as R
 from src.textnorm import pretty_math
-from src.ui import data, style
+from src.ui import data, reader, style
 from src.ui import components as C
 
 # Şık harflerinin rozet rengi (Streamlit etiket Markdown'ı). Yeşil/kırmızı yok: sınavda doğru/yanlış ipucu sanılmasın
@@ -107,10 +107,7 @@ def start_screen(req: dict, items: list[dict]) -> None:
 
 # ---------------------------------------------------------------- 2. odak modu
 
-_FOCUS_CSS = """<style>
-section[data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"], [data-testid="stExpandSidebarButton"] { display: none !important; }
-.block-container, [data-testid="stMainBlockContainer"] { max-width: 880px; padding-top: 1.4rem; }
-</style>"""
+_FOCUS_CSS = style.focus_css("1120px", "1.4rem")
 
 
 def _pick(qid: str, value) -> None:
@@ -371,12 +368,17 @@ def results(req: dict, items: list[dict]) -> None:
             continue
         ans = ex["answers"].get(it["id"])
         style.html(C.question_card(it, i, reveal=True, chosen=ans, verdict=False))
-        row = st.columns([1.3, 1.4, 1.8, 2.5], vertical_alignment="center")
+        row = st.columns([1.2, 1.5, 1.3, 1.7, 2], vertical_alignment="center")
         label = ("İtirazla doğru" if it["id"] in overrides and not graded[it["id"]] else "Doğru") if good else \
             ("Boş" if it["id"] in empty else "Yanlış")
         row[0].badge(label, icon=":material/check:" if good else ":material/close:",
                      color="green" if good else ("gray" if it["id"] in empty else "red"))
-        with row[1].popover("Hatalı bildir", icon=":material/flag:"):
+        page = it.get("check", {}).get("evidence_page")
+        if row[1].button(f"Kaynağı aç{f' · s.{page}' if page else ''}", icon=":material/menu_book:", key=f"src_{it['id']}",
+                         type="tertiary", help="Notundaki kanıt sayfası tam ekranda, kanıt cümlesi sarıyla işaretli"):
+            reader.open_source(it, "exam")
+            st.rerun()
+        with row[2].popover("Hatalı bildir", icon=":material/flag:"):
             note = st.text_input("Ne yanlış?", key=f"rep_{it['id']}", placeholder="ör. iki şık da doğru")
             if st.button("Gönder", key=f"repb_{it['id']}", type="primary"):
                 R.report(it["id"], note, req["id"], user=data.uid())
@@ -384,7 +386,7 @@ def results(req: dict, items: list[dict]) -> None:
                 st.toast("Bildirildi. Soru incelenene kadar sınavlara konmayacak.", icon=":material/flag:")
         # Kısa cevap otomatik karşılaştırılır ve yanılabilir: öğrenci itiraz eder, soru öğretmen incelemesine düşer
         if it["q"]["type"] == "short_answer" and not graded[it["id"]] and it["id"] not in overrides and _answered(ans):
-            with row[2].popover("Cevabım doğruydu", icon=":material/gavel:"):
+            with row[3].popover("Cevabım doğruydu", icon=":material/gavel:"):
                 st.caption(f"Senin cevabın: “{ans}” · Beklenen: “{pretty_math(it['q']['answer'])}”. İtirazın puanına "
                            "yansır ve soru öğretmen incelemesine gönderilir.")
                 why = st.text_input("Neden doğru? (isteğe bağlı)", key=f"obj_{it['id']}")
@@ -396,5 +398,5 @@ def results(req: dict, items: list[dict]) -> None:
                     st.rerun()
         hn = ex.get("hints", {}).get(it["id"], 0)
         if hn:
-            row[3].caption(f"💡 Bu soruda {hn} ipucu kullandın")
+            row[4].caption(f"💡 {hn} ipucu")
         st.space("small")

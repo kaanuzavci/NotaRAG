@@ -225,6 +225,72 @@ def rename(doc: str, user_id: str, name: str) -> None:
     _forget_names()
 
 
+# ---------------------------------------------------------------- klasörler (kişiye özel gruplama)
+
+def folders(user_id: str) -> list[dict]:
+    """Kişinin klasörleri, oluşturma sırasıyla: [{id, name, created, docs: [belge, ...]}]."""
+    with appdb.connect() as con:
+        rows = con.execute("SELECT * FROM folders WHERE user_id = ? ORDER BY created", (user_id,)).fetchall()
+        members = con.execute("SELECT folder_id, doc FROM folder_docs WHERE user_id = ?", (user_id,)).fetchall()
+    docs: dict[str, list[str]] = {}
+    for m in members:
+        docs.setdefault(m["folder_id"], []).append(m["doc"])
+    return [{"id": r["id"], "name": r["name"], "created": r["created"], "docs": docs.get(r["id"], [])} for r in rows]
+
+
+def _folder_name(name: str) -> str:
+    name = " ".join((name or "").split())
+    if not 1 <= len(name) <= 60:
+        raise LibraryError("Klasör adı 1-60 karakter olmalı.")
+    return name
+
+
+def _own_folder(con, folder_id: str, user_id: str) -> None:
+    if not con.execute("SELECT 1 FROM folders WHERE id = ? AND user_id = ?", (folder_id, user_id)).fetchone():
+        raise LibraryError("Böyle bir klasörün yok.")
+
+
+def create_folder(user_id: str, name: str, docs: list[str] = ()) -> str:
+    """Yeni klasör; verilen notlar (başka klasördeyseler oradan alınıp) içine konur. → klasör kimliği."""
+    import secrets
+    name, fid = _folder_name(name), secrets.token_hex(6)
+    with appdb.connect() as con:
+        if con.execute("SELECT 1 FROM folders WHERE user_id = ? AND lower(name) = lower(?)", (user_id, name)).fetchone():
+            raise LibraryError(f"“{name}” adında bir klasörün zaten var.")
+        con.execute("INSERT INTO folders (id, user_id, name, created) VALUES (?, ?, ?, ?)", (fid, user_id, name, time.time()))
+    move_to_folder(user_id, list(docs), fid)
+    return fid
+
+
+def rename_folder(user_id: str, folder_id: str, name: str) -> None:
+    name = _folder_name(name)
+    with appdb.connect() as con:
+        _own_folder(con, folder_id, user_id)
+        con.execute("UPDATE folders SET name = ? WHERE id = ?", (name, folder_id))
+
+
+def delete_folder(user_id: str, folder_id: str) -> None:
+    """Klasörü siler; içindeki notlar silinmez, Belgeler'in ana görünümüne döner."""
+    with appdb.connect() as con:
+        _own_folder(con, folder_id, user_id)
+        con.execute("DELETE FROM folder_docs WHERE folder_id = ?", (folder_id,))
+        con.execute("DELETE FROM folders WHERE id = ?", (folder_id,))
+
+
+def move_to_folder(user_id: str, docs: list[str], folder_id: str | None) -> None:
+    """Notları klasöre taşır (folder_id None: klasörden çıkarır). Yalnızca kişinin görebildiği notlar."""
+    allowed = visible(user_id)
+    with appdb.connect() as con:
+        if folder_id:
+            _own_folder(con, folder_id, user_id)
+        for doc in docs:
+            if doc not in allowed:
+                continue
+            con.execute("DELETE FROM folder_docs WHERE user_id = ? AND doc = ?", (user_id, doc))
+            if folder_id:
+                con.execute("INSERT INTO folder_docs (user_id, doc, folder_id) VALUES (?, ?, ?)", (user_id, doc, folder_id))
+
+
 def _forget_names() -> None:
     global _names
     _names = (0.0, {})

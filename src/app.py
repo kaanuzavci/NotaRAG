@@ -1,7 +1,7 @@
 """NotaRAG arayüzü. Çalıştırma: .venv\\Scripts\\streamlit run src/app.py  →  http://localhost:8501
 
 Önce giriş (src/ui/auth.py); giriş yapılmadan hiçbir sayfa görünmez. Rol yok: herkes aynı sayfaları görür.
-Sayfalar (src/ui/pages): Ana sayfa · Sınav Hazırla · Bilgi Kartları · Belgeler · Soru Bankası · İnceleme · Rapor ·
+Sayfalar (src/ui/pages): Ana sayfa · Sınav Hazırla · Bilgi Kartları · Belgeler · Soru Bankası · Sınav Kâğıdı · İnceleme · Rapor ·
 Modeller ve Kota · Profil ve beyin analizi
 Görsel dil: .streamlit/config.toml (tema) + src/ui/style.py (ayrıntılar); ortak soru kartı src/ui/components.py.
 """
@@ -37,6 +37,7 @@ pages = {
     "İçerik": [
         st.Page("ui/pages/documents.py", title="Belgeler", icon=":material/library_books:"),
         st.Page("ui/pages/bank.py", title="Soru Bankası", icon=":material/inventory_2:"),
+        st.Page("ui/pages/paper.py", title="Sınav Kâğıdı", icon=":material/print:"),
     ],
     "Kalite": [
         st.Page("ui/pages/review.py", title="İnceleme", icon=":material/rate_review:"),

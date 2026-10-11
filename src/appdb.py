@@ -77,6 +77,21 @@ MIGRATIONS: list[list[str]] = [
             updated REAL NOT NULL,
             PRIMARY KEY (user_id, kind))""",
     ],
+    # 3 (2026-10-09): klasörler — kişinin kendi notlarını derslere göre gruplaması (Belgeler sayfası). Klasör kişiye
+    # özel (başkası görmez); not ilk yüklendiğinde klasörsüzdür. Bir not, bir kişide en çok bir klasörde durur.
+    [
+        """CREATE TABLE folders (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            created REAL NOT NULL)""",
+        "CREATE INDEX folders_user ON folders(user_id)",
+        """CREATE TABLE folder_docs (
+            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            doc TEXT NOT NULL REFERENCES documents(doc) ON DELETE CASCADE,
+            folder_id TEXT NOT NULL REFERENCES folders(id) ON DELETE CASCADE,
+            PRIMARY KEY (user_id, doc))""",
+    ],
 ]
 
 _ready: set[str] = set()  # bu süreçte şeması güncellenmiş dosyalar

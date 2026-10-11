@@ -18,7 +18,9 @@ from src.ui.shelf import all_card, palette, shelf
 
 # Sayfaya özgü: kartlara yer açmak için biraz daha geniş içerik alanı (Belgeler de aynısını kullanır)
 _CSS = """<style>
-.block-container { max-width: 1320px; padding-left: 3rem; padding-right: 3rem; }
+.block-container { max-width: none; width: min(1320px, calc(100vw - 300px)); margin: 0 auto; padding-left: 3rem;
+  padding-right: 3rem; }
+@media (max-width: 768px) { .block-container { width: 100%; padding-left: 1rem; padding-right: 1rem; } }
 </style>"""
 
 
