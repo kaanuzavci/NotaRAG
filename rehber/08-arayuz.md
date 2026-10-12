@@ -333,7 +333,7 @@ Doğru / yanlış ifadeleri, "aşağıdakilerden hangisi" ve olumsuz kök ("…d
 
 ---
 
-## `src/ui/flashcards.py` — kart oturumu ekranı (Streamlit özel bileşeni, 588 satır)
+## `src/ui/flashcards.py` — kart oturumu ekranı (Streamlit özel bileşeni, 622 satır)
 
 **Ne işe yarar?** Bilgi kartı oturumunun bütün ekranı: tam pencere, koyu bir sahne (düz parlak zemin yerine; kullanıcı isteği 2026-10-12). Yerleşim Quizlet'in kart modundan: kart ortada, solunda "Bilemediklerin", sağında "Bildiklerin" yığını.
 
@@ -352,24 +352,34 @@ Doğru / yanlış ifadeleri, "aşağıdakilerden hangisi" ve olumsuz kök ("…d
 - **Üst şerit:** kart başına bir parça (bildiklerin yeşil, bilemediklerin kırmızı, atladıkların gri, açık kart beyaz), isabet halkası (atlananlar sayılmaz; %70+ yeşil, %40+ sarı, altı kırmızı), seri (1-4 turuncu, 5+ koyu turuncu alev; artınca sayı bir kez zıplar), süre.
 - **Yan paneller:** sayı, açıklama ("Bunlar bugün yine gelecek", "En yakın tekrarı 3 gün sonra"), yığın (değerlendirilen kartın renginde küçük kart; en çok 13 tanesi görünür, yığın her kartla biraz yükselir) ve son üç kartın sorusu. Paneller kartla aynı boyda ve sabit (içerik geldikçe büyüyüp zıplamaz). Dar ekranda (< 1180 px) paneller gizlenir, sayılar düğmelerin köşesine geçer.
 
-**Neden akıcı?** Bütün hareketler yalnızca `transform` ve `opacity` (ekran kartında, ekranın yenileme hızında çizilir); sürekli dönen animasyon yok. Sürükleme `requestAnimationFrame` ile kare başına bir kez güncellenir. Uçuş Web Animations API ile (`el.animate`). Açık kart ve arkasındaki üç kart (`s0`-`s3`) sınıf değişince geçişle yer değiştirir; yeni kart görünmez `s4` konumunda eklenip yerine kayar. "Hareketi azalt" tercihinde uçuş, dönüş ve geçişler kapanır.
+**Neden akıcı?** Bütün hareketler yalnızca `transform` ve `opacity` (ekran kartında, ekranın yenileme hızında çizilir); sürekli dönen animasyon yok (boşta GPU ve ana iş parçacığı neredeyse hiç çalışmıyor). Sürükleme `requestAnimationFrame` ile kare başına bir kez güncellenir. Uçuş Web Animations API ile (`el.animate`). Açık kart ve arkasındaki üç kart (`s0`-`s3`) sınıf değişince geçişle yer değiştirir. "Hareketi azalt" tercihinde uçuş, dönüş ve geçişler kapanır.
+
+**İkinci tur (2026-10-13, kullanıcı: "Edge'de hâlâ hafif kasıyor").** Görünmez Edge'de ölçüldü (CDP izleme; geçici kayıtlı önizleme sunucusunda 6-10 değerlendirme). Kareler arası boşluk `requestAnimationFrame` ile ölçüldü; işlemci 4 kat yavaşlatılınca (pildeki dizüstünü taklit) eski sürümde en uzun takılma **79 ms** (~5 kare), 40 ms'yi aşan 3-4 takılma vardı. Yeni sürümde en uzun takılma 18-30 ms, 40 ms'yi aşan yok; normal hızda 36 ms → 12 ms. Yapılanlar:
+- **Tuşa basılan karede yerleşim yok.** Sıradaki kartın sıradakisi (`s4`, görünmez) hareket bitince boşta eklenir. Geçişte kartlar yalnızca sınıf değiştirir. Uçuş için kartın ve yığınların yeri de boşta ölçülür (`measure`) ve pencere boyu değişince yenilenir. Eskiden bu iki iş tuş karesinde 3-14 ms tutuyordu. Ölçülen yerle sürüklenip bırakılan kart da tam yığına iner (eskiden sürükleme kadar kayık iniyordu).
+- **Python'a haber hareket bitince gider** (`sync(…, 700)`). Streamlit'in yeniden çalışıp veriyi işlemesi kart uçarken ana iş parçacığını meşgul etmez. Art arda değerlendirmeler tek haberde birleşir. "Notta aç" ve "Ara ver" bekleyen haberi önce gönderir (`flush`).
+- **Paneller sonra.** Yan panellerin açıklaması ve son kartları hareket bitince yazılır; sayılar hemen yazılır.
+- **GPU yükü azaldı.** Ölçümde geçiş sırasındaki GPU işinin ~üçte biri iki kalemdendi: zemindeki nokta deseninin tam ekran maskesi ve kartın arkasında renk değiştiren ışık. İkisi kalktı; desen maskesiz olarak zeminin kendisinde. Ön yüzde `overflow: hidden` (dönen katmanda yuvarlak köşe maskesi) yok, gölgeler küçüldü.
+- **Ufak işler:** düğme ve seri "zıplaması" sınıf söküp takmak (zorunlu yerleşim) yerine Web Animations ile. `.fx`'te `contain: strict`.
+- **Ölçülemeyen:** görünmez Edge yazılımsal GPU kullanır; gerçek ekran kartındaki çizim ve Edge ayarları (donanım hızlandırma, verimlilik modu) burada görülemez.
 
 **Bağlantılar:** ← `pages/cards.py` (`deck`). → `shelf.Component` (CCv2 kaydı).
 
 **İçindekiler**
-- `_CSS`: bileşenin stili (Shadow DOM'da: sayfanın CSS'i içeri girmez, yazı tipleri girer). Renkler `.fx` üzerinde değişken (`--good`, `--bad`, `--panel`…). Dikkat: `.deck`'teki `perspective` ayrı bir katman açar; deste `z-index: 2` ile panellerin üstünde durur, yoksa sürüklenen kart sağdaki yığının altında kalıyordu. Geri düğmesinin sınıfı `.leave`: `.back` kartın arka yüzüyle çakıştı (düğme ayna gibi dönmüştü).
+- `_CSS`: bileşenin stili (Shadow DOM'da: sayfanın CSS'i içeri girmez, yazı tipleri girer). Renkler `.fx` üzerinde değişken (`--good`, `--bad`, `--panel`…). Dikkat: `.deck`'teki `perspective` ayrı bir katman açar; deste `z-index: 2` ile panellerin üstünde durur, yoksa sürüklenen kart sağdaki yığının altında kalıyordu. `@starting-style` kuralı `.card.s0`-`.card.s3` özgüllüğünde: yalnızca `.card` yazılırsa yuva kuralları onu ezer. Geri düğmesinin sınıfı `.leave`: `.back` kartın arka yüzüyle çakıştı (düğme ayna gibi dönmüştü).
 - `_HTML`: tek sarmalayıcı (`.fx`); içini JS kurar.
 - `_JS`: JavaScript (Python dizgisi içinde; satır bağlantısı yok). Başlıca işlevler:
   - `frame(S)`: ekranın iskeleti (şerit, paneller, deste, düğmeler, kısayollar).
   - `cardEl(S, k)`: sıradaki k. kartın öğesi (iki yüz + iki damga). Anahtar sıra numarası: atlanan soru sırada iki kez bulunabilir.
-  - `layout(root, S)`: açık kart ve arkasındaki üç kart (`s0`-`s3`); kartın renginde arka ışık (iki katman sırayla, renk geçişi yalnızca opaklıkla).
-  - `stats(S)`, `paint(root, S, bumped)`: günlükten sayılar; ilerleme, isabet, seri, yığın sayıları ve son kartlar.
+  - `layout(root, S)`: açık kart ve arkasındaki üç kart (`s0`-`s3`) + görünmez `s4`; eksik kart (açılışta, karıştırınca) eklenir ve girişini `@starting-style` oynatır.
+  - `settle(root, S)`: hareket bitince (0,65 sn) `s4`'ü ekler, konumları ölçer, panelleri yazar.
+  - `measure(root, S)`: destenin ortası ve iki yığının ortası (uçuş için).
+  - `stats(S)`, `paint(root, S, bumped)`, `panels(root, S)`: günlükten sayılar; ilerleme, isabet, seri, yığın sayıları (hemen), panellerin açıklaması ve son kartlar (değerlendirmede hareket bitince).
   - `grade(root, S, result)`: değerlendirme. Günlüğe ekler, atlanan kartı (bir kez) sona ekler, `fly` ve `layout`'u çağırır, `sync` ile Python'a bildirir. Son kartta "Deste bitti" yazısı belirir; kart yığına varınca (0,65 sn) `ended` gönderilir.
   - `fly(root, S, el, result, k)`: kartı yığının ortasına, yığındaki kart boyuna küçülterek uçurur; varınca yığına küçük kart ekler (`pileCard`).
-  - `flip`, `shuffle` (kalan kartlar karışır, ekrandaki kart değişir; kartlar bir an yana savrulup yeniden dağıtılır), `toast` (kısa bildirim, şeridin altında), `drag` (sürükleme).
+  - `flip`, `shuffle` (kalan kartlar karışır, ekrandaki kart değişir; kartlar bir an yana savrulup yeniden dağıtılır), `toast` (kısa bildirim, şeridin altında), `drag` (sürükleme), `sync` / `flush` (Python'a haber: değerlendirmede 0,7 sn sonra, birleştirerek).
   - `init(root, data)`: oturumu veriden kurar (kaldığın yerden ya da okuyucudan dönünce de: yığınlar günlükten yeniden dizilir).
   - Dışa açılan işlev: belirteç (`tok`) değişmedikçe yeniden çizmez; klavye dinleyicisini ve süre sayacını her çağrıda yeniden bağlar, bileşen sayfadan kalkınca söker. Tab ile seçilmiş bir düğmede Boşluk / Enter düğmenin kendi işini yapar.
-- [`deck(key, data)`](../src/ui/flashcards.py#L584): bileşeni çizer. Dönen değerin `act`'ı tetik (`"leave"` ya da `"src|kimlik"`); destenin durumu `st.session_state[key]["sync"]`'te.
+- [`deck(key, data)`](../src/ui/flashcards.py#L618): bileşeni çizer. Dönen değerin `act`'ı tetik (`"leave"` ya da `"src|kimlik"`); destenin durumu `st.session_state[key]["sync"]`'te.
 
 ---
 

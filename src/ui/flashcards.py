@@ -25,17 +25,19 @@ from src.ui.shelf import Component
 
 _CSS = """
 :host { display: block; }
-.fx { position: fixed; inset: 0; z-index: 1000100; display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
+/* contain: strict → içerideki yerleşim ve boyama değişiklikleri alttaki Streamlit sayfasına yayılmaz */
+.fx { position: fixed; inset: 0; z-index: 1000100; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; contain: strict;
   color: #ECEAF7; font-family: 'Instrument Sans', sans-serif; overflow: hidden; user-select: none;
   --ink: #ECEAF7; --sub: #A9AACB; --mute: #7D80A6; --line: rgba(255, 255, 255, .09); --panel: rgba(255, 255, 255, .045);
   --good: #34D399; --good-t: #7EF0C0; --bad: #FF7A66; --bad-t: #FFAB9E; --ease: cubic-bezier(.22, 1, .36, 1);
-  background: radial-gradient(1200px 700px at 12% -10%, #2B2A6E 0%, transparent 60%),
+  /* ince nokta deseni + iki renk lekesi + koyu geçiş; hepsi tek katmanda, sabit. Eskiden desen ayrı bir öğede maskeyle
+     soluyordu ve kartın arkasında renk değiştiren bir ışık vardı: geçiş sırasındaki GPU işinin ~üçte biri bu ikisiydi
+     (görünmez Edge'de ölçüm, 2026-10-13) */
+  background: radial-gradient(rgba(255, 255, 255, .045) 1px, transparent 1.2px) 0 0 / 26px 26px,
+    radial-gradient(1200px 700px at 12% -10%, #2B2A6E 0%, transparent 60%),
     radial-gradient(900px 600px at 105% 110%, #10394A 0%, transparent 60%),
+    radial-gradient(700px 480px at 50% 46%, rgba(120, 100, 220, .16) 0%, transparent 70%),
     linear-gradient(180deg, #14163A 0%, #0E1029 100%); }
-/* ince nokta deseni: düz zemin "boş" görünmesin (sabit, hareketsiz) */
-.fx::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .5;
-  background-image: radial-gradient(rgba(255, 255, 255, .07) 1px, transparent 1.2px); background-size: 26px 26px;
-  -webkit-mask-image: radial-gradient(ellipse at 50% 45%, #000 0%, transparent 75%); mask-image: radial-gradient(ellipse at 50% 45%, #000 0%, transparent 75%); }
 button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; -webkit-tap-highlight-color: transparent; }
 button:focus-visible { outline: 2px solid #B9A4FF; outline-offset: 3px; }
 svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -71,8 +73,6 @@ kbd { font: 500 .7rem/1 'JetBrains Mono', monospace; padding: 3px 6px; border-ra
 .flame { width: 26px; height: 26px; color: #6F7196; stroke-width: 1.8; transition: color .3s; }
 .flame path { fill: currentColor; fill-opacity: .18; }
 .stat.warm .flame { color: #FFB454; } .stat.hot .flame { color: #FF7A3D; } .stat.hot .flame path { fill-opacity: .45; }
-.stat.pop b { animation: pop .45s var(--ease); }
-@keyframes pop { 40% { transform: scale(1.35); } }
 .tbtn { display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 16px; border-radius: 14px; font-weight: 600; font-size: .92rem;
   border: 1px solid var(--line); background: var(--panel); color: var(--ink); transition: background .15s, border-color .15s, transform .15s; }
 .tbtn:hover { background: rgba(255, 255, 255, .09); border-color: rgba(255, 255, 255, .2); }
@@ -113,9 +113,6 @@ kbd { font: 500 .7rem/1 'JetBrains Mono', monospace; padding: 3px 6px; border-ra
 
 /* deste panellerin üstünde (perspective ayrı katman açar): sürüklenen ve yığına uçan kart panelin üstünden geçer */
 .deck { grid-row: 1; grid-column: 2; position: relative; z-index: 2; min-width: 0; min-height: 240px; perspective: 2000px; touch-action: none; }
-.glow { position: absolute; left: 50%; top: 50%; width: 92%; height: 92%; transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none;
-  background: radial-gradient(closest-side, var(--g), transparent); opacity: 0; transition: opacity .7s ease; }
-.glow.on { opacity: .45; }
 /* arkadaki kartlar ~34 px aşağı taşar: kart o kadar kısa ve yukarıda, düğmelerin üstüne binmesin */
 .card { position: absolute; left: 50%; top: calc(50% - 17px); width: min(100%, 900px); height: min(calc(100% - 40px), 580px); margin: 0; translate: -50% -50%;
   container-type: size; transform-origin: 50% 60%; will-change: transform;
@@ -124,20 +121,24 @@ kbd { font: 500 .7rem/1 'JetBrains Mono', monospace; padding: 3px 6px; border-ra
 .card.s1 { transform: translate3d(18px, 14px, 0) rotate(2.6deg) scale(.965); }
 .card.s2 { transform: translate3d(-20px, 22px, 0) rotate(-3.2deg) scale(.935); }
 .card.s3 { transform: translate3d(6px, 30px, 0) rotate(1.2deg) scale(.905); }
-.card.s4 { transform: translate3d(0, 40px, 0) scale(.88); opacity: 0; transition: none; }
+/* yeni kart görünmez, biraz aşağıdan girer: @starting-style ilk çizimin başlangıcı (eskiden zorunlu yeniden yerleşimle) */
+@starting-style { .card.s0, .card.s1, .card.s2, .card.s3 { transform: translate3d(0, 40px, 0) scale(.88); opacity: 0; } }
+/* s4: sıradakinin sıradakisi, boşta önceden eklenir (görünmez): geçiş anında yalnızca sınıfı değişir, yerleşim işi olmaz */
+.card.s4 { transform: translate3d(0, 40px, 0) scale(.88); opacity: 0; pointer-events: none; }
 .card.s1, .card.s2, .card.s3 { pointer-events: none; }
 .card.drag, .card.fly { transition: none; }
 .card.shuffle { animation: riffle .5s var(--ease); }
 @keyframes riffle { 30% { transform: translate3d(var(--sx), -10px, 0) rotate(var(--sr)); } }
 .flip { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform .6s cubic-bezier(.3, .75, .25, 1); }
 .card.flipped .flip { transform: rotateY(180deg); }
+/* ön yüzde overflow: hidden yok (dönen katmanda yuvarlak köşe maskesi pahalı; içerik zaten taşmıyor), gölge küçük */
 .face { position: absolute; inset: 0; border-radius: 28px; backface-visibility: hidden; -webkit-backface-visibility: hidden;
-  display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 2px 0 rgba(255, 255, 255, .06) inset, 0 30px 60px -28px rgba(0, 0, 0, .7); }
+  display: flex; flex-direction: column; box-shadow: 0 22px 36px -22px rgba(0, 0, 0, .75); }
 .front { color: var(--cink); padding: 26px 34px 20px; cursor: grab;
   background: radial-gradient(120% 90% at 0% 0%, rgba(255, 255, 255, .5), transparent 55%), linear-gradient(155deg, var(--c1) 0%, var(--c2) 100%); }
 .card.drag .front { cursor: grabbing; }
-.back { transform: rotateY(180deg); background: #FFFDF8; color: #1E2433; cursor: pointer; }
-.back::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 6px; background: var(--a); }
+.back { transform: rotateY(180deg); background: #FFFDF8; color: #1E2433; cursor: pointer; overflow: hidden; }
+.back::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 6px; background: var(--a); border-radius: 28px 28px 0 0; }
 .chips { display: flex; align-items: center; gap: 7px; min-height: 32px; min-width: 0; }
 .chip { flex: 0 1 auto; min-width: 0; font-size: .76rem; font-weight: 600; padding: 5px 11px; border-radius: 999px; background: rgba(255, 255, 255, .62); color: var(--cink);
   max-width: 46cqi; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -187,8 +188,6 @@ kbd { font: 500 .7rem/1 'JetBrains Mono', monospace; padding: 3px 6px; border-ra
 .act.skip:hover { background: rgba(255, 255, 255, .1); }
 .act.good { color: var(--good-t); background: rgba(52, 211, 153, .1); border-color: rgba(52, 211, 153, .32); }
 .act.good:hover { background: rgba(52, 211, 153, .18); border-color: rgba(52, 211, 153, .55); }
-.act.flash { animation: flash .35s ease; }
-@keyframes flash { 40% { transform: scale(.97); filter: brightness(1.3); } }
 
 /* ---- alt satır: kısayollar ---- */
 .foot { position: relative; z-index: 1; display: flex; justify-content: center; align-items: center; gap: 18px; flex-wrap: wrap;
@@ -220,8 +219,9 @@ kbd { font: 500 .7rem/1 'JetBrains Mono', monospace; padding: 3px 6px; border-ra
   .pile { margin: 10px 0 8px; } .foot { padding: 8px 20px 10px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .card, .flip, .glow, .bar i, .ring .fg { transition: none !important; }
-  .pile i.in, .stat.pop b, .act.flash, .card.shuffle { animation: none !important; }
+  .card, .flip, .bar i, .ring .fg { transition: none !important; }
+  .pile i.in, .card.shuffle { animation: none !important; }
+  @starting-style { .card.s0, .card.s1, .card.s2, .card.s3 { opacity: 1; } }
 }
 """
 
@@ -266,7 +266,7 @@ function frame(S) {
       <div class="note" data-note="bad"></div>
       <div class="pile" data-pile="bad"><div class="empty">${ICON.back} sola sürükle ya da ${KBD("←")}</div></div>
       <ul class="recent" data-recent="bad"></ul></aside>
-      <div class="deck"><div class="glow a"></div><div class="glow b"></div><div class="done">Deste bitti<small>Özet hazırlanıyor…</small></div></div>
+      <div class="deck"><div class="done">Deste bitti<small>Özet hazırlanıyor…</small></div></div>
       <div class="acts">
         <button class="act bad" data-grade="bad"><span class="cnt" data-c="bad">0</span><span class="l">${ICON.x}Bilemedim</span><span class="w" data-w="bad"></span>${KBD("←")}</button>
         <button class="act skip" data-grade="skip"><span class="l">${ICON.skip}Atla</span><span class="w" data-w="skip"></span>${KBD("↓")}</button>
@@ -287,7 +287,6 @@ function cardEl(S, k) {
   const id = S.queue[k], c = S.cards[id] || { q: "(Bu soru havuzdan çıkarıldı.)", ans: "", ev: "" }
   const [c1, c2, ink, a] = S.pal[k % S.pal.length]
   const el = document.createElement("div")
-  el.className = "card s4"
   el.style.cssText = `--c1:${c1};--c2:${c2};--cink:${ink};--a:${a}`
   const chips = (c.diff ? `<span class="chip fix">${c.diff}</span>` : "") + (c.topic ? `<span class="chip" title="${c.topic}">${c.topic}</span>` : "")
     + (c.seen ? "" : '<span class="chip fix new">Yeni kart</span>')
@@ -303,29 +302,47 @@ function cardEl(S, k) {
   return el
 }
 
-// ---- sahne: açık kart ve arkasındaki üç kart (s0-s3); yeni gelen s4'ten (görünmez) yerine kayar
+// ---- sahne: açık kart ve arkasındaki üç kart (s0-s3) + görünmez s4. Geçişte kartlar yalnızca sınıf değiştirir; eksik kart
+// (açılışta, karıştırınca) eklenir ve girişini @starting-style oynatır. s4 hareket bitince eklenir (settle)
 function layout(root, S) {
   const deck = root.querySelector(".deck")
-  const want = []
-  for (let k = S.pos; k < Math.min(S.queue.length, S.pos + 4); k++) want.push(k)
-  for (const [k, el] of S.els) if (!want.includes(k)) { el.remove(); S.els.delete(k) }
-  let fresh = false
-  want.forEach((k) => { if (!S.els.has(k)) { const el = cardEl(S, k); deck.appendChild(el); S.els.set(k, el); fresh = true } })
-  if (fresh) deck.offsetWidth  // yeni kartlar s4'te çizilsin, sonra geçişle yerlerine
-  want.forEach((k, slot) => {
-    const el = S.els.get(k)
+  const end = Math.min(S.queue.length, S.pos + 5)
+  for (const [k, el] of S.els) if (k < S.pos || k >= end) { el.remove(); S.els.delete(k) }
+  for (let k = S.pos; k < end; k++) {
+    const slot = k - S.pos
+    let el = S.els.get(k)
+    if (!el) { if (slot === 4) continue; el = cardEl(S, k); S.els.set(k, el) }
     el.className = "card s" + slot + (slot === 0 && S.flipped ? " flipped" : "")
     el.style.zIndex = 20 - slot
     el.setAttribute("aria-hidden", slot ? "true" : "false")
-  })
-  // kartın renginde hafif ışık (iki katman sırayla: renk geçişi yalnızca opaklıkla)
-  const cur = S.els.get(S.pos)
-  if (cur) {
-    S.glowIdx = 1 - (S.glowIdx || 0)
-    const on = root.querySelectorAll(".glow")[S.glowIdx], off = root.querySelectorAll(".glow")[1 - S.glowIdx]
-    on.style.setProperty("--g", S.pal[S.pos % S.pal.length][1]); on.classList.add("on"); off.classList.remove("on")
+    if (!el.isConnected) deck.appendChild(el)
   }
   hints(root, S)
+  settle(root, S)
+}
+
+// Hareket bitince (boşta): s4'ü ekle ve uçuş için konumları ölç. Tuşa basıldığı karede ne yeni kartın yerleşimi ne de
+// konum ölçümü (zorunlu yeniden yerleşim) yapılsın: ikisi o karede 3-10 ms tutuyordu (2026-10-13 ölçümü)
+function settle(root, S) {
+  clearTimeout(S.idleT)
+  S.idleT = setTimeout(() => {
+    const k = S.pos + 4
+    if (k < S.queue.length && !S.els.has(k)) {
+      const el = cardEl(S, k)
+      el.className = "card s4"; el.style.zIndex = 16; el.setAttribute("aria-hidden", "true")
+      S.els.set(k, el); root.querySelector(".deck").appendChild(el)
+    }
+    if (!S.rects) measure(root, S)
+    panels(root, S)
+  }, 650)
+}
+
+// Destenin ortası (açık kartın yeri; CSS'teki gibi 17 px yukarıda) ve iki yığının ortası. Pencere boyu değişince silinir
+function measure(root, S) {
+  const box = (sel) => { const e = root.querySelector(sel), b = e && e.getBoundingClientRect()
+    return b && b.width ? { x: b.left + b.width / 2, y: b.top + b.height / 2, w: b.width, h: b.height } : null }
+  const d = box(".deck")
+  S.rects = d && { card: { x: d.x, y: d.y - 17, w: Math.min(d.w, 900) }, bad: box('[data-pile="bad"]'), good: box('[data-pile="good"]') }
 }
 
 function hints(root, S) {
@@ -359,12 +376,20 @@ function paint(root, S, bumped) {
   fg.style.stroke = acc == null ? "transparent" : acc >= 70 ? "#34D399" : acc >= 40 ? "#FBBF24" : "#FF7A66"
   const fire = root.querySelector(".stat.fire")
   fire.classList.toggle("warm", T.streak >= 1 && T.streak < 5); fire.classList.toggle("hot", T.streak >= 5)
-  if (bumped === "good" && T.streak > 0) { fire.classList.remove("pop"); fire.offsetWidth; fire.classList.add("pop") }
+  if (bumped === "good" && T.streak > 0 && !reduced())
+    fire.querySelector("b").animate([{ transform: "scale(1)" }, { transform: "scale(1.35)", offset: .4 }, { transform: "scale(1)" }], 450)
   root.querySelector(".strk").textContent = T.streak
   root.querySelector(".bestv").textContent = T.best ? `seri · en iyi ${T.best}` : "seri"
   for (const kind of ["bad", "good"]) {
     root.querySelector(`[data-n="${kind}"]`).textContent = T[kind]
     root.querySelector(`[data-c="${kind}"]`).textContent = T[kind]
+  }
+  if (!bumped) panels(root, S)  // değerlendirmede: paneller hareket bitince (settle), ilk kare hafif kalsın
+}
+
+// yan panellerin açıklaması ve son kartları
+function panels(root, S) {
+  for (const kind of ["bad", "good"]) {
     const ids = S.log.filter(([, r]) => r === kind).map(([id]) => id)
     let note = ""
     if (kind === "bad" && ids.length) note = "Bunlar bugün yine gelecek"
@@ -402,31 +427,31 @@ function grade(root, S, result) {
   if (result === "skip" && !S.skipped.has(id)) { S.skipped.add(id); S.queue.push(id) }
   S.pos++
   S.flipped = false
-  const btn = root.querySelector(`[data-grade="${result}"]`)
-  btn.classList.remove("flash"); btn.offsetWidth; btn.classList.add("flash")
-  if (el) fly(root, S, el, result, k)
+  if (el) fly(root, S, el, result, k)  // önce ölçer (yerleşim temizken), sonra yazar
+  if (!reduced()) root.querySelector(`[data-grade="${result}"]`).animate([{ transform: "scale(1)" }, { transform: "scale(.97)", offset: .4 }, { transform: "scale(1)" }], 300)
   layout(root, S)
   paint(root, S, result)
   if (S.pos >= S.queue.length) {
     S.over = true
     root.classList.add("over")
     setTimeout(() => sync(S, true), reduced() ? 0 : 650)  // son kart yığına varsın, sonra özet
-  } else sync(S)
+  } else sync(S, false, 700)
 }
 
 function fly(root, S, el, result, k) {
   const done = () => { el.remove(); if (result !== "skip") pileCard(root, S, result, k, true) }
   if (reduced()) return done()
-  const r = el.getBoundingClientRect(), from = getComputedStyle(el).transform
+  if (!S.rects) measure(root, S)  // normalde boşta ölçülmüş olur
+  const from = getComputedStyle(el).transform  // yalnızca stil (yerleşim değil): sürüklenmiş ya da hâlâ öne kayan kart
   el.classList.add("fly"); el.classList.remove("drag")
   el.style.zIndex = 40
   el.style.transformOrigin = "50% 50%"  // küçülürken merkezi yığının ortasına otursun
   let to
-  const pile = root.querySelector(`[data-pile="${result}"]`)
-  const pr = pile && pile.getBoundingClientRect()
+  const c = S.rects && S.rects.card, pr = S.rects && S.rects[result]
   if (result === "skip") to = "translate3d(0, 46px, 0) scale(.84) rotate(2deg)"
-  else if (pr && pr.width) {  // yığının ortasına, yığındaki kart boyuna küçülerek
-    const s = 136 / r.width, dx = pr.left + pr.width / 2 - (r.left + r.width / 2), dy = pr.top + pr.height / 2 - (r.top + r.height / 2)
+  else if (c && pr) {  // yığının ortasına, yığındaki kart boyuna küçülerek. Fark kartın dönüşümsüz yerinden: sürüklenmiş
+    // kart da tam yığına iner (eskiden sürükleme kadar kayık iniyordu)
+    const s = 136 / c.w, dx = pr.x - c.x, dy = pr.y - c.y
     to = `translate3d(${dx}px, ${dy}px, 0) rotate(${result === "good" ? 10 : -10}deg) scale(${s})`
   } else to = `translate3d(${result === "good" ? 120 : -120}%, 10%, 0) rotate(${result === "good" ? 18 : -18}deg)`  // dar ekran: kenardan çıkar
   const a = el.animate([{ transform: from === "none" ? "translate3d(0,0,0)" : from, opacity: 1 },
@@ -463,7 +488,7 @@ function shuffle(root, S) {
     layout(root, S); paint(root, S)
   }, reduced() ? 0 : 260)
   toast(root, S, `Kalan ${rest.length} kart karıştırıldı.`)
-  sync(S)
+  sync(S, false, 600)
 }
 
 function toast(root, S, text) {
@@ -473,9 +498,15 @@ function toast(root, S, text) {
 }
 
 // Python'a destenin durumu: sıra ve değerlendirme günlüğü (birikimli; Python yalnızca yeni satırları yazar)
-function sync(S, ended) {
-  S.send("sync", { tok: S.tok, queue: S.queue, log: S.log, ended: !!ended })
+// later (ms): değerlendirmeden sonra haber kart uçarken değil, hareket bitince gider (Streamlit'in yeniden çalışması ve
+// verinin işlenmesi animasyonun ortasında ana iş parçacığını meşgul etmesin); art arda değerlendirmeler tek haberde birleşir
+function sync(S, ended, later) {
+  clearTimeout(S.syncT); S.syncT = 0
+  const send = () => { S.syncT = 0; S.send("sync", { tok: S.tok, queue: S.queue, log: S.log, ended: !!ended }) }
+  if (later) S.syncT = setTimeout(send, later); else send()
 }
+
+function flush(S) { if (S.syncT) sync(S) }  // bekleyen haber hemen (sayfadan ayrılmadan önce)
 
 // ---- sürükleme: sola bilemedim, sağa bildim; az sürüklenip bırakılırsa yerine döner; hiç sürüklenmezse çevirir
 function drag(root, S) {
@@ -528,6 +559,9 @@ function init(root, data) {
   }
   S.pos = Math.min(S.log.length, S.queue.length)
   root.dataset.tok = data.tok
+  if (root._ro) root._ro.disconnect()
+  root._ro = new ResizeObserver(() => { S.rects = null; settle(root, S) })  // pencere boyu değişti: konumları yeniden ölç
+  root._ro.observe(root)
   root.classList.remove("over")
   root.innerHTML = frame(S)
   S.log.forEach(([, r], k) => { if (r !== "skip") pileCard(root, S, r, k, false) })
@@ -542,8 +576,8 @@ function init(root, data) {
     const act = b.dataset.do
     if (act === "shuffle") shuffle(root, S)
     else if (act === "end") { S.over = true; sync(S, true) }
-    else if (act === "leave") S.fire("act", "leave")
-    else if (act === "src") S.fire("act", "src|" + S.queue[S.pos])
+    else if (act === "leave") { flush(S); S.fire("act", "leave") }
+    else if (act === "src") { flush(S); S.fire("act", "src|" + S.queue[S.pos]) }
   }
 }
 
