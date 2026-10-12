@@ -24,6 +24,10 @@ Hedefimiz "her soruyu doğru üreten" bir sistem değil; **hangi sorusuna güven
 7. Ölçülmüş retrieval kararı: dense (Gemini embedding) — hibrit ve 5 harf köklemeli BM25 ile karşılaştırıldı, varsayılan dense (bkz. §7 ve `eval/sonuclar_retrieval.md`)
 8. Çıktı dilini belge dilinden bağımsız seçebilme (ör. İngilizce PDF → Türkçe soru)
 9. Görsel/taranmış PDF desteği (Gemini, yedek qwen görsel okuma) ve Türkçe metin düzeltmeleri (üs/alt simge, satır sonu tiresi)
+10. Bilgi kartları: doğrulanmış sorulardan şıksız deste, FSRS-5 aralıklı tekrar (`src/cards.py`; LLM yok)
+11. Hesaplar ve belge kütüphanesi: her hesap kendi çözüm/kart verisiyle; notlar varsayılan gizli, istenirse herkese açık; klasörler. Ana sayfa (not desteleri, kaldığın yerden devam), profil ve beyin analizi (konu konu ustalık, zayıf konulardan sınav)
+12. Sınav Kâğıdı: soru bankasından A4/A3 PDF (ayrı cevap anahtarıyla), `src/exampaper.py` (rehber 14)
+13. Zorluk bir ölçüm: üretecin iddiası + yapı kuralı + benzetilmiş öğrenci + gerçek çözümler (`src/difficulty.py`, `src/simulate.py`; rehber 10)
 
 **Kapsam dışı:**
 - Model eğitimi / fine-tuning (hazır embedding + LLM API'leri kullanılıyor)
@@ -82,10 +86,10 @@ Hedefimiz "her soruyu doğru üreten" bir sistem değil; **hangi sorusuna güven
 
 ## 4. Temel Tasarım Kararları
 
-### 4.1 RAGAS nerede kullanılıyor, nerede kullanılmıyor
-LITERATURE.md §4'teki "kendi doğrulamamızı yazmak yerine RAGAS kullanalım" önerisini **değerlendirme katmanında** uyguluyoruz, çalışma anındaki doğrulama katmanında değil. Gerekçe:
+### 4.1 RAGAS nerede kullanılacak, nerede kullanılmayacak
+LITERATURE.md §4'teki "kendi doğrulamamızı yazmak yerine RAGAS kullanalım" önerisini **değerlendirme katmanında** uygulamayı planlıyoruz, çalışma anındaki doğrulama katmanında değil. **Durum (2026-10-11): RAGAS henüz kullanılmıyor** — kodda yok, paketi kurulu değil (`wheelhouse/`'ta), PROMPTS.md §5 hazır ama hiçbir yerden çağrılmıyor. Raporda "RAGAS ile ölçtük" denemez; ölçümler kendi betiklerimizle (`eval/`). Gerekçe:
 - RAGAS bir **değerlendirme** aracı: tek bir soru için çok sayıda LLM çağrısı yapıyor. Ücretsiz API kotalarında her üretilen soruya uygulanamaz.
-- RAGAS faithfulness, uzun cevapları iddialara bölerek çalışıyor. Quiz cevapları ise "B", "Yanlış", "2 adet" gibi kısa ifadeler; bölünecek bir iddia yok. Bu yüzden RAGAS'a vermeden önce soru+cevabı tek bir **önermeye** dönüştürüyoruz (PROMPTS.md §5).
+- RAGAS faithfulness, uzun cevapları iddialara bölerek çalışıyor. Quiz cevapları ise "B", "Yanlış", "2 adet" gibi kısa ifadeler; bölünecek bir iddia yok. Bu yüzden RAGAS'a vermeden önce soru+cevabı tek bir **önermeye** dönüştüreceğiz (PROMPTS.md §5).
 - RAGAS çoktan seçmeli soruya özgü hataları göremiyor: ikinci bir doğru şık bulunması, cevabın şık uzunluğundan tahmin edilebilmesi gibi. Bu hataları bizim tipe özel kontrollerimiz yakalıyor.
 - Kanıt alıntısı kontrolü deterministik ve ücretsiz. Hiçbir LLM tabanlı metrik onun yerini tutmuyor.
 
@@ -139,8 +143,8 @@ Tasarım ilkesi: **kota dolduğunda sistem yavaşlar ama kaliteden ödün vermez
 | Embedding (ana) | `gemini-embedding-001`, 768 boyut (API) | Çok dilli; model indirmek gerekmiyor. Toplu istek destekliyor (`gemini-embedding-2` listeyi tek vektöre birleştiriyor). 768 boyut, 3072'ye göre indirmeyi 4 kat azaltıyor |
 | Embedding (deney) | bge-m3 / Türkçe'ye özel model, yerel GPU | Yapılmayacak: kullanıcı tercihi dizüstünde GPU iş yükü yok (yalnızca açık istekle) |
 | Vektör DB | ChromaDB (yerel, dosya tabanlı) | Ödev "vektör veritabanı" istiyor. Embedding'i biz veriyoruz, böylece Chroma kendi varsayılan modelini indirmiyor |
-| Sparse retrieval | rank-bm25 + F5 kökleme (yalnızca karşılaştırma) | 68 sorguluk değerlendirmede dense'ten geride kaldı (isabet@5 %72'ye %100) |
-| Füzyon | Reciprocal Rank Fusion (yalnızca karşılaştırma) | TR sorgu → EN slaytta zarar verdi (isabet@5 %58'e %100); varsayılan değil |
+| Sparse retrieval | rank-bm25 + F5 kökleme (yalnızca karşılaştırma) | 145 sorguluk değerlendirmede dense'ten çok geride kaldı (isabet@5 %62-63'e %99; `eval/sonuclar_retrieval.md`) |
+| Füzyon | Reciprocal Rank Fusion (yalnızca karşılaştırma) | Dense'ten kötü (isabet@5 %76'ya %99); TR sorgu → EN slaytta daha da zararlı (elle, n=12: %58'e %100). Varsayılan değil |
 | LLM (üretim) | Gemini 3.8 / 3.5 Flash, toplu (bir istekte bir grubun tüm birimleri); yedek: Groq `qwen3.8-27b` birim başına | Aynı 12 birimde toplu Gemini %92-100, qwen %92 doğrulandı; Gemini daha çeşitli ve zor soru üretiyor. Hesap soruları (§2c) yalnızca Gemini'de (yedek yok) |
 | Doğrulama | gpt-oss-120b / 20b (Groq), Nemotron 3 Ultra (OpenRouter ücretsiz), qwen — üreticiden farklı aile | Kendi hatasını görememe riskini azaltır; duyarlılık testleri: 120b 17/17, 20b 20/20, Nemotron 10/10 + hesap 12/12, qwen 19/19 |
 | LLM düzenleme | Kendi yönlendiricimiz (`src/llm/router.py` + `ledger.py`); LangChain kullanılmıyor | Ödevin teknoloji listesinde var, ama asıl zorluk ücretsiz kota ve kalite kuralları: günlük istek/token kotası süreçler arasında ortak defterde izlenir (LangChain'in hız sınırlayıcısı süreç içi ve saniyelik), kota dolunca zayıf modele geçilmez (LangChain `with_fallbacks` sıradaki modele geçer), doğrulayıcı üreticiden farklı aileden. PDF için PyMuPDF zaten doğrudan gerekiyordu (sayfa kalitesi, kanıt vurgulama), Chroma doğrudan kullanılıyor → LangChain yeni yetenek eklemiyor (karar 2026-10-07) |
@@ -148,7 +152,7 @@ Tasarım ilkesi: **kota dolduğunda sistem yavaşlar ama kaliteden ödün vermez
 | Öğrenci cevabı puanlama | SymPy değer karşılaştırması + sıkı metin eşleşmesi (`src/grading.py`) | '30240' = '9!/(3!·2!)'; '2' ≠ '(n choose 2)·2'; güvenilmez girdi için büyüklük sınırları |
 | Bulanık eşleşme | rapidfuzz | Kanıt alıntısı için "neredeyse birebir" eşleşme |
 | Değerlendirme | Kendi betikleri (`eval/`); RAGAS planlı | Retrieval ablasyonu, doğrulayıcı duyarlılığı, hesap kontrolü, toplu üretim, Bloom deneyi |
-| Arayüz | Streamlit 1.59 | Hızlı prototipleme; giriş + 9 sayfa (`src/app.py`). Ana sayfanın kart desteleri Streamlit özel bileşeni (CCv2, iframe'siz Shadow DOM): düz HTML tıklamayı Python'a iletemiyor, bağlantı ise sayfayı yeniden yükleyip oturumu düşürüyordu |
+| Arayüz | Streamlit 1.59 | Hızlı prototipleme; giriş + 10 sayfa (`src/app.py`). Ana sayfanın kart desteleri Streamlit özel bileşeni (CCv2, iframe'siz Shadow DOM): düz HTML tıklamayı Python'a iletemiyor, bağlantı ise sayfayı yeniden yükleyip oturumu düşürüyordu |
 | Beyin analizi | Kendi kayıtlarından kural tabanlı (`src/mastery.py`) | Soru → konu bağı konu haritasının sayfalarından (kalıcı); konunun durumu son sınav cevabı ve kart kutusundan; açıklanabilir eşikler, LLM ve kota yok |
 | Hesaplar ve belge kaydı | SQLite (`data/app.sqlite`), parola özeti scrypt (Python `hashlib`) | Kurulum ve ek paket gerektirmez, tek dosya; şema adım adım sürümlü (yeni alan var olan veriyi bozmadan eklenir); hesap kimliği giriş yönteminden bağımsız → ileride Google ya da telefonla giriş aynı hesaba bağlanır. Rol yok: herkes aynı sayfaları kullanır, verisi kendisinindir; belge varsayılan gizli, istenirse herkese açılır (geri alınamaz). Sona eklenen geçmiş (çözümler, kartlar) JSONL'de kişi kimliğiyle (`rehber/11`) |
 
@@ -164,12 +168,17 @@ NotaRAG/
 ├── requirements.txt, constraints.txt   # sürümler sabitlenmiş (pip önbelleğiyle uyumlu)
 ├── .env                      # API anahtarları (repoya girmez; şablon .env.example)
 ├── src/
-│   ├── app.py                # Streamlit girişi: önce giriş (ui/auth.py), sonra 9 sayfa (Ana sayfa varsayılan)
+│   ├── app.py                # Streamlit girişi: önce giriş (ui/auth.py), sonra 10 sayfa (Ana sayfa varsayılan)
+│   ├── config.py             # yollar, API anahtarları (.env), belge adı yardımcıları
 │   ├── pipeline.py           # uçtan uca akış: PDF → … → doğrulanmış sorular (ekleyerek)
 │   ├── request.py            # sınav isteği: arama, havuz, hedefli üretim, çözüm kayıtları
 │   ├── topics.py             # konu haritası (PROMPTS §7)
 │   ├── grading.py            # öğrenci cevabı puanlama (SymPy)
 │   ├── export.py             # Moodle XML, GIFT, sınav kâğıdı HTML, CSV
+│   ├── exampaper.py          # basılı sınav kâğıdı PDF'i: A4/A3 şablon, sütunlara yerleşim, ayrı cevap anahtarı (PyMuPDF)
+│   ├── cards.py              # bilgi kartları: şıksız deste + FSRS-5 aralıklı tekrar (LLM yok)
+│   ├── difficulty.py         # zorluk = ölçüm: iddia + yapı + benzetilmiş öğrenci + gerçek çözümler (Elo)
+│   ├── simulate.py           # benzetilmiş öğrenci (Gemma): açık kitap hızlı cevap + "dikkatli öğrenci" çabası
 │   ├── textnorm.py           # Türkçe normalizasyon, üs/alt simge, tire, pretty_math
 │   ├── review_store.py       # soru kimliği, insan kararları, kanıt vurgulama
 │   ├── qualify.py            # aday model yeterlilik testi
@@ -188,15 +197,20 @@ NotaRAG/
 │   ├── verification/         # kod kontrolleri, kör doğrulama, duyarlılık testi
 │   ├── llm/                  # router (tek kapı), models (kalite kapısı), ledger (kota + önbellek), capacity
 │   └── ui/                   # auth.py (giriş), shelf.py (not desteleri, CCv2), docview.py (not penceresi),
-│                             # reader.py (tam ekran PDF okuyucu, CCv2), upload.py, quiz.py (sınav deneyimi),
-│                             # style.py, components.py, data.py, pages/ (home, profile, documents, exam, cards, …), parts/
+│                             # reader.py (tam ekran PDF okuyucu, CCv2), flashcards.py (kart oturumu ekranı, CCv2),
+│                             # upload.py, quiz.py (sınav deneyimi),
+│                             # loginart.py (giriş ekranı SVG'leri), style.py, components.py, data.py,
+│                             # pages/ (home, profile, documents, exam, cards, bank, paper = Sınav Kâğıdı, review, report, models), parts/
 ├── data/                     # sample_docs/ (PDF'ler), parsed/, chunks/, chroma/, topics/, questions/, requests/,
 │                             # jobs/ (arka plan iş günlükleri), review/ (attempts, cards, reports: kişi kimliğiyle),
 │                             # llm.sqlite (kota + önbellek), app.sqlite (hesaplar, oturumlar, belge kaydı)
 ├── eval/                     # değerlendirme betikleri + sonuclar_*.md, yeterlilik/
 ├── tests/                    # python -m tests.<ad>
 ├── rehber/                   # dosya dosya kod rehberi (her fonksiyon, bağlantılar, nedenleri)
-└── scripts/                  # bekci.py: iş ve kota izleyici · rehber_satirlari.py: rehber bağlantılarını koda hizalar
+└── scripts/                  # bekci.py: iş ve kota izleyici · rehber_satirlari.py: rehber bağlantılarını koda hizalar ·
+                              # belge_denetim.py: belgeler kodla uyumlu mu (testler, dosyalar, sayfa sayısı, belgede olup kodda olmayan teknoloji) ·
+                              # tasarim.py (gerçek uygulamayı geçici hesapla açıp ekran/tıklama), onizleme.py + ekran.py
+                              # (hızlı önizleme + ekran görüntüsü) · ogm_indir.py, auad_indir.py (deney verisi indirme)
 ```
 
 ## 7. Değerlendirme Planı
@@ -208,7 +222,7 @@ NotaRAG/
 2. **Üretim kalitesi:**
    - **İnsan kabul oranı:** doğrulama açıkken ve kapalıyken üretilen sorulardan insanın onayladığı oran. *2026-10-04: kullanıcı kararıyla şimdilik yapılmıyor;* yerine doğrulayıcı duyarlılık testleri (kasıtlı bozulmuş sorular) ve öğrenci geri bildirimi (hatalı bildir, madde analizi).
    - **Doğrulayıcı isabeti:** `verified` etiketli soruların kaçının insan tarafından reddedildiği ve kötü soruların kaçının yakalandığı.
-   - **RAGAS faithfulness:** önermeye dönüştürülmüş soru+cevap üzerinden hesaplanır.
+   - **RAGAS faithfulness:** önermeye dönüştürülmüş soru+cevap üzerinden hesaplanır. *Henüz yapılmadı (planlı; §4.1).*
 3. **Yetersiz bağlam testi ("üretmemeyi bilmek"):** içindekiler, kaynakça, kapak, yalnızca görsel içeren sayfalar gibi 10-15 bağlam. Sistemin bunlardan soru uydurmayıp boş liste döndürme oranı ölçülür. "Halüsinasyon üretmiyor" iddiası bu test olmadan kanıtlanamaz.
 4. **Sadakat ve bilişsel düzey dengesi (özgün analiz):** Sorular Bloom düzeyine göre (hatırlama, anlama, uygulama) etiketlenir ve faithfulness her düzey için ayrı raporlanır. Beklentimiz şu: dokümana sadakat zorlandıkça sistem hatırlama düzeyine kayacak, uygulama düzeyindeki sorularda ise halüsinasyon artacak. Bu ödünleşimi sayıyla göstermek raporun özgün bulgusu olabilir. *İlk ölçüm (`eval/sonuclar_bloom.md`, 17 birim): iki koşulda da dayanaksız oranı %0 — beklenen ödünleşim bu örneklemde görülmedi.*
 
@@ -234,8 +248,10 @@ Windows, Python 3.11 sanal ortamı (`.venv`). Anahtarlar `.env` dosyasında (şa
 .venv\Scripts\python -m src.accounts [sifirla <ad>]     # hesapları listele / unutulan parolayı sıfırla
 .venv\Scripts\python -m src.library [gizle <belge>]     # belge kaydı / acil durumda herkese açık belgeyi gizle
 .venv\Scripts\python scripts\tasarim.py baslat|ekran|tikla|durdur   # tasarım denemesi: geçici hesap veritabanıyla 8503
+.venv\Scripts\python scripts\belge_denetim.py           # belgeler kodla uyumlu mu (HATA 0 olmalı); oturum sonunda
+.venv\Scripts\python scripts\rehber_satirlari.py [--yaz]  # rehber bağlantıları ve başlıklardaki "(N satır)" sayıları
 ```
 
 Testler (internetsiz, API çağrısı yok): `.venv\Scripts\python -m tests.<ad>` — `test_pipeline`, `test_checks`, `test_compute`,
 `test_grading`, `test_textnorm`, `test_router`, `test_parser`, `test_cards`, `test_difficulty`, `test_accounts`,
-`test_mastery`.
+`test_mastery`, `test_exampaper` (12 dosya; 2026-10-11'de hepsi geçiyor).

@@ -118,7 +118,7 @@ def _resume(ident: str) -> None:
     if ident == "resume-cards":
         cs = resume.load(uid, "cards")
         if cs:
-            st.session_state.cards = {**{k: v for k, v in cs.items() if k != "updated"}, "last": None}
+            st.session_state.cards = resume.restore_cards(cs)
         st.switch_page("ui/pages/cards.py")
     ex = resume.load(uid, "exam")
     if ex and R.load(ex["id"]):

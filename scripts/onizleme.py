@@ -75,20 +75,19 @@ elif v in ("setup", "session", "flip", "summary"):
     if v != "setup" and "cards" not in st.session_state:
         items = K.pool(sorted({it["doc"] for it in R.all_items().values()}))
         ids = [it["id"] for it in rnd.sample(items, 15)]
-        st.session_state.cards = {"queue": ids, "pos": 0, "res": {}, "col": {}, "skipped": [], "streak": 0, "best": 0,
-                                  "last": None, "started": time.time() - 400, "ended": False, "v": 0}
+        st.session_state.cards = {"queue": ids, "pos": 0, "res": {}, "skipped": [], "streak": 0, "best": 0,
+                                  "started": time.time() - 400, "ended": False}
         cs = st.session_state.cards
-        if v in ("session", "flip"):
-            for i, r in enumerate(["good", "bad", "good", "skip", "good"]):
-                cs["res"][ids[i + 1]], cs["col"][ids[i + 1]] = r, i
-            cs["queue"] = [ids[0]] + ids[6:]
-            cs["streak"], cs["best"] = 2, 2
+        if v in ("session", "flip"):  # beş kart değerlendirilmiş (yığınlar dolu); flip: açık kart çevrili
+            for q, r in zip(ids, ["good", "bad", "good", "skip", "good"]):
+                cs["res"][q] = r
+            cs["queue"], cs["pos"] = ids + [ids[3]], 5
+            cs["skipped"], cs["streak"], cs["best"] = [ids[3]], 1, 1
+            cs["preview_flip"] = v == "flip"
         if v == "summary":
-            for i, q in enumerate(ids):
-                cs["res"][q], cs["col"][q] = rnd.choice(["good", "good", "bad", "skip"]), i
+            for q in ids:
+                cs["res"][q] = rnd.choice(["good", "good", "bad", "skip"])
             cs["ended"], cs["best"] = True, 4
-    if v == "flip":
-        style.html("<style>details.nr-fc .nr-flip { transform: rotateY(180deg) !important; transition: none !important; }</style>")
     run_page("src/ui/pages/cards.py")
 else:
     from src.ui import quiz as Q

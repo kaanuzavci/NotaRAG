@@ -1,6 +1,7 @@
 """Sınav Hazırla — sistemin ana kullanımı (src/request.py).
 
-Kullanıcı hazır listeden SEÇER (belge, konu, zorluk, tip, sayı); serbest metin yok. Sistem seçilen konular için
+Kullanıcı hazır listeden SEÇER (belge, konu, zorluk, sayı); serbest metin yok. Soru tipi şimdilik yalnızca çoktan seçmeli
+(kullanıcı kararı 2026-10-12: ilk aşamada çoktan seçmeli + bilgi kartları; diğer tipler sonra). Sistem seçilen konular için
 notlarda ilgili sayfaları arar, sınavı önce doğrulanmış hazır sorulardan kurar, eksikleri isteğe bağlı üretir.
 Sonra: çöz (puan, zayıf konular, yanlışlarda çözüm ve kaynak, hatalı soru bildirimi) ya da yazdır / Moodle'a aktar.
 """
@@ -13,6 +14,7 @@ from src.ui import data, reader, style
 from src.ui import quiz as Q
 
 DIFF = {"Karışık": None, "Kolay": "easy", "Orta": "medium", "Zor": "hard"}
+KINDS = ["multiple_choice"]  # doğru / yanlış, kısa cevap ve hesap soruları sonraki aşamada (request.py hepsini destekliyor)
 
 
 # ---------------------------------------------------------------- 1. seçim
@@ -42,18 +44,15 @@ def _builder() -> None:
                                 format_func=lambda o: o[1] if len(chosen) == 1 else f"{data.short(o[0])} · {o[1]}")
         st.space("small")
         st.markdown("##### 3 · Nasıl bir sınav?")
-        a, b, c = st.columns([3, 4, 2], gap="medium")
+        a, c = st.columns([4, 3], gap="medium")
         diff = a.segmented_control("Zorluk", list(DIFF), default="Karışık")
-        avail = ["multiple_choice", "true_false", "short_answer"]
-        if any(data.has_math(d) for d in chosen):
-            avail.append("computed")
-        kinds = b.pills("Soru tipleri", avail, selection_mode="multi", default=avail, format_func=R.KINDS.get)
         n = c.select_slider("Soru sayısı", [5, 10, 15, 20], value=10)
+        st.caption("Sorular çoktan seçmeli (dört şık).")
         st.space("small")
-        go = st.button("Sınavı hazırla", type="primary", icon=":material/auto_awesome:", disabled=not kinds)
+        go = st.button("Sınavı hazırla", type="primary", icon=":material/auto_awesome:")
     if go:
         with st.spinner("Notlarında bu konuları anlatan sayfalar aranıyor…"):
-            req = R.prepare(chosen, list(dict.fromkeys(t for _, t in picked)), DIFF[diff or "Karışık"], kinds, n,
+            req = R.prepare(chosen, list(dict.fromkeys(t for _, t in picked)), DIFF[diff or "Karışık"], KINDS, n,
                             user=data.uid())
         _open(req["id"])
         st.rerun()

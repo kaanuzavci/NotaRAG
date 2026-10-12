@@ -48,6 +48,14 @@ def restore_exam(state: dict) -> dict:
     return s
 
 
+def restore_cards(state: dict) -> dict:
+    """Kart oturumuna dönüş: aradaki süre oturum süresine eklenmesin (başlangıç, ara kadar ileri alınır)."""
+    s = {k: v for k, v in state.items() if k != "updated"}
+    if s.get("started") and state.get("updated"):
+        s["started"] += max(0.0, time.time() - state["updated"])
+    return s
+
+
 def clear(user_id: str | None, kind: str) -> None:
     if not user_id:
         return

@@ -16,7 +16,8 @@ from src import request as R
 from src.ui import components as C
 from src.ui import data, style
 
-TYPES = {"multiple_choice": "Çoktan seçmeli", "true_false": "Doğru / Yanlış", "short_answer": "Kısa cevap"}
+# Şimdilik yalnızca çoktan seçmeli (kullanıcı kararı 2026-10-12; doğru / yanlış ve kısa cevap sonraki aşamada)
+TYPES = {"multiple_choice": "Çoktan seçmeli"}
 
 
 @st.cache_data(ttl=30, show_spinner=False)
@@ -106,7 +107,7 @@ def render() -> None:
         docs = sorted({r["doc"] for r in bank})
         # Süzgeç çubuğu sabit yükseklikte: seçimler açılır kutuların (popover) içinde, düğmenin üstünde yalnızca sayı
         # yazar. Eskiden çoklu seçim kutuları seçtikçe aşağı uzuyor, altındaki tabloyu ve kâğıdı itiyordu.
-        kinds_all = ["Çoktan seçmeli", "Doğru / Yanlış", "Kısa cevap", "Hesap"]
+        kinds_all = sorted({r["kind"] for r in bank})
         fbar = st.container(key="pp_fbar", horizontal=True, vertical_alignment="center", gap="small")
         f_doc = _filter(fbar, "Not", "pp_f_doc", docs, data.short, ":material/description:")
         f_kind = _filter(fbar, "Tip", "pp_f_kind", kinds_all, str, ":material/category:")

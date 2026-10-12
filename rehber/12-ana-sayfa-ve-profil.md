@@ -14,7 +14,7 @@ Bu bölüm 2026-10-08'de eklenen kişisel çalışma ekranlarını anlatıyor:
 Örnek alınan sistemler:
 - **NotebookLM:** not defteri ızgarası. İlk kart "+ Yeni", sonra kişinin defterleri, altında öne çıkanlar.
 - **Quizlet:** "kaldığın yerden devam et" satırı.
-- **Anki / Leitner:** bellek kutuları.
+- **Anki:** aralıklı tekrar ve bellek kutuları (2026-10-09'a kadar Leitner kutuları, sonra FSRS-5; kutu sayısı kararlılıktan türetilir).
 
 Tasarım ilkesi değişmedi: kâğıt zemin, lacivert mürekkep, sakin. Hareket yalnızca bir anlam taşıyınca kullanılıyor: üzerine gelince deste açılır ve eylemler görünür; işlenen notun ilerleme çubuğu canlıdır.
 
@@ -42,7 +42,7 @@ Tasarım ilkesi değişmedi: kâğıt zemin, lacivert mürekkep, sakin. Hareket 
 - [`_resume_cards(items)`](../src/ui/pages/home.py#L45): iki "kaldığın yer" kartı. Kart oturumunda kaçıncı kartta olunduğu ve bildim/bilemedim sayısı; sınavda kaç sorunun cevaplandığı. Sınavın belgeleri artık görünmüyorsa gösterilmez.
 - [`_new_note()`](../src/ui/pages/home.py#L79) (`@st.dialog`): "Yeni not ekle" penceresi (`upload.uploader`).
 - [`_see_all(which)`](../src/ui/pages/home.py#L110): "Tümünü gör" → Belgeler; hangi süzgecin seçili geleceği `session_state.docs_filter`'da.
-- [`_resume(ident)`](../src/ui/pages/home.py#L116): yarım kart oturumu ya da sınav: kayıtlı durum `session_state`'e konur, ilgili sayfaya gidilir (sınavda `resume.restore_exam`).
+- [`_resume(ident)`](../src/ui/pages/home.py#L116): yarım kart oturumu ya da sınav: kayıtlı durum `session_state`'e konur, ilgili sayfaya gidilir (`resume.restore_cards` / `restore_exam`: aradaki süre sayılmaz).
 - [`_review_today(ids)`](../src/ui/pages/home.py#L131): bugünün tekrarı. Kart sayfasının sınav sonucundan gelen `cards_preset` yolunu kullanır.
 - [`_section(title, sub, count)`](../src/ui/pages/home.py#L140): bölüm başlığı (`.nr-shelf-h`: başlık, sayı hapı ve yanında kısa açıklama tek satırda).
 - [`_hello()`](../src/ui/pages/home.py#L146): selam satırı ve bugünün tekrarı düğmesi.
@@ -99,7 +99,7 @@ Tasarım ilkesi değişmedi: kâğıt zemin, lacivert mürekkep, sakin. Hareket 
 
 ---
 
-## `src/ui/pages/profile.py` — profil ve beyin analizi (269 satır)
+## `src/ui/pages/profile.py` — profil ve beyin analizi (264 satır)
 
 **Ne işe yarar?**
 - **Profil:** profil resmi (yoksa adın baş harfleri kişiye özgü pastel zeminde), ad, kullanıcı adı, katılım ayı, kısa tanıtım. "Profili düzenle" penceresi.
@@ -139,7 +139,7 @@ Tasarım ilkesi değişmedi: kâğıt zemin, lacivert mürekkep, sakin. Hareket 
 
 **Bir sorunun durumu, ona dair en son kanıttan gelir:**
 - sınavdaki son cevap (ikinci denemeler dahil, çünkü öğrenmeyi gösterir);
-- kartın kutusu: 1. kutu bilemedi, 2-3. kutu bildi, 4-5. kutu uzun süreli bellekte.
+- kartın kutusu: 1. kutu bilemedi, 2-3. kutu bildi, 4-5. kutu uzun süreli bellekte. FSRS-5'e geçildiğinden beri kutu, kartın kararlılığından (S) türetilir (`cards._box`): S ≥ 1, 3, 7, 21 gün → 2, 3, 4, 5. kutu; son değerlendirme Bilemedim ise 1.
 
 Bu, ölçümden (madde güçlüğü, Elo; bölüm 10) farklıdır: orada yalnızca kişinin soruyu ilk görüşü sayılır. Burada amaç ölçmek değil, kişinin şu anki durumunu göstermek.
 
@@ -159,7 +159,7 @@ Bu, ölçümden (madde güçlüğü, Elo; bölüm 10) farklıdır: orada yalnız
 
 ---
 
-## `src/resume.py` — kaldığın yerden devam et (55 satır)
+## `src/resume.py` — kaldığın yerden devam et (63 satır)
 
 **Ne işe yarar?** Kişinin en son yarım bıraktığı kart oturumunu ve sınavı `data/app.sqlite`'ın `progress` tablosunda saklar. Kişi ve tür başına (`cards` / `exam`) tek satır vardır: ekrandaki durumun (`session_state.cards` / `.exam`) kopyası. Sekme kapansa, çıkış yapılsa ya da başka cihazdan girilse de ana sayfa yarım kalanı gösterir.
 
@@ -171,7 +171,8 @@ Bu, ölçümden (madde güçlüğü, Elo; bölüm 10) farklıdır: orada yalnız
 - [`save(user_id, kind, state)`](../src/resume.py#L19): üzerine yazarak kaydeder (`ON CONFLICT … DO UPDATE`).
 - [`load(user_id, kind)`](../src/resume.py#L29): durum + `updated` (son değişiklik zamanı).
 - [`restore_exam(state)`](../src/resume.py#L42): sınava dönüş. Beklenen süre sayaca eklenmez: başlangıç zamanı, aradaki süre kadar ileri alınır (10. dakikada bırakılan sınav ertesi gün 10. dakikadan devam eder).
-- [`clear(user_id, kind)`](../src/resume.py#L51).
+- [`restore_cards(state)`](../src/resume.py#L51): kart oturumuna dönüş; aynı kural (2026-10-12'ye kadar süre aradaki günleri de sayıyordu: "77 sa"). Kart oturumunun "Ara ver" düğmesi de oturumu kaydedip ana sayfaya döner, dönüş bununla.
+- [`clear(user_id, kind)`](../src/resume.py#L59).
 
 ---
 
@@ -185,7 +186,7 @@ Bu, ölçümden (madde güçlüğü, Elo; bölüm 10) farklıdır: orada yalnız
 - **[`library.py`](../src/library.py):** [`add_to_library`](../src/library.py#L201) (yalnızca herkese açık not), [`mine`](../src/library.py#L210), kayıtta `order` (giriş sırası; renk için).
 - **[`ui/data.py`](../src/ui/data.py):** [`mine`](../src/ui/data.py#L91), [`items`](../src/ui/data.py#L97), [`mastery`](../src/ui/data.py#L120), [`home_stats`](../src/ui/data.py#L137), [`due_cards`](../src/ui/data.py#L142), [`avatar_b64`](../src/ui/data.py#L148).
 - **[`ui/style.py`](../src/ui/style.py):**
-  - [`avatar(user, b64, size)`](../src/ui/style.py#L560), `.nr-hello`, `.nr-sec` (profil), `.nr-avatar`; ana sayfa başlıkları bölüm 13'te `.nr-shelf-h`'ye geçti.
+  - [`avatar(user, b64, size)`](../src/ui/style.py#L481), `.nr-hello`, `.nr-sec` (profil), `.nr-avatar`; ana sayfa başlıkları bölüm 13'te `.nr-shelf-h`'ye geçti.
   - Sitenin genelinde seçili hap ve bölmeli düğmeler artık lacivert dolgulu (`[data-selected="true"]`); eskiden açık griydi, seçilmemişle neredeyse aynı görünüyordu.
   - `st.container(key="nr_card_…")` kâğıt beyazı kart görünümü alır (Sınav Hazırla formu).
 - **Sayfalar:**

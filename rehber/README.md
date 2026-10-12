@@ -10,7 +10,7 @@ Bu klasör projedeki **bütün kod dosyalarını tek tek** anlatır. Her dosya i
 
 Fonksiyon adları bağlantıdır; tıklayınca VS Code o satırı açar. Rehberi önizlemede okumak için dosya açıkken `Ctrl+Shift+V` (yan yana: `Ctrl+K V`).
 
-> Rehber **2026-10-05**'teki koda göre yazıldı; 2026-10-06'da bilgi kartları ve zorluk ölçümü, 2026-10-07'de kullanıcı girişi ve belge kütüphanesi (bölüm 11), 2026-10-08'de ana sayfa, profil ve beyin analizi (bölüm 12), aynı akşam not penceresi, tam ekran okuyucu ve kart görünümlü Belgeler (bölüm 13) eklendi. Kod değiştikçe satır numaraları kayabilir. Bağlantıları koda göre yeniden hizalamak için `python scripts\rehber_satirlari.py --yaz` çalıştır (fonksiyon adına bakarak düzeltir; internetsiz). Bağlantı yanlış satıra gidiyorsa dosyada `Ctrl+Shift+O` ile ada göre atla.
+> Rehber **2026-10-05**'teki koda göre yazıldı; 2026-10-06'da bilgi kartları ve zorluk ölçümü, 2026-10-07'de kullanıcı girişi ve belge kütüphanesi (bölüm 11), 2026-10-08'de ana sayfa, profil ve beyin analizi (bölüm 12), aynı akşam not penceresi, tam ekran okuyucu ve kart görünümlü Belgeler (bölüm 13), 2026-10-09'da giriş ekranı, odak ekranları, Sınav Kâğıdı, belge klasörleri ve FSRS-5 kartlar (bölüm 14) eklendi. 2026-10-11'de belge denetimi yapıldı (sayılar ve tablo güncellendi). Kod değiştikçe satır numaraları kayabilir. Bağlantıları koda göre yeniden hizalamak için `python scripts\rehber_satirlari.py --yaz` çalıştır (fonksiyon adına bakarak düzeltir; internetsiz). Bağlantı yanlış satıra gidiyorsa dosyada `Ctrl+Shift+O` ile ada göre atla.
 
 ## Bölümler (verinin aktığı sırayla)
 
@@ -23,12 +23,13 @@ Fonksiyon adları bağlantıdır; tıklayınca VS Code o satırı açar. Rehberi
 | 5 | [Soru üretimi](05-uretim.md) | `generation/` (4 dosya) |
 | 6 | [Doğrulama ve kalite kapısı](06-dogrulama.md) | `verification/` (4), `qualify.py` |
 | 7 | [Sınav isteği ve yardımcılar](07-sinav-istegi.md) | `topics.py`, `request.py`, `grading.py`, `review_store.py`, `export.py`, `requote.py` |
-| 8 | [Arayüz (Streamlit)](08-arayuz.md) | `ui/` (14 dosya), `cards.py` |
-| 9 | [Ölçüm, testler ve araçlar](09-olcum-ve-test.md) | `eval/` (9), `tests/` (11), `scripts/` (7) |
+| 8 | [Arayüz (Streamlit)](08-arayuz.md) | `ui/` (26 dosya; kart oturumu ekranı `ui/flashcards.py`), `cards.py` |
+| 9 | [Ölçüm, testler ve araçlar](09-olcum-ve-test.md) | `eval/` (9), `tests/` (12), `scripts/` (7) |
 | 10 | [Zorluk: iddia değil ölçüm](10-zorluk.md) | `difficulty.py`, `simulate.py` |
 | 11 | [Hesaplar ve belge kütüphanesi](11-hesaplar-ve-belgeler.md) | `appdb.py`, `accounts.py`, `library.py`, `jsonl.py`, `ui/auth.py` |
 | 12 | [Ana sayfa, profil ve beyin analizi](12-ana-sayfa-ve-profil.md) | `ui/pages/home.py`, `ui/shelf.py`, `ui/upload.py`, `ui/pages/profile.py`, `mastery.py`, `resume.py` |
 | 13 | [Not penceresi, tam ekran okuyucu ve Belgeler](13-not-penceresi-ve-okuyucu.md) | `ui/docview.py`, `ui/reader.py`, `ui/pages/documents.py` |
+| 14 | [Giriş ekranı, odak ekranları ve Sınav Kâğıdı](14-giris-odak-ekranlari-ve-sinav-kagidi.md) | `ui/auth.py` (giriş), `ui/loginart.py`, `exampaper.py`, `ui/pages/paper.py`, `cards.py` (FSRS-5), belge klasörleri (`library.py`) |
 
 Acele edenler için okuma sırası: bu sayfa → 1 (özellikle `pipeline.py`) → 7'deki `request.py` → 5 → 6. Bu beşi sistemin omurgasıdır; gerisi bu omurgaya hizmet eder.
 
@@ -36,9 +37,9 @@ Acele edenler için okuma sırası: bu sayfa → 1 (özellikle `pipeline.py`) �
 
 ## Rakamlarla proje
 
-- **91** Python dosyası var; bunların **12**'si boş `__init__.py` (2026-10-07 sayımı).
+- **105** Python dosyası var; bunların **12**'si boş `__init__.py` (2026-10-11 sayımı).
   - `__init__.py`, Python'a "bu klasör bir paket, içinden `from src.llm import ...` diye içe aktarabilirsin" der. İçinin boş olması normaldir.
-- Geriye **79 gerçek dosya** kalıyor: boş satırlar hariç yaklaşık **10.300 satır**.
+- Geriye **93 gerçek dosya** kalıyor: boş satırlar hariç yaklaşık **14.260 satır**.
 
 | Katman | Klasör | Satır | Görevi |
 |---|---|---|---|
@@ -48,9 +49,9 @@ Acele edenler için okuma sırası: bu sayfa → 1 (özellikle `pipeline.py`) �
 | LLM kapısı | `src/llm/` | ~660 | Bütün yapay zekâ çağrılarının geçtiği tek kapı |
 | Üretim | `src/generation/` | ~625 | Soru ve cevap üretir; hesap sorularını SymPy ile yeniden hesaplar |
 | Doğrulama | `src/verification/` | ~500 | Soruyu önce kodla, sonra başka bir model ailesiyle denetler |
-| Kök dosyalar | `src/*.py` | ~2.520 | Akışlar (pipeline, request), puanlama, dışa aktarma, Türkçe metin, bilgi kartları, zorluk ölçümü, hesaplar ve belge kütüphanesi |
-| **Arayüz** | `src/ui/` | **~2.500** | Streamlit sayfaları, giriş, sınav ve bilgi kartı ekranları (en büyük katman) |
-| Ölçüm ve test | `eval/`, `tests/`, `scripts/` | ~2.460 | Deneyler, API çağırmayan testler, izleme ve önizleme araçları |
+| Kök dosyalar | `src/*.py` | ~3.280 | Akışlar (pipeline, request), puanlama, dışa aktarma, sınav kâğıdı PDF'i, Türkçe metin, bilgi kartları (FSRS-5), zorluk ölçümü, hesaplar ve belge kütüphanesi |
+| **Arayüz** | `src/ui/` | **~5.240** | Streamlit sayfaları, giriş, not pencereleri, okuyucu, sınav ve bilgi kartı ekranları (en büyük katman) |
+| Ölçüm ve test | `eval/`, `tests/`, `scripts/` | ~2.930 | Deneyler, API çağırmayan testler, izleme ve önizleme araçları |
 
 ---
 
@@ -123,11 +124,11 @@ Modüller birbirleriyle en çok bu dosyalar üzerinden konuşur. Bir dosyanın n
 | `data/requests/<id>.json` / `.log` | Bir sınav isteğinin durumu / arka plan işinin çıktısı | `request.save`, `request.start` | exam sayfası, `scripts/bekci` |
 | `data/jobs/<belge>.json` / `.log` | Belge işleme işinin başlangıcı / çıktısı | `ui/data.start_job` | `ui/data.job_status`, `scripts/bekci` |
 | `data/review/attempts.jsonl` | Her öğrenci çözümü (soru kimliği, kişi, doğru mu, cevap, ipucu) | `request.record_attempt` | `difficulty.real_attempts` → `request.item_stats` (madde analizi), Elo |
-| `data/review/cards.jsonl` | Bilgi kartı değerlendirmeleri (Bildim / Bilemedim / Atla; kişi) | `cards.record` | `cards.history` (kişinin Leitner kutuları), `cards.first_seen` |
+| `data/review/cards.jsonl` | Bilgi kartı değerlendirmeleri (Bildim / Bilemedim / Atla; kişi) | `cards.record` | `cards.history` (kişinin FSRS durumu; kayıt baştan oynatılır), `cards.first_seen` |
 | `data/review/difficulty.jsonl` | Zorluk ölçümleri (benzetilmiş öğrenci: p, çaba) | `difficulty.record` (`simulate.measure`) | `difficulty.measurements` → `apply` |
 | `data/review/reports.jsonl` | "Hatalı bildir" ve kısa cevap itirazları (bildiren kişi) | `request.report` | `request.reported`, `blocked_ids` |
 | `data/reviews.jsonl` | İnceleme sayfasındaki onay/red kararları (kararı veren) | `review_store.save_decision` | `review_store.decisions` |
-| `data/app.sqlite` | Hesaplar (profil resmi, tanıtım), giriş yolları, oturumlar, belge kaydı ve erişim (bölüm 11), yarım kalan kart oturumu ve sınav (`progress`, bölüm 12) | `accounts`, `library` (`appdb` şemayı kurar) | `ui/auth`, `ui/data` (görünürlük), `cards`, `difficulty` (eski kayıtların sahibi) |
+| `data/app.sqlite` | Hesaplar (profil resmi, tanıtım), giriş yolları, oturumlar, belge kaydı, erişim ve kişinin belge klasörleri (bölüm 11, 14), yarım kalan kart oturumu ve sınav (`progress`, bölüm 12) | `accounts`, `library` (`appdb` şemayı kurar) | `ui/auth`, `ui/data` (görünürlük), `cards`, `difficulty` (eski kayıtların sahibi) |
 | `data/llm.sqlite` | Kota sayaçları + LLM yanıt önbelleği | `llm/ledger` | `llm/ledger`, `scripts/bekci` |
 | `data/pilot/` | Geliştirme sırasındaki model karşılaştırmaları | `generation/pilot`, `verification/__main__`, eval betikleri | `review_store.question_sets`, eval, qualify |
 | `eval/sonuclar_*.json` / `.md` | Ölçüm sonuçları | eval betikleri, `verification/sensitivity` | Rapor sayfası (`ui/parts/evaluation`) |
@@ -260,7 +261,7 @@ Bunlar hata değil; projenin nasıl büyüdüğünü gösteren izler. İleride t
 1. **Ölü kod** (kimse kullanmıyor):
    - [`ui/parts/system.py`](../src/ui/parts/system.py): dosyanın tamamı; yerini `ui/pages/models.py` aldı.
    - [`ui/parts/evaluation.render`](../src/ui/parts/evaluation.py#L194): Rapor sayfası alt fonksiyonları doğrudan çağırıyor.
-   - [`schema.Batch`](../src/generation/schema.py#L71), [`review_store.agreement`](../src/review_store.py#L226), `review_store.LABEL_TR`, [`style.card`](../src/ui/style.py#L577), `style.INK / PAPER / HIGHLIGHT`. (`ui/data.DOC_SHORT` 2026-10-07'de silindi.)
+   - [`schema.Batch`](../src/generation/schema.py#L71), [`review_store.agreement`](../src/review_store.py#L226), `review_store.LABEL_TR`, [`style.card`](../src/ui/style.py#L498), `style.INK / PAPER / HIGHLIGHT`. (`ui/data.DOC_SHORT` 2026-10-07'de silindi.)
 2. **Tanımlı ama hiç çağrılmayan rol:** `models.py`'deki `"judge"` (kısa cevap hakemi). Hakem istemi (§4d) aslında doğrulayıcı rolüyle çağrılıyor ([`verify_short`](../src/verification/verify.py#L174)). Arayüz bu rolü listeliyor, kod kullanmıyor.
 3. **Tekrarlanan kod:**
    - `chunks.jsonl` okuyan fonksiyonun yaklaşık 9 kopyası var (`index.load_chunks`, `generate._load`, `review_store.load_chunks`, `topics._chunks`, `pipeline.run` içinde, `verification/__main__`, `sensitivity`, `requote`, `eval/batch_compare`).

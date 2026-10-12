@@ -344,89 +344,12 @@ div[data-testid="stDialog"] [role="dialog"] h2 p { font-family: 'Fraunces', seri
 
 section[data-testid="stSidebar"] .nr-foot { font-size: .74rem; color: #8F876F; }
 
-/* ==== Çalışma ekranları (bilgi kartı + sınav), v3: kâğıt zemin üstünde sakin kartlar; hareket yalnızca anlam taşıyınca
-   (kart döner, değerlendirilen kart yığınına gider). Figür, konfeti, süzülen ışık yok (kullanıcı kararı, 2026-10-05). ==== */
+/* ==== Çalışma ekranları (kart kurulumu, oturum özeti, sınav): kâğıt zemin üstünde sakin kartlar. Kart oturumunun
+   kendisi ayrı bir bileşen (src/ui/flashcards.py, kendi CSS'iyle). ==== */
 :root { --nr-ink: #1E2433; --nr-sub: #4A5163; --nr-mute: #6B6F7B; --nr-paper: #FFFDF8; --nr-edge: #E2DAC8; --nr-hair: #ECE6D8;
   --nr-shadow: 0 1px 2px rgba(30,36,51,.05), 0 12px 30px -18px rgba(30,36,51,.32); --nr-ease: cubic-bezier(.22,1,.36,1);
   --nr-good: #3B8D66; --nr-bad: #C6503A; --nr-skip: #B9AF98; --nr-accent: #3A7BB8; --nr-track: #DCE7F3; }
 
-/* Bilgi kartı (NotebookLM gibi: önde soru, arkada cevap). Ortada ve büyük; tıklayınca 3B döner, yine tıklayınca geri.
-   Her yeni kartta sarmalayıcı etiket değişir (div/section) → tarayıcı kartı sıfırdan çizer: animasyon her seferinde
-   oynar, çevrilmiş kart bir sonrakine çevrili geçmez (React aynı etiketli öğeyi yeniden kullanıyordu). */
-.nr-deck { position: relative; perspective: 1800px; height: clamp(26rem, calc(100vh - 31rem), 42rem); margin-top: .3rem; }
-.nr-stack { position: absolute; inset: 0; border-radius: 26px; background: var(--s); box-shadow: var(--nr-shadow); }
-.nr-stack.s1 { transform: translateY(14px) scale(.96); opacity: .8; }
-.nr-stack.s2 { transform: translateY(28px) scale(.92); opacity: .5; }
-details.nr-fc { position: absolute; inset: 0; z-index: 2; animation: nr-deal .55s .1s var(--nr-ease) both; }
-details.nr-fc > summary { list-style: none; display: block; height: 100%; cursor: pointer; outline: none; }
-details.nr-fc > summary::-webkit-details-marker { display: none; }
-details.nr-fc > summary::marker { content: ""; }
-@keyframes nr-deal { from { opacity: 0; transform: translateY(-16px) scale(.975); } to { opacity: 1; transform: none; } }
-.nr-flip { position: relative; height: 100%; transform-style: preserve-3d; transition: transform .7s var(--nr-ease); }
-details.nr-fc:not([open]) > summary:hover .nr-flip { transform: translateY(-3px); }
-details.nr-fc[open] .nr-flip { transform: rotateY(180deg); }
-.nr-face { position: absolute; inset: 0; display: flex; flex-direction: column; border-radius: 26px; overflow: hidden;
-  backface-visibility: hidden; -webkit-backface-visibility: hidden; padding: 2rem 3.2rem 1.5rem; box-shadow: var(--nr-shadow); }
-.nr-face.front { background: linear-gradient(160deg, var(--c1) 0%, var(--c2) 100%); color: var(--ink); }
-.nr-face.back { transform: rotateY(180deg); background: var(--nr-paper); border: 1px solid var(--nr-edge); color: var(--nr-ink); overflow-y: auto; }
-.nr-face.back::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 5px; background: var(--a); }
-.nr-fc .meta { display: flex; flex-wrap: wrap; gap: .4rem; }
-.nr-fc .meta span { font-size: .76rem; font-weight: 600; color: var(--ink); background: rgba(255,255,255,.6); padding: .2rem .7rem; border-radius: 999px; }
-.nr-fc .body { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: .4rem 1rem; }
-.nr-fc .fq { font-family: 'Fraunces', serif; font-size: clamp(2rem, 2.5vw, 2.6rem); line-height: 1.34; font-weight: 600; max-width: 44ch; }
-.nr-fc.long .fq { font-size: clamp(1.6rem, 2vw, 2rem); } .nr-fc.xlong .fq { font-size: clamp(1.3rem, 1.6vw, 1.6rem); }
-.nr-fc .hint { text-align: center; font-size: .84rem; color: var(--ink); opacity: .72; }
-.nr-fc .back .lab { font-size: .7rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--a); margin: 1.05rem 0 .3rem; }
-.nr-fc .back .lab:first-child { margin-top: .3rem; }
-.nr-fc .back .q2 { color: var(--nr-mute); font-size: .92rem; line-height: 1.5; }
-.nr-fc .back .ans { font-family: 'Fraunces', serif; font-size: 1.9rem; font-weight: 600; line-height: 1.32; }
-.nr-fc .back .nr-evidence { border-left-color: var(--a); border-radius: 0 12px 12px 0; }
-.nr-fc .back .flipback { margin-top: auto; padding-top: .9rem; font-size: .8rem; color: var(--nr-mute); text-align: center; }
-/* Değerlendirilen kart yığınına gider; üstünde sonuç rozeti */
-.nr-ghost { position: absolute; inset: 0; z-index: 5; pointer-events: none; border-radius: 26px; padding: 1.8rem 2.6rem; overflow: hidden;
-  color: var(--ink); background: linear-gradient(160deg, var(--c1), var(--c2)); font-family: 'Fraunces', serif; font-size: 1.4rem;
-  display: flex; align-items: center; justify-content: center; text-align: center; box-shadow: var(--nr-shadow); }
-.nr-ghost::after { content: attr(data-s); position: absolute; right: 1.5rem; top: 1.3rem; width: 3.2rem; height: 3.2rem; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center; font: 700 1.5rem 'Instrument Sans', sans-serif; color: #FFFFFF; background: var(--st); }
-.nr-ghost.good { --st: var(--nr-good); animation: nr-fly-good .8s .08s cubic-bezier(.55,0,.7,.25) both; }
-.nr-ghost.bad { --st: var(--nr-bad); animation: nr-fly-bad .8s .08s cubic-bezier(.55,0,.7,.25) both; }
-.nr-ghost.skip { --st: #8A826F; animation: nr-fly-skip .8s .08s cubic-bezier(.55,0,.7,.25) both; }
-@keyframes nr-fly-good { 20% { transform: translate(2%, -3%) rotate(2deg); } to { transform: translate(34%, 64%) rotate(16deg) scale(.12); opacity: 0; } }
-@keyframes nr-fly-bad { 20% { transform: translate(-2%, -3%) rotate(-2deg); } to { transform: translate(-34%, 64%) rotate(-16deg) scale(.12); opacity: 0; } }
-@keyframes nr-fly-skip { 20% { transform: translateY(-4%); } to { transform: translateY(66%) scale(.12); opacity: 0; } }
-/* Yığınlar (göstergeler) */
-.nr-piles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; margin-top: 2.3rem; }
-.nr-pile { display: flex; align-items: center; gap: .7rem; min-height: 4.1rem; padding: .55rem .9rem; border-radius: 18px;
-  background: var(--nr-paper); border: 1px solid var(--nr-edge); box-shadow: 0 1px 2px rgba(30,36,51,.04); }
-.nr-pile .ico { flex: 0 0 auto; width: 2.3rem; height: 2.3rem; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 1.05rem; color: #FFFFFF; background: var(--pc); }
-.nr-pile .n { font-family: 'Instrument Sans', sans-serif; font-size: 1.5rem; font-weight: 650; line-height: 1; color: var(--nr-ink); }
-.nr-pile .l { font-size: .8rem; color: var(--nr-sub); }
-.nr-pile .mini { margin-left: auto; display: flex; padding-right: .4rem; }
-.nr-pile .mini b { display: block; width: 1.05rem; height: 1.45rem; border-radius: .3rem; margin-left: -.5rem; background: var(--mc);
-  border: 1.5px solid var(--nr-paper); box-shadow: 0 1px 3px rgba(30,36,51,.25); }
-.nr-pile .mini b:nth-child(odd) { transform: rotate(-8deg); } .nr-pile .mini b:nth-child(even) { transform: rotate(7deg); }
-.nr-pile.bad { --pc: var(--nr-bad); } .nr-pile.skip { --pc: #8A826F; } .nr-pile.good { --pc: var(--nr-good); }
-.nr-pile.bump { animation: nr-bump .5s .8s var(--nr-ease) both; }
-@keyframes nr-bump { 40% { transform: scale(1.05); } }
-/* Değerlendirme düğmeleri: yumuşak renk tonu, etiket + simge */
-div.st-key-fc_bad button, div.st-key-fc_skip button, div.st-key-fc_good button { min-height: 3.4rem; border-radius: 16px;
-  border: 1px solid var(--nr-edge); transition: transform .25s var(--nr-ease), background .2s ease; }
-div.st-key-fc_bad button p, div.st-key-fc_skip button p, div.st-key-fc_good button p { font-size: 1.02rem; font-weight: 600; color: inherit; }
-div.st-key-fc_bad button { color: #A0412D; background: #FBEFEB; } div.st-key-fc_skip button { color: #5B5444; background: #F4F0E6; }
-div.st-key-fc_good button { color: #2F6B4F; background: #EEF5F0; }
-div.st-key-fc_bad button:hover { background: #F6E1DA; transform: translateY(-2px); }
-div.st-key-fc_skip button:hover { background: #ECE6D8; transform: translateY(-2px); }
-div.st-key-fc_good button:hover { background: #E1EFE6; transform: translateY(-2px); }
-.nr-gap { font-size: .8rem; color: var(--nr-mute); text-align: center; margin-top: .45rem; }
-/* Üst şerit: kart sayacı, ilerleme, isabet, seri */
-.nr-topbar { display: flex; align-items: center; gap: 1rem; padding: .65rem 1rem; border-radius: 16px; background: var(--nr-paper);
-  border: 1px solid var(--nr-edge); }
-.nr-topbar .c { font-size: .9rem; color: var(--nr-sub); white-space: nowrap; } .nr-topbar .c b { color: var(--nr-ink); }
-.nr-topbar .track { flex: 1; height: 8px; border-radius: 4px; background: var(--nr-track); overflow: hidden; }
-.nr-topbar .track i { display: block; height: 100%; border-radius: 4px; background: var(--nr-accent); transition: width .5s var(--nr-ease); }
-.nr-topbar .chip { font-size: .82rem; color: var(--nr-sub); background: #F1ECE0; border-radius: 999px; padding: .12rem .6rem; white-space: nowrap; }
-.nr-topbar .chip b { color: var(--nr-ink); }
 /* Kurulum ekranı sayıları */
 .nr-ctiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .8rem; margin: .2rem 0 1.1rem; }
 .nr-ctile { border-radius: 18px; padding: .95rem 1.1rem; color: var(--ink); background: linear-gradient(160deg, var(--c1), var(--c2)); }
@@ -483,8 +406,6 @@ div.st-key-nr_opts button { border-radius: 16px; }
 div.st-key-nr_opts button[kind="primary"] { background: #EEF2F8; border: 1.5px solid #1F3A5F; box-shadow: 0 0 0 3px rgba(31,58,95,.12); }
 div.st-key-nr_opts button[kind="primary"] p { color: #1E2433; }
 
-@media (prefers-reduced-motion: reduce) { .nr-fc, .nr-flip, .nr-ghost, .nr-pile { animation: none !important; transition: none !important; }
-  .nr-ghost { display: none; } }
 </style>
 """
 
