@@ -10,7 +10,7 @@ LLM'in soru ve cevabı yazdığı katman. Dört dosya:
 
 ---
 
-## `src/generation/schema.py` — soru şeması (69 satır)
+## `src/generation/schema.py` — soru şeması (72 satır)
 
 **Ne işe yarar?** LLM'in JSON çıktısındaki her soru önce bu Pydantic sınıfından geçer. Alan eksikse, tip yanlışsa ya da kural bozuksa soru `schema` nedeniyle reddedilir. Bozuk soru tek tek elenir; partinin tamamı atılmaz.
 

@@ -97,7 +97,7 @@ Neden `calls` tablosuna yeni sütun eklenmedi? O sırada çalışan eski süreç
 - [`usage(model)`](../src/llm/ledger.py#L47): (istek, token, dolu mu) — bugün için.
 - [`tokens_24h(model, table)`](../src/llm/ledger.py#L54): son 24 saatteki toplam token (`calls` ya da `prompt_cache` tablosundan).
 - [`cached_24h(model)`](../src/llm/ledger.py#L61): son 24 saatte istem önbelleğinden okunan token.
-- [`cooldown_left(model)`](../src/llm/ledger.py#L66) / [`set_cooldown(model, s)`](../src/llm/ledger.py#L72): bekleme süresini okur / ayarlar.
+- [`cooldown_left(model)`](../src/llm/ledger.py#L66) / [`set_cooldown(model, seconds)`](../src/llm/ledger.py#L72): bekleme süresini okur / ayarlar.
 - [`available(model, need_tokens)`](../src/llm/ledger.py#L77): şu an kullanılabilir mi? Dört koşula bakar:
   - dolu işareti yok,
   - bekleme süresi yok,
@@ -117,13 +117,13 @@ Neden `calls` tablosuna yeni sütun eklenmedi? O sırada çalışan eski süreç
 - [`Throttle`](../src/llm/ledger.py#L181): **süreç içi** dakikalık kayan pencere.
   - [`wait(model, tokens)`](../src/llm/ledger.py#L187): son 60 saniyedeki istek/token sayısı sınırı aşacaksa uyur. `rpm`/`tpm` tanımsızsa hiç beklemez.
   - [`can(model, tokens)`](../src/llm/ledger.py#L203): aynı kontrol ama bekletmez; "şu an çağrılabilir mi?" sorusunu cevaplar.
-  - [`settle(model, actual)`](../src/llm/ledger.py#L214): çağrı bitince rezerve edilen en kötü durum token'ını gerçek kullanımla değiştirir. Bu yapılmadan Groq'ta dakikada yalnızca 1 çağrı yapılabiliyordu.
+  - [`settle(model, actual_tokens)`](../src/llm/ledger.py#L214): çağrı bitince rezerve edilen en kötü durum token'ını gerçek kullanımla değiştirir. Bu yapılmadan Groq'ta dakikada yalnızca 1 çağrı yapılabiliyordu.
 
 **Önbelleğin etkisi:** Aynı model, aynı istem ve aynı parametrelerle yapılan ikinci çağrı API'ye gitmez, **0 kota** harcar. Yarıda kesilen bir işi yeniden başlatmak bu yüzden ucuzdur. İstemi bir harf bile değiştirmek önbelleği geçersiz kılar.
 
 ---
 
-## `src/llm/router.py` — tek kapı (355 satır)
+## `src/llm/router.py` — tek kapı (360 satır)
 
 **Ne işe yarar?** `call(rol, istem, ...)` rolün model zincirini sırayla dener. Önbelleğe bakar, kotayı denetler, sağlayıcıya göre doğru API'yi çağırır, hatayı sınıflandırır ve sonucu kaydeder. Hiçbir model cevap veremezse `AllModelsExhausted` fırlatır.
 

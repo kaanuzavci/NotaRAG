@@ -47,7 +47,7 @@ Burada en önemli bulgu, bizim kendi yazacağımız doğrulama mantığının li
 
 Bu başlık son derece güncel (2025-2026) ve doğrudan bizim dil kararımızı etkiliyor:
 
-- **RAGSmith** (2025) analizi: Türkçe gibi morfolojik olarak zengin (agglutinative) dillerde, aynı anlamsal birim çok farklı çekim ekleriyle görünebildiği için saf sözcük eşleştirmeli (BM25 gibi) retrieval yetersiz kalabiliyor; bu yüzden retrieval'in dile duyarlı tasarlanması gerekiyor.
+- **RAGSmith** (Kartal ve ark., 2025): RAG bileşenlerinin veri kümesine göre en iyi bileşimini arayan bir çerçeve. Çok dilli/düşük kaynaklı dillere ayrılan bölümünde, Türkçe dahil biçimbilimsel olarak zengin (sondan eklemeli) dillerin yüzey biçimlerinin saf sözcük eşleştirmesine zarar verdiğini, bu yüzden retrieval'in dile duyarlı tasarlanması gerektiğini belirtiyor (bu tespit RAGSmith'in kendi deneyi değil, atıf yaptığı çalışmalara dayanıyor: [42, 51, 52]).
 - **Turk-LettuceDetect** (2025) — Türkçe RAG uygulamaları için özel olarak geliştirilmiş, literatürdeki **ilk** halüsinasyon tespit modeli ailesi. Türkçe'nin düşük kaynaklı ve morfolojik olarak karmaşık olması nedeniyle genel çok dilli yaklaşımların yetersiz kaldığını, Türkçe'ye özel modellerin daha tutarlı sonuç verdiğini gösteriyor.
 - **TurkColBERT** (2025) — Türkçe bilgi erişimi için yoğun (dense) ve geç-etkileşimli (late-interaction) modelleri karşılaştıran ilk kapsamlı karşılaştırma.
 - **TurkEmbed / EmbedTurk** (2025) — Türkçe'ye özel embedding modelleri; çok dilli genel modellerin (bge-m3 gibi) Türkçe'de genelleme kaybı yaşayabileceğini, dile özel modellerin NLI/STS görevlerinde daha iyi performans gösterdiğini öne sürüyor.
@@ -58,8 +58,8 @@ Bu başlık son derece güncel (2025-2026) ve doğrudan bizim dil kararımızı 
 ## 6. Doküman Ayrıştırma ve Layout-Farkında Chunking
 
 - Genel kabul gören bulgu: sabit karakter/token tabanlı ("naive") chunking, bir kavramın tanımını örneğinden koparabiliyor; **layout-farkında (layout-aware) ayrıştırma**, başlık, tablo, görsel gibi yapısal unsurları koruyarak chunking yapıyor ve retrieval kalitesini artırıyor (Omdena, 2025 teknik incelemesi; Panicker, 2023, LayoutPDFReader üzerinden).
-- **D-RAC** (Yellow.ai, 2025) — Herhangi bir doküman formatını (DOCX, PPTX, taranmış görsel dahil) önce PDF'e normalize edip, ardından tek bir multimodal dönüşüm geçişiyle retrieval-farkında Markdown'a çeviren bir boru hattı. Bizim "farklı formatlarda tutarlı ayrıştırma" ihtiyacımızla doğrudan örtüşüyor.
-- **MinerU tabanlı section-aware chunking** (CMIP-Forge, 2026) — Başlık hiyerarşisini ve bölüm yollarını koruyarak chunk üreten bir vizyon-dil modeli tabanlı ayrıştırıcı; akademik/bilimsel dokümanlarda düzenli kullanılıyor.
+- **D-RAC** (Allu ve ark., Yellow.ai, 2026) — Herhangi bir doküman formatını (DOCX, PPTX, taranmış görsel dahil) önce PDF'e normalize edip, ardından tek bir multimodal dönüşüm geçişiyle retrieval-farkında Markdown'a çeviren bir boru hattı. Bizim "farklı formatlarda tutarlı ayrıştırma" ihtiyacımızla doğrudan örtüşüyor.
+- **MinerU tabanlı bölüm-duyarlı chunking** (CMIP-Forge; Pantiukhin ve ark., 2026) — CMIP-Forge iklim bilimi yayınları için bir RAG + etmen sistemi; PDF'leri MinerU (başlık hiyerarşisini ve bölüm yollarını koruyan, vizyon-dil modeli tabanlı bir ayrıştırıcı) ile ayrıştırıyor ve MinerU çıktısı üzerinde çalışan özel bir bölüm-duyarlı parçalayıcıyla (hedef en çok 1.000 token, kaynakça gibi bölümler elenir) 101.828 parça üretiyor. Katkısı ayrıştırıcının kendisi değil, onu kullanan uçtan uca sistemdir.
 - **AgenticOCR** (2026) — OCR'ı "her şeyi oku" yerine "sadece gerekeni oku" şeklinde sorgu-güdümlü hale getiren yeni bir yaklaşım; verimlilik ve doğruluk artışı sağlıyor ama bizim ölçeğimiz için muhtemelen gereğinden karmaşık.
 
 **Projeye etkisi:** "Başlık/bölüm duyarlı chunking" kararımız literatürle tam örtüşüyor. D-RAC'ın "her formatı PDF'e normalize et, tek geçişte işle" fikri, bizim PyMuPDF + Gemini görsel fallback ikili yaklaşımımızı sadeleştirmek için ileride değerlendirilebilir (opsiyonel, kapsam dışı tutulabilir).
@@ -113,16 +113,16 @@ Literatür üç ana noktada planımızı doğruluyor, bir noktada güçlendiriyo
 1. **Doğrulanmış:** RAG tabanlı eğitimsel soru üretimi aktif ve güncel bir araştırma alanı (2025'te en az 5 doğrudan ilgili çalışma).
 2. **Doğrulanmış:** Doğrulama/insan kontrolü katmanı olmadan üretilen soruların kalitesi literatürde de yetersiz bulunuyor — bizim doğrulama katmanı kararımız gerekli, "riskli" değil.
 3. **Doğrulanmış:** Başlık/bölüm duyarlı chunking, sabit boyutlu chunking'den daha iyi sonuç veriyor.
-4. **Güçlendirildi (plan güncellemesi):** Kendi doğrulama mantığımızı sıfırdan yazmak yerine RAGAS kütüphanesini kullanmalıyız. Türkçe performansı gerçekten önemsiyorsak, Türkçe'ye özel bir embedding modelini bonus karşılaştırma olarak eklemeliyiz.
+4. **Güçlendirildi (plan güncellemesi):** Kendi doğrulama mantığımızı sıfırdan yazmak yerine RAGAS kütüphanesini kullanmalıyız. Türkçe performansı gerçekten önemsiyorsak, Türkçe'ye özel bir embedding modelini bonus karşılaştırma olarak eklemeliyiz. *(Durum, 2026-10-11: ikisi de yapılmadı. RAGAS kodda yok, planlı; Türkçe'ye özel embedding karşılaştırması GPU/indirme kararı yüzünden yapılmayacak. Aşağıdaki "Karar Güncellemesi"ne bakın.)*
 5. **Boşluk/fırsat:** Türkçe ders dokümanlarına özel, doğrulamalı bir RAG soru-cevap sistemi literatürde yok denecek kadar az. Bu, projenin özgün katkı iddiasını güçlendiriyor.
 
 ---
 
-## Karar Güncellemesi (2026-10-01) — Literatürden Tasarıma
+## Karar Güncellemesi (2026-10-01; durum 2026-10-11'de düzeltildi) — Literatürden Tasarıma
 
-Yukarıdaki 4. maddedeki öneri ("RAGAS'ı kullanalım, Türkçe'ye özel embedding'i karşılaştıralım") uygulandı, ancak bir düzeltmeyle:
+Yukarıdaki 4. maddedeki öneri ("RAGAS'ı kullanalım, Türkçe'ye özel embedding'i karşılaştıralım") **kısmen uygulandı**: RAGAS'ın nerede kullanılacağına karar verildi ama **henüz kullanılmıyor**, Türkçe'ye özel embedding karşılaştırması da yapılmadı (aşağıda). Karar bir düzeltmeyle alındı:
 
-- **RAGAS doğrulama katmanının yerine geçmiyor, değerlendirme katmanına giriyor.** RAGAS bir değerlendirme çerçevesi. Soru başına çok sayıda LLM çağrısı yaptığı için ücretsiz kotalarda her üretilen soruya uygulanamaz. Faithfulness metriği uzun cevapları iddialara bölmek üzere tasarlanmış; "B" ya da "Yanlış" gibi quiz cevaplarında bölünecek iddia yok. Bu yüzden soru+cevap önce tek bir önermeye dönüştürülüyor (PROMPTS.md §5). Ayrıca RAGAS, çoktan seçmeli sorulara özgü kusurları (ikinci bir doğru şık, cevabı ele veren ipuçları) ölçmüyor. Çalışma anındaki doğrulama bu nedenle kendi tipe özel tasarımımızla kalıyor (README §4.2). RAGAS, raporda akademik olarak tanınmış bir metrik sağlamak için `eval/` altında kullanılıyor.
+- **RAGAS doğrulama katmanının yerine geçmiyor, değerlendirme katmanına girecek (planlı; kodda ve kurulumda yok).** RAGAS bir değerlendirme çerçevesi. Soru başına çok sayıda LLM çağrısı yaptığı için ücretsiz kotalarda her üretilen soruya uygulanamaz. Faithfulness metriği uzun cevapları iddialara bölmek üzere tasarlanmış; "B" ya da "Yanlış" gibi quiz cevaplarında bölünecek iddia yok. Bu yüzden soru+cevap önce tek bir önermeye dönüştürülecek (PROMPTS.md §5; istem hazır, çağrılmıyor). Ayrıca RAGAS, çoktan seçmeli sorulara özgü kusurları (ikinci bir doğru şık, cevabı ele veren ipuçları) ölçmüyor. Çalışma anındaki doğrulama bu nedenle kendi tipe özel tasarımımızla kalıyor (README §4.2). RAGAS'ın `eval/` altında raporda akademik olarak tanınmış bir metrik sağlaması planlanıyor; yapılmazsa raporda "kullanılmadı, nedeni" yazılacak. Ölçümlerimiz kendi betiklerimizle yapıldı.
 - **Doğru/Yanlış sorularında "desteklenmiyor" ile "yanlış" aynı şey değil.** NLI literatüründeki 3 sınıflı ayrım (entailment / contradiction / neutral) doğrulamaya taşındı: "Yanlış" cevaplı bir ifade bağlamla çelişmeli. Bağlamda hiç geçmeyen bir ifade yanlış sayılmaz.
 - **RAGSmith'in Türkçe BM25 uyarısına ucuz bir cevap:** Can vd. (2008), Türkçe metinlerde kelimelerin ilk 5 harfinin alınmasının (F5) kök bulucularla yarışabilir sonuç verdiğini gösteriyor. Hibrit retrieval'da BM25 bu şekilde, ek model ya da kütüphane olmadan uygulanıyor. Dense ve sparse sonuçlar Reciprocal Rank Fusion (Cormack vd., 2009) ile birleştiriliyor.
 - **Türkçe'ye özel embedding deneyi opsiyonel.** Model indirmeleri (~1-2 GB) mobil internet kotasını aştığı için bu deney Wi-Fi bağlantısına bırakıldı. Kod, embedding modelini tek satırla değiştirilebilir tutacak şekilde yazılıyor.
@@ -130,45 +130,45 @@ Yukarıdaki 4. maddedeki öneri ("RAGAS'ı kullanalım, Türkçe'ye özel embedd
 
 ### Ölçüm sonucu (2026-10-03): literatürden çıkan iki retrieval hipotezi kendi verimizde
 
-`eval/evaluate_retrieval.py`, 68 sorgu (35 elle etiketli + 33 doğrulanmış üretilmiş soru), 3 belge:
+`eval/evaluate_retrieval.py`, 145 sorgu (35 elle etiketli + 110 doğrulanmış üretilmiş soru; ilk ölçüm 2026-10-03'te 68 sorguydu, aşağıdaki rakamlar 2026-10-11'de `eval/sonuclar_retrieval.md` dosyasından güncellendi):
 
 | Hipotez (kaynak) | Beklenti | Sonuç |
 |---|---|---|
-| F5 kökleme Türkçe BM25'i iyileştirir (Can vd., 2008) | F5 > köklemesiz | **Doğrulanmadı.** TR→TR elle sorgularda isabet@1 %80'e %93 (köklemesiz önde); üretilmiş TR→TR sorgularda isabet@3 %95'e %86 (F5 önde). Küçük örneklemde tutarlı bir üstünlük yok |
-| Hibrit (dense + BM25, RRF) dense'ten iyidir (Brown vd., 2025; RAGSmith) | Hibrit ≥ dense | **Çürütüldü (bu ortamda).** Dense isabet@5 %100, hibrit %85. TR sorgu → EN slayt durumunda hibrit %58: BM25, Türkçe slayttaki benzer kelimeleri öne çıkarıp doğru İngilizce sayfayı aşağı itiyor |
+| F5 kökleme Türkçe BM25'i iyileştirir (Can vd., 2008) | F5 > köklemesiz | **Doğrulanmadı.** Elle TR→TR sorgularda (n=15) isabet@1 %80'e %93 (köklemesiz önde); üretilmiş TR→TR sorgularda (n=65) isabet@3 %85'e %82 (F5 hafif önde, isabet@5'te eşit %86). Tümünde (n=145) isabet@5 %63'e %62. Tutarlı bir üstünlük yok |
+| Hibrit (dense + BM25, RRF) dense'ten iyidir (Brown vd., 2025; RAGSmith) | Hibrit ≥ dense | **Çürütüldü (bu ortamda).** Tümünde (n=145) dense isabet@5 %99, hibrit %76 (dil kuralı kapalıyken %83). TR sorgu → EN slayt durumunda hibrit elle sorgularda (n=12) %58, üretilmiş sorgularda (n=45) %47, dense %100 ve %98: BM25, Türkçe slayttaki benzer kelimeleri öne çıkarıp doğru İngilizce sayfayı aşağı itiyor |
 
-Yorum: Literatürdeki hibrit/kökleme kazançları tek dilli ve geniş derlemlerde ölçülmüş. Bizim ortamımız **çok dilli** (TR+EN) ve **küçük** (140 parça); güçlü bir çok dilli embedding modeli (gemini-embedding-001) burada sözcük eşleştirmesine ihtiyaç bırakmıyor. Karar: varsayılan arama dense; BM25/hibrit karşılaştırma için kodda kalıyor. Bu, "literatürü uyguladık ama kendi verimizde ölçtük" sonucunun somut örneği.
+Yorum: Literatürdeki hibrit/kökleme kazançları tek dilli ve geniş derlemlerde ölçülmüş. Bizim ortamımız **çok dilli** (TR+EN) ve **küçük** (ölçüm sırasında 140, bugün 6 belgede 309 parça); güçlü bir çok dilli embedding modeli (gemini-embedding-001) burada sözcük eşleştirmesine ihtiyaç bırakmıyor. Karar: varsayılan arama dense; BM25/hibrit karşılaştırma için kodda kalıyor. Bu, "literatürü uyguladık ama kendi verimizde ölçtük" sonucunun somut örneği.
 
-Not: Kaynakçadaki bazı yazarı belirtilmemiş girişlerin (özellikle 2026 tarihli arXiv çalışmaları) künyeleri, rapora girmeden önce arXiv üzerinden teyit edilmelidir.
+Künye denetimi (2026-10-11): `data/kaynaklar/`'daki 29 arXiv PDF'inin ilk sayfası kaynakçayla karşılaştırıldı. **Düzeltilenler:** 2 (başlık: "The Survey of…"), 10, 16, 17, 18, 19 (yazarlar eklendi), 23 (yıl 2025 → 2026, tam başlık ve yazarlar), 24 (başlık tamamen yanlıştı: CMIP-Forge bir ayrıştırma sistemi değil, iklim bilimi için RAG + etmen sistemi; §6'daki anlatım buna göre düzeltildi), 48 (2026 çalışmasının yazarları), 3, 5, 7 (alt başlıklar). Geri kalan arXiv girişleri PDF'le tutuyor. **PDF'i olmadığı için teyit edilemeyenler** (rapora girmeden önce kaynağından bakılmalı): 1 (arXiv numarası bilinen künyeden), 6, 8, 9, 11, 12, 13, 20, 21, 22, 26, 27, 32 ve web kaynakları 28-31, 33-34.
 
 ---
 
 ## Kaynakça
 
-1. Lewis, P. et al. (2020). *Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks.*
-2. Huang, Y. & Huang, J. (2024). *A Survey on Retrieval-Augmented Text Generation for Large Language Models.* arXiv:2404.10981
-3. Gupta, S., Ranjan, R., & Singh, S. N. (2024). *A Comprehensive Survey of Retrieval-Augmented Generation (RAG).* arXiv:2410.12837
+1. Lewis, P. ve ark. (2020). *Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks.* NeurIPS 2020. arXiv:2005.11401 *(arXiv numarası ve yayın yeri PDF'ten değil, bilinen künyeden; PDF `data/kaynaklar/`'da yok)*
+2. Huang, Y. & Huang, J. X. (2024). *The Survey of Retrieval-Augmented Text Generation in Large Language Models.* arXiv:2404.10981
+3. Gupta, S., Ranjan, R., & Singh, S. N. (2024). *A Comprehensive Survey of Retrieval-Augmented Generation (RAG): Evolution, Current Landscape and Future Directions.* arXiv:2410.12837
 4. Sharma, C. (2025). *Retrieval-Augmented Generation: A Comprehensive Survey of Architectures, Enhancements, and Robustness Frontiers.* arXiv:2506.00054
-5. Brown, A., Roman, M., & Devereux, B. (2025). *A Systematic Literature Review of Retrieval-Augmented Generation.* arXiv:2508.06401
+5. Brown, A., Roman, M., & Devereux, B. (2025). *A Systematic Literature Review of Retrieval-Augmented Generation: Techniques, Metrics, and Challenges.* arXiv:2508.06401
 6. TASK Quarterly (2025). *An Analysis of Retrieval-Augmented Generation: A Systematic Review.*
-7. Guo, S., Liao, L., Li, C., & Chua, T-S. (2024). *A Survey on Neural Question Generation.* IJCAI 2024. arXiv:2402.18267
+7. Guo, S., Liao, L., Li, C., & Chua, T-S. (2024). *A Survey on Neural Question Generation: Methods, Applications, and Prospects.* IJCAI 2024. arXiv:2402.18267
 8. Lu, C-Y. & Lu, S-E. (2021). *A Survey of Approaches to Automatic Question Generation: 2019-2021.* ROCLING 2021
 9. Lohr, D., Berges, M., Chugh, A., Kohlhase, M., & Müller, D. (2025). *Leveraging LLMs to Generate Course-Specific Semantically Annotated Learning Objects.*
-10. (2025). *Leveraging In-Context Learning and RAG for Automatic Question Generation in Educational Domains.* arXiv:2501.17397
+10. Maity, S., Deroy, A., & Sarkar, S. (2025). *Leveraging In-Context Learning and Retrieval-Augmented Generation for Automatic Question Generation in Educational Domains.* arXiv:2501.17397
 11. (2025). *Smarter Questions, Smaller Models: RAG-Enhanced MCQ Generation for POSCOMP.* SBC
 12. (2025). *Leveraging LLMs for Dynamic Content Generation and Contextual Quizzes.* SLIIT
 13. Haas, S. (2025). *Leveraging Contemporary LLMs and Knowledge Graph-based RAG for Quiz Content Creation.* TU Graz Master's Thesis
 14. Es, S. et al. (2023). *RAGAS: Automated Evaluation of Retrieval Augmented Generation.* arXiv:2309.15217
 15. Malin, B., Kalganova, T., & Boulgouris, N. (2025). *A Review of Faithfulness Metrics for Hallucination Assessment in LLMs.* arXiv:2501.00269
-16. (2025). *Benchmarking LLM Faithfulness in RAG with Evolving Leaderboards.* arXiv:2505.04847
-17. (2025). *RAGSmith: A Framework for Finding the Optimal Composition of RAG Methods.* arXiv:2511.01386
-18. (2025). *Turk-LettuceDetect: A Hallucination Detection Model Suite for Turkish RAG Applications.* arXiv:2509.17671
-19. (2025). *TurkColBERT: A Benchmark of Dense and Late-Interaction Models for Turkish IR.* arXiv:2511.16528
+16. Tamber, M. S., Bao, F. S., Xu, C., Luo, G., Kazi, S., Bae, M., Li, M., Mendelevitch, O., Qu, R., & Lin, J. (2025). *Benchmarking LLM Faithfulness in RAG with Evolving Leaderboards.* arXiv:2505.04847
+17. Kartal, M. Y., Kose, S. K., Sevinç, K., & Aktaş, B. (2025). *RAGSmith: A Framework for Finding the Optimal Composition of Retrieval-Augmented Generation Methods Across Datasets.* arXiv:2511.01386
+18. Taş, S., El Huseyni, M., Ezerceli, Ö., Bayraktar, R., & Terzioğlu, F. B. (2025). *Turk-LettuceDetect: A Hallucination Detection Models for Turkish RAG Applications.* arXiv:2509.17671
+19. Ezerceli, Ö., ElHussieni, M., Taş, S. ve ark. (2025). *TurkColBERT: A Benchmark of Dense and Late-Interaction Models for Turkish Information Retrieval.* arXiv:2511.16528
 20. Ezerceli, Ö. et al. (2025). *TurkEmbed: Turkish Embedding Model on NLI & STS Tasks.* ASYU 2025
 21. Oytac, D. et al. (2025). *EmbedTurk: Leveraging LLMs as Text Encoders for Turkish.* INFUS 2025
 22. (2025). *Pubmed-RAG-TR / WikiRAG-TR: Turkish Medical RAG Dataset.* Çankaya Üniversitesi Tez Merkezi
-23. Yellow.ai AI Research Team (2025). *D-RAC: Universal Retrieval-Aware Ingestion of Enterprise Documents.* arXiv:2609.24220
-24. (2026). *CMIP-Forge: An Agentic System using MinerU-based Document Parsing.* arXiv:2606.17076
+23. Allu, U., Sivaprakash, A., Singh, P., & Manocha, A. (Yellow.ai AI Research Team) (2026). *Document Retrieval-Aware Chunking (D-RAC): Universal Retrieval-Aware Ingestion of Enterprise Documents via PDF Normalization and Multimodal Markdown Conversion.* arXiv:2609.24220 *(önbaskı tarihi 12 Ağustos 2026; önceki sürümde yıl 2025 yazıyordu)*
+24. Pantiukhin, D., Shapkin, B., Kuznetsov, I., Jung, T., & Koldunov, N. (2026). *CMIP-Forge: An Agentic System that Retrieves, Computes, and Self-Reviews Climate Science.* arXiv:2606.17076 *(önceki künyede başlık yanlıştı: "…using MinerU-based Document Parsing")*
 25. Wang, Z. et al. (2026). *AgenticOCR: Parsing Only What You Need for Efficient RAG.* arXiv:2602.24134
 26. Can, F., Koçberber, S., Balçık, E., Kaynak, C., Öcalan, H. Ç., & Vursavaş, O. M. (2008). *Information Retrieval on Turkish Texts.* Journal of the American Society for Information Science and Technology, 59(3), 407-421.
 27. Cormack, G. V., Clarke, C. L. A., & Büttcher, S. (2009). *Reciprocal Rank Fusion Outperforms Condorcet and Individual Rank Learning Methods.* SIGIR 2009.
@@ -192,6 +192,6 @@ Not: Kaynakçadaki bazı yazarı belirtilmemiş girişlerin (özellikle 2026 tar
 45. Albalak, A. ve ark. (2025). *Big-Math: A Large-Scale, High-Quality Math Dataset for Reinforcement Learning in Language Models.* arXiv:2502.17387
 46. Yaneva, V. ve ark. (2024). *Findings from the First Shared Task on Automated Prediction of Difficulty and Response Time for Multiple-Choice Questions* (BEA 2024). sig-edu.org/sharedtask/2024
 47. Yüksel, A. ve ark. (2024). *TurkishMMLU: Measuring Massive Multitask Language Understanding in Turkish.* Findings of EMNLP 2024, arXiv:2407.12402
-48. Feng, W. ve ark. (2024). *Exploring Automated Distractor Generation for Math Multiple-choice Questions via Large Language Models.* Findings of NAACL 2024; (2026) *Can LLMs Model Incorrect Student Reasoning? A Case Study on Distractor Generation.* arXiv:2603.15547
+48. Feng, W. ve ark. (2024). *Exploring Automated Distractor Generation for Math Multiple-choice Questions via Large Language Models.* Findings of NAACL 2024; Zengaffinen, Y., Opedal, A., Rooein, D., Srivatsa, K. A., Sonkar, S., & Sachan, M. (2026) *Can LLMs Model Incorrect Student Reasoning? A Case Study on Distractor Generation.* arXiv:2603.15547
 49. Wang, X. ve ark. (2026). *From Memorization to Creation: Evaluating the Cognitive Depth of LLM-Generated Educational Questions.* arXiv:2606.18257
 50. Amanlou, M. ve ark. (2026). *KNIGHT: Knowledge Graph-Driven Multiple-Choice Question Generation with Adaptive Hardness Calibration.* CPAL 2026, arXiv:2602.20135

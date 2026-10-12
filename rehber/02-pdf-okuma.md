@@ -43,6 +43,7 @@ Sistemin kalitesi burada başlar. PDF'ten yanlış okunan bir metin yanlış sor
   - `meta-sezgisel` geçiyorsa tire korunur.
   - İkisi de yoksa Türkçe'de birleştirir (satır sonu bölmesi hecedir), İngilizce'de tireyi korur.
 - [`pretty_math(s)`](../src/textnorm.py#L128): **yalnızca ekranda gösterim** için. Saklanan veri değişmez. Görsel modelin yazdığı LaTeX'i ve `^` gösterimini okunur Unicode'a çevirir (`\frac{a}{b}` → `a/b`, `2^n` → `2ⁿ`, `(n choose 2)` → `C(n, 2)`).
+- [`_simple(x)`](../src/textnorm.py#L123): `pretty_math`'in yardımcısı. `\frac{…}{…}` ve `\sqrt{…}` çevrilirken pay, payda ya da kök içi yalnızca harf, rakam, nokta, `·` ve `′`'den oluşuyorsa olduğu gibi bırakılır; başka bir şey içeriyorsa parantez içine alınır (`\frac{a}{b+c}` → `a/(b+c)`, `\sqrt{x+1}` → `√(x+1)`).
 - [`tr_lower(s)`](../src/textnorm.py#L155): Türkçe küçük harf. Python'un `"I".lower()` sonucu `"i"`'dir, Türkçe'de doğrusu `"ı"`.
 - [`normalize_for_match(s)`](../src/textnorm.py#L160): karşılaştırma için agresif düzleştirme. Satır sonu tirelerini ve LaTeX komutlarını atar, küçük harf yapar, **ı/i farkını da siler**, noktalamayı boşluğa çevirir.
   - LLM `İstanbul` yerine `Istanbul` yazabilir; İngilizce `IITG` Türkçe kurala göre `ııtg` olur. Bu yüzden ı/i katlanır.
@@ -56,7 +57,7 @@ Testler: [`tests/test_textnorm.py`](../tests/test_textnorm.py).
 
 ---
 
-## `src/ingestion/pdf_parser.py` — PDF'ten yapılandırılmış sayfalara (528 satır)
+## `src/ingestion/pdf_parser.py` — PDF'ten yapılandırılmış sayfalara (534 satır)
 
 **Ne işe yarar?** PyMuPDF ile PDF'in metin katmanını okur ve her sayfa için şunları çıkarır:
 - başlık (ve başlığın nereden bulunduğu)
@@ -161,7 +162,7 @@ Testler: [`tests/test_parser.py`](../tests/test_parser.py). Her test bulunmuş b
 
 ---
 
-## `src/ingestion/vision.py` — resim olan sayfaları okuma (150 satır)
+## `src/ingestion/vision.py` — resim olan sayfaları okuma (154 satır)
 
 **Ne işe yarar?** `needs_vision` işaretli sayfaları 150 dpi JPEG'e çevirir ve görsel modele (Gemini, yedeği qwen) **PROMPTS.md §1** ile okutur. Sonucu önbelleğe yazar. Her sayfa yalnızca bir kez gönderilir.
 

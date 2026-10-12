@@ -18,7 +18,7 @@ Bu bölüm 2026-10-07'de eklenen **kullanıcı girişi** katmanını anlatıyor.
 
 | Kişisel (her hesabın kendi) | Ortak (herkesin) |
 |---|---|
-| Sınav çözümleri, kart değerlendirmeleri, Leitner kutuları | Soru havuzu (`data/questions/`), parçalar, ChromaDB dizini, konu haritaları |
+| Sınav çözümleri, kart değerlendirmeleri ve kartların FSRS durumu (kararlılık, zorluk) | Soru havuzu (`data/questions/`), parçalar, ChromaDB dizini, konu haritaları |
 | Görebildiği belgeler (yükledikleri + herkese açık olanlar) | Kota ve LLM önbelleği (`data/llm.sqlite`) |
 | Yeteneği θ (Elo; bölüm 10) | Sorunun zorluğu (herkesin ilk denemelerinden) |
 
@@ -33,7 +33,7 @@ Kutular, "ilk deneme" ve seviye **saklanmaz, kayıtlardan hesaplanır**. Aynı b
 
 ---
 
-## `src/appdb.py` — uygulama veritabanı (106 satır)
+## `src/appdb.py` — uygulama veritabanı (133 satır)
 
 **Ne işe yarar?** `data/app.sqlite` dosyasını açar ve şemasını günceller. Hesaplar, oturumlar ve belge kaydı buradaki tablolardadır.
 
@@ -52,6 +52,8 @@ Kutular, "ilk deneme" ve seviye **saklanmaz, kayıtlardan hesaplanır**. Aynı b
   - `documents` ve `doc_access`: belge kaydı ve kimin hangi belgeye erişimi olduğu.
 
   2. adım (2026-10-08, bölüm 12): `users.avatar` (profil resmi), `users.about` (kısa tanıtım), `progress` (kaldığın yerden devam et). Var olan veritabanı açılışta bu adıma kendiliğinden geçti; kayıtlara dokunulmadı.
+
+  3. adım (2026-10-09, bölüm 14): `folders` (kişiye özel klasör: kimlik, ad, oluşturma zamanı) ve `folder_docs` (hangi not hangi klasörde; anahtar `(user_id, doc)` → bir not bir kişide en çok bir klasörde durur). Kişi ya da belge silinirse satırlar `ON DELETE CASCADE` ile kendiliğinden gider.
 - [`_migrate(con)`](../src/appdb.py#L100): dosyanın sürümünü (`PRAGMA user_version`) okur, eksik adımları sırayla uygular.
 - [`connect()`](../src/appdb.py#L112): `with appdb.connect() as con:` biçiminde kullanılır. Çıkışta değişiklikleri kaydeder; hata olursa geri alır; bağlantıyı kapatır.
 - [`version()`](../src/appdb.py#L131): şemanın şu anki adımı (testler kullanır).
@@ -64,7 +66,7 @@ Kutular, "ilk deneme" ve seviye **saklanmaz, kayıtlardan hesaplanır**. Aynı b
 
 ---
 
-## `src/accounts.py` — hesaplar ve giriş (209 satır)
+## `src/accounts.py` — hesaplar ve giriş (277 satır)
 
 **Ne işe yarar?** Hesap açar, kullanıcı adı ve parolayı doğrular, "beni hatırla" oturumlarını yönetir.
 
@@ -75,6 +77,7 @@ Kutular, "ilk deneme" ve seviye **saklanmaz, kayıtlardan hesaplanır**. Aynı b
 
 **İçindekiler**
 - [`USERNAME`](../src/accounts.py#L29), [`MIN_PASSWORD`](../src/accounts.py#L30): kullanıcı adı yalnızca küçük harf a-z, rakam, `.`, `_`, `-` (3-32 karakter). Türkçe harfler görünen adda serbest; kullanıcı adında yok, çünkü `I`/`İ` gibi harflerin küçük harfe çevrilmesi dile göre değişir ve girişte eşleşme şaşabilirdi. Parola en az 8 karakter.
+- [`normalize_username(username)`](../src/accounts.py#L83): kullanıcı adını boşluklardan arındırıp küçük harfe çevirir (`None` gelirse boş metin). Hesap açma, giriş ve parola sıfırlama hepsi bunun sonucunu karşılaştırır; böylece `Kagan` ile `kagan` aynı hesaptır.
 - [`hash_password(password)`](../src/accounts.py#L42): parolayı **scrypt** ile özetler. Sonuç `scrypt$15$8$1$<tuz>$<özet>` biçimindedir; parametreler ve tuz özetin içinde saklanır.
 - [`check_password(password, stored)`](../src/accounts.py#L49): özeti saklanan parametrelerle yeniden hesaplar, `hmac.compare_digest` ile karşılaştırır.
 - [`create(username, password, name)`](../src/accounts.py#L87): yeni hesap. Kuralları denetler, kullanıcı adı alınmışsa `AccountError` verir. **İlk hesap** eski kayıtların sahibi olur (`settings.legacy_owner`).
@@ -82,9 +85,11 @@ Kutular, "ilk deneme" ve seviye **saklanmaz, kayıtlardan hesaplanır**. Aynı b
 - [`by_identity(provider, subject)`](../src/accounts.py#L117): giriş yolundan hesabı bulur.
 - [`authenticate(username, password)`](../src/accounts.py#L125): doğruysa hesabı, değilse `None` döndürür. Olmayan bir kullanıcı adında da parola özeti hesaplanır; böylece cevap süresinden "bu kullanıcı adı var mı" anlaşılamaz.
 - [`get`](../src/accounts.py#L134), [`all_users`](../src/accounts.py#L139), [`count`](../src/accounts.py#L144): okuma yardımcıları.
+- [`_user(con, user_id)`](../src/accounts.py#L63): kullanıcı satırını dışarıya verilen biçime çevirir: `{id, name, username}` (kullanıcı adı `identities`'teki `password` girişinin `subject`'idir; yoksa `None`). `get`, `authenticate`, `all_users` ve oturum fonksiyonları hesabı hep bununla döndürür; parola özeti ya da profil resmi sızmaz.
 - [`set_password(username, password)`](../src/accounts.py#L149): parolayı değiştirir ve o hesabın açık oturumlarını kapatır.
 - [`legacy_owner()`](../src/accounts.py#L220): eski kayıtların sahibi. Bir kez okunup bellekte tutulur. Veritabanı yoksa **oluşturmadan** `None` döner: testler ve ölçüm betikleri gerçek `data/` klasöründe dosya yaratmasın.
 - Oturumlar:
+  - [`_token_hash(token)`](../src/accounts.py#L236): belirtecin SHA-256 özeti; veritabanına yalnızca bu yazılır ve gelen belirteç aranırken de bununla karşılaştırılır.
   - [`new_session(user_id, days)`](../src/accounts.py#L240): rastgele bir belirteç üretir (`secrets.token_urlsafe`), veritabanına yalnızca **SHA-256 özetini** yazar, belirtecin kendisini döndürür (tarayıcı çerezine gidecek). Süresi geçmiş oturumları da temizler.
   - [`session_user(token)`](../src/accounts.py#L249): çerezden gelen belirteç geçerliyse hesabı döndürür. Çerez tarayıcıdan geldiği için her türlü değer olabilir; metin değilse `None`.
   - [`end_session(token)`](../src/accounts.py#L258): çıkışta oturumu siler.
@@ -97,14 +102,14 @@ Kutular, "ilk deneme" ve seviye **saklanmaz, kayıtlardan hesaplanır**. Aynı b
 
 ---
 
-## `src/library.py` — belge kütüphanesi (240 satır)
+## `src/library.py` — belge kütüphanesi (324 satır)
 
 **Ne işe yarar?** Her belgenin kaydını tutar: kimliği, görünen adı, sahibi, gizli ya da herkese açık oluşu, kimlerin erişebildiği. Yüklenen bir PDF'in sistemde zaten olup olmadığını **içeriğine bakarak** anlar.
 
 **Bağlantılar**
 - ← `ui/pages/documents.py` (yükleme, herkese açma, ad), `ui/data.py` (görünürlük, adlar), `export._doc_name`, `pipeline.run` (`sync`), `ui/auth.py`, testler.
 - → `appdb`, `accounts.legacy_owner`, `pymupdf`, `config`.
-- 💾 Okur/yazar: `data/app.sqlite` (`documents`, `doc_access`). Yazar: `data/sample_docs/<kimlik>.pdf`.
+- 💾 Okur/yazar: `data/app.sqlite` (`documents`, `doc_access`, `folders`, `folder_docs`). Yazar: `data/sample_docs/<kimlik>.pdf`.
 
 **Belge kimliği.** Kimlik (`doc`), belgenin veri dosyalarındaki anahtardır: `sample_docs/<doc>.pdf`, `parsed/<doc>.json`, parça kimliklerinin başı (`<doc>:p003:1`), `questions/<doc>_tr.jsonl`. Bir kez verilir ve **değişmez**; görünen ad ayrıdır ve sahibi değiştirebilir.
 - Mevcut 6 belgenin kimliği bugünkü dosya adlarıdır. Değiştirmek bütün veriyi yeniden yazmak demekti; yerine kayda içerik özetleri eklendi.
@@ -120,6 +125,7 @@ Eşleşen belge yükleyene açılır: hazır sorular, konu haritası ve dizin ol
 **Görünürlük.** Belge, erişimi olanlara (onu yükleyenlere) görünür. Erişimi olan biri belgeyi herkese açabilir. Açılan belge **arayüzden yeniden gizlenemez**: başkalarının o belgeden hazırladığı sınavlar ve kayıtları boşa düşmesin diye. Acil durumda (ör. telif) bu bilgisayarda `python -m src.library gizle <belge>` ile kaldırılır.
 
 **İçindekiler**
+- [`LibraryError`](../src/library.py#L41): kullanıcıya olduğu gibi gösterilecek (Türkçe) hata; arayüz yakalayıp mesajı yazar. `ValueError`'dan türer.
 - [`file_hash(data)`](../src/library.py#L47): dosya baytlarının SHA-256 özeti.
 - [`text_signature(data)`](../src/library.py#L51): (sayfa sayısı, sayfa metinlerinin özeti). Metin boşluk ve büyük/küçük harf farkından arındırılır. Sayfaların en az %80'i en az 30 karakter metin içermiyorsa özet `None` olur. PDF değilse `ValueError` verir; PyMuPDF HTML ve düz metni de açabildiği için `pdf_parser`'daki gibi biçime bakılır.
 - [`_taken(con, key)`](../src/library.py#L75): bir anahtar kullanılmış mı? Kayıt, PDF ya da ondan türemiş veri (`parsed`, `topics`, `questions`) varsa evet. Silinmiş bir belgenin artığı kalmışsa yeni belge o artıkları devralmasın diye. Windows'ta dosya adları büyük/küçük harf duyarsız olduğu için karşılaştırma da öyle.
@@ -134,7 +140,14 @@ Eşleşen belge yükleyene açılır: hazır sorular, konu haritası ve dizin ol
 - [`get`](../src/library.py#L175), [`all_docs`](../src/library.py#L181), [`has_access`](../src/library.py#L186): okuma yardımcıları.
 - [`publish(doc, user_id)`](../src/library.py#L191): belgeyi herkese açar. Yalnızca erişimi olan açabilir. Geri alma fonksiyonu yoktur (testi de bunu denetler).
 - [`rename(doc, user_id, name)`](../src/library.py#L216): görünen adı değiştirir; yalnızca sahibi.
-- [`display_name(doc)`](../src/library.py#L299): görünen ad. Dışa aktarma ve soru kartları her soru için çağırdığı için adlar 10 saniye bellekte tutulur.
+- [`display_name(doc)`](../src/library.py#L299): görünen ad. Dışa aktarma ve soru kartları her soru için çağırdığı için adlar 10 saniye bellekte tutulur. [`_forget_names()`](../src/library.py#L294) bu belleği boşaltır (`rename` sonrası yeni ad hemen görünsün).
+- **Klasörler** (2026-10-09; kişiye özel gruplama, Belgeler sayfası; bölüm 14):
+  - [`folders(user_id)`](../src/library.py#L230): kişinin klasörleri, oluşturma sırasıyla: `{id, name, created, docs}`.
+  - [`create_folder(user_id, name, docs)`](../src/library.py#L253): klasör açar ve verilen notları içine koyar (başka klasördeyse oradan alınır). Aynı ad (büyük/küçük harf farkı gözetilmez) ikinci kez açılamaz. Klasör kimliği rastgele 12 hane.
+  - [`rename_folder`](../src/library.py#L265), [`delete_folder`](../src/library.py#L272): ad değiştirme; silme (içindeki notlar silinmez, ana görünüme döner).
+  - [`move_to_folder(user_id, docs, folder_id)`](../src/library.py#L280): notları taşır; `folder_id=None` klasörden çıkarır. Yalnızca kişinin görebildiği notlar taşınır (`visible`).
+  - [`_folder_name`](../src/library.py#L241): adı sadeleştirir (art arda boşluklar teke iner), 1-60 karakter ister. [`_own_folder`](../src/library.py#L248): klasör bu kişinin değilse "Böyle bir klasörün yok" der (başkasının klasör kimliğini bilmek yetmez).
+  - [`_row(r)`](../src/library.py#L67): veritabanı satırını belge sözlüğüne çevirir; `order` (kayda giriş sırası) ana sayfada notun rengini belirler.
 - Komut satırı: `python -m src.library` kayıtlı belgeleri listeler (sahip, görünürlük, erişim sayısı).
 
 **Neden böyle?** Eskiden belgenin kimliği dosya adıydı. Aynı adla farklı bir PDF yüklenince, boyutu farklıysa eskisinin üzerine yazılıyordu ve eski sorular, sayfa metinleri ve konu haritası yeni dosyayla karışıyordu. Boyutu aynıysa yeni dosya sessizce yok sayılıyordu. Şimdi hiçbir yükleme var olan bir belgenin üzerine yazmaz.
@@ -156,7 +169,7 @@ Eşleşen belge yükleyene açılır: hazır sorular, konu haritası ve dizin ol
 
 ---
 
-## `src/ui/auth.py` — giriş ekranı ve oturum (130 satır)
+## `src/ui/auth.py` — giriş ekranı ve oturum (208 satır)
 
 **Ne işe yarar?** Giriş yapılmamışsa giriş ekranını gösterir. Kenar çubuğunun altına kimin giriş yaptığını ve "Çıkış yap" düğmesini koyar.
 
@@ -174,7 +187,8 @@ Eşleşen belge yükleyene açılır: hazır sorular, konu haritası ve dizin ol
 - [`_logout()`](../src/ui/auth.py#L113): oturumu veritabanından siler ve `session_state`'i tamamen temizler; açık sınav ve kart oturumu sıradaki kişiye kalmasın. Çerezi silmek için işaret bırakır.
 - [`sidebar(u)`](../src/ui/auth.py#L122): kenar çubuğunun en altı (CSS ile dibe sabit; bölüm 13). Çerezi bu oturumda yazılacaksa burada yazar; profil resmi, ad, @kullanıcı adı ve "Çıkış".
 - [`_login_form()`](../src/ui/auth.py#L138), [`_create_form(first)`](../src/ui/auth.py#L152): iki form. Hiç hesap yoksa "Hesap oluştur" açık gelir ve ilk hesabın eski kayıtların sahibi olacağı söylenir.
-- [`page()`](../src/ui/auth.py#L183): giriş ekranının kendisi. Kenar çubuğu gizli, dar ve ortalı.
+- [`page()`](../src/ui/auth.py#L183): giriş ekranının kendisi. Kenar çubuğu gizli, dar ve ortalı. (2026-10-09'dan beri iki yarılı yeni tasarım; ayrıntı bölüm 14, görseller `ui/loginart.py`.)
+- [`_google()`](../src/ui/auth.py#L179): "Google ile devam et" düğmesinin geri çağırması. **Şimdilik yalnızca görünüm:** "Google ile giriş yakında" bildirimi gösterir, gerçek giriş yok. Bağlamak için aşağıdaki "İleride: Google ya da telefonla giriş".
 
 **Akış (tarayıcıda denendi):** giriş → çerez yazılır → sayfa yenilenince `current()` çerezden oturumu geri getirir → çıkış → oturum silinir, çerez temizlenir → yenileyince giriş ekranı.
 

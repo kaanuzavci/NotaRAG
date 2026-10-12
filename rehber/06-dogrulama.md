@@ -161,7 +161,7 @@ Testler: [`tests/test_checks.py`](../tests/test_checks.py).
 
 ---
 
-## `src/qualify.py` — aday model yeterlilik testi (164 satır)
+## `src/qualify.py` — aday model yeterlilik testi (165 satır)
 
 **Ne işe yarar?** `python -m src.qualify <model> [--kisa]` komutu aday bir modeli doğrulayıcı olarak onaylamadan önce tek seferde sınar. Sonuç `eval/yeterlilik/<model>.json` + `.md` dosyalarına ve bir onay önerisine dönüşür. **Onayı insan verir**: `models.py`'deki `APPROVED`'a kanıtıyla eklenir.
 

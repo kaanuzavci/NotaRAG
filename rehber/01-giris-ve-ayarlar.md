@@ -9,7 +9,7 @@ Bu bölüm dört dosyayı ve bir istem dosyasını anlatıyor:
 
 ---
 
-## `src/config.py` — proje ayarları (33 satır)
+## `src/config.py` — proje ayarları (37 satır)
 
 **Ne işe yarar?** Bütün klasör yolları ve API anahtarları tek yerde tanımlanır. Başka bir dosya "veri klasörü nerede?" diye sorduğunda cevabı buradan alır. Yol bir gün değişirse tek satır değişir.
 
@@ -85,7 +85,7 @@ Bu iki ifadeyi PROMPTS.md'de değiştirirsen kural ekleme sessizce çalışmaz y
 
 ---
 
-## `src/app.py` — arayüzün giriş noktası (49 satır)
+## `src/app.py` — arayüzün giriş noktası (52 satır)
 
 **Ne işe yarar?** `streamlit run src/app.py` komutu bu dosyayı çalıştırır. Sayfa ayarlarını yapar, ortak stili basar, **önce giriş ister**, sonra kenar çubuğundaki menüyü kurar ve seçilen sayfayı çalıştırır.
 
@@ -112,7 +112,7 @@ Bu iki ifadeyi PROMPTS.md'de değiştirirsen kural ekleme sessizce çalışmaz y
 
 ---
 
-## `src/pipeline.py` — belge işlemenin orkestra şefi (233 satır)
+## `src/pipeline.py` — belge işlemenin orkestra şefi (237 satır)
 
 **Ne işe yarar?** Bir PDF'i baştan sona işler: okuma → görsel okuma → bölümleme → dizin + konu haritası → soru üretimi → doğrulama. Sonuç `data/questions/<belge>_<dil>.jsonl` dosyasıdır. Kendisi pek az iş yapar; diğer modülleri doğru sırayla çağırır ve kota dolunca bekler. Projeyi anlamak için okunacak **ilk** dosya budur.
 

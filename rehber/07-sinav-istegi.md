@@ -39,7 +39,7 @@ Bu bölümde sistemin asıl kullanım akışı var. Kullanıcı konu seçer, sis
 
 ---
 
-## `src/request.py` — sınav isteği: sistemin RAG akışı (379 satır)
+## `src/request.py` — sınav isteği: sistemin RAG akışı (386 satır)
 
 **Ne işe yarar?** Sınav Hazırla sayfasındaki her istek burada işlenir. Üç aşama var:
 1. **Arama:** her konu adı → seçili belgelerde dense arama → en ilgili parçalar.
@@ -144,7 +144,7 @@ Testler: [`tests/test_grading.py`](../tests/test_grading.py) (29 durum, güvenli
 
 ---
 
-## `src/review_store.py` — soru kimliği, kararlar, kanıt işaretleme (232 satır)
+## `src/review_store.py` — soru kimliği, kararlar, kanıt işaretleme (235 satır)
 
 **Ne işe yarar?** Üç iş yapar:
 1. Soru kimliğini hesaplar ve soru setlerini listeler.

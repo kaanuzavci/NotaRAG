@@ -44,7 +44,7 @@ Pencere neden `session_state.doc_open` ile tutuluyor? Streamlit'te pencere (`st.
 
 ---
 
-## `src/ui/docview.py` — not penceresi ve not kartı (~400 satır)
+## `src/ui/docview.py` — not penceresi ve not kartı (511 satır)
 
 **Ne işe yarar?**
 - Not kartının verisini hazırlar (rafta ve Belgeler ızgarasında aynı kart).
@@ -91,12 +91,13 @@ Pencere neden `session_state.doc_open` ile tutuluyor? Streamlit'te pencere (`st.
 - [`reading()`](../src/ui/docview.py#L248), [`reader_view()`](../src/ui/docview.py#L253), [`_back(r, page)`](../src/ui/docview.py#L257), [`_read(stem, page, tab, topic)`](../src/ui/docview.py#L263): okuyucuya geçiş ve dönüş. `_read` okuyucuya hangi sekmeden geldiğini ve (Konular'dan geldiyse) hangi konuya tıklandığını da yazar.
 - [`_body(stem)`](../src/ui/docview.py#L273): pencerenin içi. Sekmeler durum tutar (`st.tabs(key="dv_tab", on_change="rerun")`): yalnızca seçili sekme çalışır, sayfa görüntüsü boşuna hazırlanmaz. Sekme değiştirmek yalnızca pencereyi yeniden çalıştırır. Hazır soru sayısı `data.ready()`'den (önbellekli).
 - [`_hero(d, meta, n_ready)`](../src/ui/docview.py#L296), [`_actions(d, meta, n_ready)`](../src/ui/docview.py#L325): üst kısım ve düğmeler. "Herkese aç" eskiden ayrı bir onay penceresiydi; Streamlit pencere içinde pencere açamadığı için artık açılır kutu (`st.popover`) içinde uyarı + "Anladım, herkese aç".
+- **Sağ sütundaki küçük paneller** (2026-10-09, bölüm 14; ayrı pencere yok): [`_toggle(panel)`](../src/ui/docview.py#L355) `dv_panel` durumunu açar ya da kapatır (`"publish"` / `"rename"`; aynı düğmeye ikinci basış kapatır). [`_confirm_publish(stem, uid)`](../src/ui/docview.py#L363): "Herkese açılsın mı?" kısa uyarısı (**geri alınamaz** dahil) ve "Vazgeç / Herkese aç"; onaylanınca `library.publish`, önbellek temizlenir, bildirim çıkar. [`_rename(stem, uid)`](../src/ui/docview.py#L376): ad alanı (en çok 80 karakter) ve "Vazgeç / Kaydet"; `library.rename`, `LibraryError` (ör. ad boş) alanın altında kırmızı gösterilir. İkisi de yalnızca yetkili kişiye çıkar (`has_access` / sahibi). Tarihçe: önce `st.popover` (alttaki konu listesine biniyor, "Anladım" tıklaması altındaki satıra geçip okuyucuyu açıyor ve not yayımlanmıyordu), sonra konuların üstünde ayrı kutu (kullanıcı fazla buldu).
 - [`_state(d)`](../src/ui/docview.py#L391), [`_job(stem)`](../src/ui/docview.py#L404), [`_detail(tail)`](../src/ui/docview.py#L416): not işleniyorsa adım ve son ilerleme satırı (pencerenin içinde 4 saniyede bir kendiliğinden yenilenen parça; iş bitince pencere yeni verilerle baştan çizilir). Hiç işlenmediyse "Notu işle".
 - [`_topics_tab`](../src/ui/docview.py#L428), [`_pages_tab`](../src/ui/docview.py#L459), [`_step`](../src/ui/docview.py#L455), [`_quality_tab`](../src/ui/docview.py#L500): sekmeler. Sayfalar sekmesindeki sayfa numarası `dv_pg_<not>` anahtarında; okuyucu kapanınca buraya son okunan sayfa yazılır. Sayfa görüntüsü ve metin kutusunun yüksekliği ekran yüksekliğinden (`calc(100vh - …)`): pencere ekrandan taşmaz.
 
 ---
 
-## `src/ui/reader.py` — tam ekran PDF okuyucu (~390 satır)
+## `src/ui/reader.py` — tam ekran PDF okuyucu (408 satır)
 
 **Ne işe yarar?** Notun sayfalarına tam ekranda çalışmak için bütün pencereyi kaplayan koyu bir sahne:
 - ortada sayfa görüntüsü (gölgeli kâğıt), iki yanda büyük ‹ › düğmeleri;
@@ -122,7 +123,7 @@ Pencere neden `session_state.doc_open` ile tutuluyor? Streamlit'te pencere (`st.
 
 ---
 
-## `src/ui/pages/documents.py` — Belgeler (baştan yazıldı, ~120 satır)
+## `src/ui/pages/documents.py` — Belgeler (292 satır)
 
 **Ne işe yarar?** Kişinin görebildiği bütün notlar (kendi notları ve herkese açık olanlar), ana sayfadaki desteler gibi kart kart. Üstte:
 - **süzgeç:** Tümü · Notlarım · Herkese açık (sayılarıyla);
@@ -138,8 +139,17 @@ Bir karta tıklayınca pencere bu sayfanın üstünde açılır. **Yükleme kutu
 
 **İçindekiler**
 - [`_fold(s)`](../src/ui/pages/documents.py#L51), [`_match(d, words)`](../src/ui/pages/documents.py#L56): arama.
-- [`_grid(stems, empty, view, live)`](../src/ui/pages/documents.py#L80): kartlar, seçili görünümde (iki görünümün bileşen anahtarı ayrı: görünüm değişince eskisi kendi dinleyicileriyle birlikte kalkar). Kişinin listesinde olmayan herkese açık not "Notlarıma ekle / Göz at" düğmeli kartla gelir. İşlenen bir not varsa ızgara 5 saniyede bir kendiliğinden yenilenen bir parçada çizilir (`live`).
-- [`render()`](../src/ui/pages/documents.py#L180): okuyucu açıksa yalnızca onu çizer; değilse başlık, süzgeç, kartlar ve (açıksa) pencere. Ana sayfadaki "Tümünü gör" `session_state.docs_filter` ile hangi süzgecin seçili geleceğini söyler.
+- **Klasörler** (2026-10-09; kullanıcıya göre özet: bölüm 14, veri katmanı: bölüm 11 `library`):
+  - [`_folders()`](../src/ui/pages/documents.py#L63): kişinin klasörleri (`library.folders`); içlerinde yalnızca kişinin hâlâ görebildiği notlar kalır (`data.visible()` süzgeci).
+  - [`_folder_items(folders, meta)`](../src/ui/pages/documents.py#L69): klasörleri kart verisine çevirir (`shelf.folder_card`): içindeki notların kapak renkleri, "N not · M hazır soru" ya da boş klasörde "Boş klasör · notlarını ekle", notların kısa adları.
+  - [`_sorted(shown, order, meta)`](../src/ui/pages/documents.py#L172): "Ada göre" (Türkçe harf farkı gözetilmez), "En çok soru" (hazır soru sayısı), varsayılan "En yeni" (kayıt zamanı).
+  - **Seçim kipi** (klasör oluşturma ve düzenleme ayrı pencere açmaz, sayfa seçim kipine geçer): [`_begin_select(fid, name, pre)`](../src/ui/pages/documents.py#L114) kipi başlatır (`fid` doluysa düzenleme; `n` her girişte artar → bileşenin anahtarı değişir, eski işaretler karışmaz), [`_end_select()`](../src/ui/pages/documents.py#L121) çıkar. [`_sel_key(sel, view)`](../src/ui/pages/documents.py#L133): o girişteki bileşenin anahtarı (`shelf_docs_p_s<n>` Sayfalı, `shelf_docs_r_s<n>` Kaydırmalı). [`_picked_now(sel, view)`](../src/ui/pages/documents.py#L125): işaretlileri bileşenin durumundan okur — tıklamalar tarayıcıda anında işlendiği için bu çalıştırmadan **önce** okunur ve sayaç ile düğme güncel kalır. [`_save_select(sel, name)`](../src/ui/pages/documents.py#L137): düzenlemede klasörü yeniden adlandırır, işareti kalkan eski notları klasörden çıkarır, işaretlileri klasöre taşır; yeni klasörde `create_folder` çağırır. `LibraryError` (aynı ad, boş ad…) `docs_error` ile ekranda kırmızı gösterilir; başarıda klasörün içi açılır ve bildirim çıkar.
+  - [`_delete_folder(fid, name, n)`](../src/ui/pages/documents.py#L157): `st.dialog` onay penceresi ("Vazgeç" / "Klasörü sil"); silince notlar silinmez, ana görünüme döner.
+- [`_grid(stems, empty, view, folders, live, select)`](../src/ui/pages/documents.py#L80): kartlar (önce klasörler), seçili görünümde (iki görünümün bileşen anahtarı ayrı: görünüm değişince eskisi kendi dinleyicileriyle birlikte kalkar). Kişinin listesinde olmayan herkese açık not "Notlarıma ekle / Göz at" düğmeli kartla gelir. İşlenen bir not varsa ızgara 5 saniyede bir kendiliğinden yenilenen bir parçada çizilir (`live`).
+- [`render()`](../src/ui/pages/documents.py#L180): okuyucu açıksa yalnızca onu çizer; değilse başlık, süzgeç, kartlar ve (açıksa) pencere. Ana sayfadaki "Tümünü gör" `session_state.docs_filter` ile hangi süzgecin seçili geleceğini söyler. Üç hâli var:
+  - **Ana görünüm:** süzgeç (Tümü · Notlarım · Herkese açık), arama, sıralama, görünüm ve "Klasör oluştur". Bir klasördeki not ana görünümde ayrıca görünmez; arama yapılırken klasörlerin adı ve içleri de aranır. "Herkese açık" süzgecinde klasör gösterilmez.
+  - **Klasörün içi:** `session_state.docs_folder`; başlıkta klasörün adı, "Belgeler" düğmesiyle geri, "Düzenle" ve (not silmeyen) "Sil". Süzgeç yok.
+  - **Seçim kipi:** üstte "Vazgeç", klasör adı alanı, arama, görünüm ve "Klasörü oluştur / Kaydet · N not" düğmesi (ad boşsa ya da hiç not işaretlenmemişse kapalı). Kartların köşesinde işaret dairesi çıkar; başka klasördeki notun kartında "Klasörde" etiketi ve klasörün adı yazar, işaretlenirse oradan taşınır.
 
 ---
 

@@ -2,7 +2,8 @@
 
 Bağlantı metnindeki ilk `ad` (ör. [`parse_pdf(path)`](../src/ingestion/pdf_parser.py#L382), [`Index.build`](...))
 hedef dosyada AST ile aranır (fonksiyon, sınıf, metot ya da modül düzeyi atama) ve #L numarası düzeltilir.
-Adı bulunamayan bağlantılar listelenir (elle bakılmalı).
+Adı bulunamayan bağlantılar listelenir (elle bakılmalı). Aynı şekilde bölüm başlıklarındaki "(N satır)" dosyanın gerçek
+satır sayısına çekilir.
 
 Kullanım: python scripts\\rehber_satirlari.py          (yalnızca rapor)
           python scripts\\rehber_satirlari.py --yaz    (dosyaları günceller)
@@ -14,6 +15,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 LINK = re.compile(r"\[([^\]]+)\]\(([^)#\s]+)#L(\d+)\)")
+HEAD = re.compile(r"^(#{2,4} `([^`]+\.py)`[^\n]*?\()(\d+)( satır\))", re.M)  # '## `src/x.py` — ad (123 satır)'
 
 
 def definitions(path: Path) -> dict[str, int]:
@@ -48,7 +50,7 @@ def symbol(text: str) -> list[str]:
 
 def main(write: bool) -> None:
     cache: dict[Path, dict[str, int]] = {}
-    fixed = unresolved = 0
+    fixed = unresolved = counted = 0
     for md in sorted((ROOT / "rehber").glob("*.md")):
         body = md.read_text(encoding="utf-8")
 
@@ -71,11 +73,24 @@ def main(write: bool) -> None:
                 print(f"  {md.name}: {names[-1]} L{line} → L{new}")
             return f"[{text}]({path}#L{new})"
 
-        new_body = LINK.sub(repl, body)
+        def head(m: re.Match) -> str:
+            nonlocal counted
+            file = next((c for c in (ROOT / m.group(2), *(ROOT / d / m.group(2) for d in ("src", "scripts", "eval", "tests")))
+                         if c.is_file()), None)
+            if file is None:
+                return m.group(0)
+            n = len(file.read_text(encoding="utf-8").splitlines())
+            if n != int(m.group(3)):
+                counted += 1
+                print(f"  {md.name}: {m.group(2)} {m.group(3)} → {n} satır")
+            return f"{m.group(1)}{n}{m.group(4)}"
+
+        new_body = HEAD.sub(head, LINK.sub(repl, body))
         if write and new_body != body:
             md.write_text(new_body, encoding="utf-8")
-    print(f"{fixed} bağlantı {'güncellendi' if write else 'güncellenecek (--yaz)'}, {unresolved} ad bulunamadı")
+    print(f"{fixed} bağlantı, {counted} başlıktaki satır sayısı {'güncellendi' if write else 'güncellenecek (--yaz)'}, {unresolved} ad bulunamadı")
 
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8")  # Windows konsolu (cp1254) '→' yazdırırken çöküyordu; --yaz dosyaya hiç yazamıyordu
     main("--yaz" in sys.argv)

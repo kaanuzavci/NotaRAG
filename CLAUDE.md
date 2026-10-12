@@ -11,10 +11,15 @@ Kullanıcı Türkçe yazar; arayüz, belgeler ve istem dışı metinler Türkçe
   ROADMAP'in ilgili bölümüne yaz, "Sıradaki işler"i güncel tut.
 - **README.md**: mimari, tasarım kararları (§4), kota mimarisi (§4.4), klasör yapısı (§6), çalıştırma (§8).
 - **PROMPTS.md**: istemler. Kod istemleri buradan okur (`src/prompts.py`, `load_prompt("2c")` gibi) → bu dosyayı değiştirmek
-  davranışı değiştirir; bölüm numaraları (§1, §2, §2b, §2c, §4a-e, §5-7) kodda geçer.
+  davranışı değiştirir; bölüm numaraları (§1, §2, §2b, §2c, §2d, §4a-e, §6, §6b, §6c, §7, §8, §8b, §8c) kodda geçer (`load_prompt` ya da `verify._fill`); §5 (RAGAS için
+  soru → önerme) hazır ama hiçbir yerden çağrılmıyor.
 - **rehber/**: dosya dosya kod rehberi (kullanıcı kodu öğrenmek için okuyor). Kod değiştirince ilgili bölümü güncelle
-  (yeni/silinen fonksiyon, değişen davranış), sonra `python scripts\rehber_satirlari.py --yaz` ile satır bağlantılarını hizala.
-  Kullanıcıya hangi dosyaları neden değiştirdiğini ve nereye bağlandığını anlat.
+  (yeni/silinen fonksiyon, değişen davranış), sonra `python scripts\rehber_satirlari.py --yaz` ile satır bağlantılarını ve
+  başlıklardaki "(N satır)" sayılarını hizala. Kullanıcıya hangi dosyaları neden değiştirdiğini ve nereye bağlandığını anlat.
+- **Oturum sonu (belgeler)**: `python scripts\belge_denetim.py` çalıştır, HATA 0 olsun (testler README §8'de, yeni dosya README §6'da
+  ve rehberde, sayfa sayısı doğru, belgede "kullanıyoruz" denen teknoloji kodda var). ROADMAP başlığındaki tarihi ve "Sıradaki
+  işler"i güncelle; bir işi **yapıldı** yazmadan önce kodda ya da ölçümde doğrula (RAGAS belgelerde "kullanılıyor" diye geçiyordu,
+  kodda hiç yoktu — 2026-10-11).
 - **data/kaynak_veri/BENIOKU.md**: indirilmiş deney verisi (MEB/ÖSYM soruları, Açık Ders notları, Belebele, TurkishMMLU…),
   `data/kaynaklar/` makaleler, `wheelhouse/` kurulmamış paketler (`pip install --no-index --find-links wheelhouse <paket>`).
 
